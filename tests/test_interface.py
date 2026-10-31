@@ -96,7 +96,7 @@ def test_fenetre_principale_et_edition(app, config_tmp):
     f = FenetrePrincipale(dossier)
     f.tableau.rafraichir()
     from PySide6.QtWidgets import QWidget
-    assert len([w for w in f.tableau.findChildren(QWidget, options=Qt.FindDirectChildrenOnly)
+    assert len([w for w in f.tableau.findChildren(QWidget, "", Qt.FindDirectChildrenOnly)
                 if w.isVisibleTo(f.tableau)]) == 1
     assert f.nom_etab.text() == "مدرسة تجريبية"
     for i in range(len(f.PAGES)):
