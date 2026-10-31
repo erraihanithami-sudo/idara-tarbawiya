@@ -71,6 +71,8 @@ class PageTableauBord(QWidget):
     def rafraichir(self) -> None:
         if self.contenu is not None:
             self.externe.removeWidget(self.contenu)
+            self.contenu.hide()
+            self.contenu.setParent(None)
             self.contenu.deleteLater()
         self.contenu = QWidget()
         self.v = QVBoxLayout(self.contenu)

@@ -55,6 +55,8 @@ def test_assistant_refuse_etape_incomplete(app, config_tmp):
     assert a.etape() == 0
     assert not a.erreur.isHidden()
     assert "إجباري" in a.erreur.text()
+    a.f_etab.nom_ar.textEdited.emit("م")
+    assert a.erreur.isHidden()
 
 
 def test_assistant_complet_ecrit_la_base(app, config_tmp):
@@ -92,6 +94,10 @@ def test_fenetre_principale_et_edition(app, config_tmp):
     remplir_assistant(a, config_tmp / "الإدارة التربوية")
     dossier = a.terminer()
     f = FenetrePrincipale(dossier)
+    f.tableau.rafraichir()
+    from PySide6.QtWidgets import QWidget
+    assert len([w for w in f.tableau.findChildren(QWidget, options=Qt.FindDirectChildrenOnly)
+                if w.isVisibleTo(f.tableau)]) == 1
     assert f.nom_etab.text() == "مدرسة تجريبية"
     for i in range(len(f.PAGES)):
         f.aller(i)

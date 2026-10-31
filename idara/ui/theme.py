@@ -53,6 +53,9 @@ QMainWindow, #fond {{ background: {PLATRE}; }}
 QLineEdit, QComboBox, QDateEdit {{
     background: {BLANC}; border: 1px solid {BORDURE_CHAMP}; border-radius: 8px;
     padding: 0 10px; min-height: 38px; }}
+QComboBox::drop-down {{ border: 0; width: 30px; }}
+QComboBox QAbstractItemView {{ background: {BLANC}; selection-background-color: {VERT_CLAIR};
+    selection-color: {VERT_FONCE}; }}
 QLineEdit:focus, QComboBox:focus, QDateEdit:focus {{ border: 2px solid {VERT}; }}
 QPushButton {{
     background: {BLANC}; border: 1px solid {BORDURE_CHAMP}; border-radius: 10px;

@@ -151,6 +151,10 @@ class AssistantPremierLancement(QWidget):
         boutons.addStretch()
         dv.addLayout(boutons)
         racine.addWidget(droite, 1)
+        # الرسالة تختفي بمجرد أن يبدأ المدير التصحيح
+        from PySide6.QtWidgets import QLineEdit
+        for c in self.findChildren(QLineEdit):
+            c.textEdited.connect(lambda _t: self.erreur.hide())
         self._aller(0)
 
     # ---------- التنقل ----------
