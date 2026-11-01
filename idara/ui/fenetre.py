@@ -26,6 +26,7 @@ from idara.ui.page_import import PageImport
 from idara.ui.page_eleves import PageEleves
 from idara.ui.page_anciens import PageAnciens
 from idara.ui.page_personnel import PagePersonnel
+from idara.ui.page_fa import PageFa
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
 
 
@@ -227,6 +228,7 @@ class FenetrePrincipale(QMainWindow):
         ("الاستيراد من مسار", None),
         ("الوثائق", None),
         ("الموارد البشرية", None),
+        ("تدبير الفائض", None),
         ("إعداد المؤسسة", None),
     ]
 
@@ -258,6 +260,9 @@ class FenetrePrincipale(QMainWindow):
             elif nom == "الموارد البشرية":
                 self.page_rh = PagePersonnel(self)
                 self.pile.addWidget(page_defilante(self.page_rh))
+            elif nom == "تدبير الفائض":
+                self.page_fa = PageFa(self)
+                self.pile.addWidget(page_defilante(self.page_fa))
             elif nom == "الاستيراد من مسار":
                 self.page_import = PageImport(self)
                 self.pile.addWidget(page_defilante(self.page_import))
@@ -348,6 +353,8 @@ class FenetrePrincipale(QMainWindow):
             self.page_anciens.rafraichir()
         elif self.PAGES[i][0] == "الموارد البشرية":
             self.page_rh.rafraichir()
+        elif self.PAGES[i][0] == "تدبير الفائض":
+            self.page_fa.rafraichir()
         elif self.PAGES[i][0] == "الاستيراد من مسار":
             self.page_import.rafraichir()
         self.pile.setCurrentIndex(i)

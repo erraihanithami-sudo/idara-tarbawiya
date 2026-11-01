@@ -22,7 +22,9 @@ CATEGORIES = {"enseignant": ("أستاذ", "أستاذة", "الأساتذة"),
               "directeur": ("المدير", "المديرة", "الإدارة")}
 STATUTS = {"actif": "في العمل", "retraite": "متقاعد(ة)", "mute": "منتقل(ة)", "autre": "مغادر(ة) لسبب آخر"}
 # الحقول ذات القيم المتكررة: تُقترح من القيم المدخلة سابقاً (لا قوائم رسمية مفترضة)
-CHAMPS_SUGGERES = ("cadre", "grade", "fonction", "cycle", "matiere")
+CHAMPS_SUGGERES = ("cadre", "grade", "fonction", "cycle")
+# قرار المدير (2026-11-01): مادة التدريس من قائمة ثابتة
+MATIERES = ("عربية", "فرنسية", "مزدوجة")
 
 _CIN = re.compile(r"^[A-Z]{1,2}[0-9]{1,8}$")
 _TEL = re.compile(r"^(\+212|0)[5-7][0-9]{8}$")
@@ -82,6 +84,8 @@ class Personnel:
     date_depart: str = ""
     dossier_disponible: bool = False
     remarques: str = ""
+    exemption_fa: str = ""        # agrege | doctorat
+    date_exemption_fa: str = ""   # تاريخ الحصول على الدكتوراه
     id: int | None = None
     classes: list[int] = field(default_factory=list)   # أقسام السنة الجارية
 
@@ -156,6 +160,21 @@ class Personnel:
         if "date_affectation_direction" in d and "date_affectation" in d \
                 and d["date_affectation"] < d["date_affectation_direction"]:
             raise ErreurPersonnel("تاريخ التعيين بالمؤسسة قبل تاريخ التعيين بالمديرية الإقليمية.")
+        if self.matiere and self.matiere not in MATIERES:
+            raise ErreurPersonnel("مادة التدريس: اختر من القائمة (" + "، ".join(MATIERES) + ").")
+        if self.exemption_fa not in ("", "agrege", "doctorat"):
+            raise ErreurPersonnel("الاستثناء من الفائض غير صحيح.")
+        if self.exemption_fa == "doctorat":
+            if not self.date_exemption_fa:
+                raise ErreurPersonnel("تاريخ الحصول على الدكتوراه إجباري للاستثناء من الفائض.")
+            try:
+                dd = date.fromisoformat(self.date_exemption_fa)
+            except ValueError:
+                raise ErreurPersonnel("تاريخ الحصول على الدكتوراه غير صحيح.") from None
+            if dd > date.today():
+                raise ErreurPersonnel("تاريخ الحصول على الدكتوراه في المستقبل.")
+        elif self.date_exemption_fa:
+            self.date_exemption_fa = ""
         if self.statut not in STATUTS:
             raise ErreurPersonnel("الوضعية غير صحيحة.")
         if self.statut != "actif" and not self.date_depart:
@@ -322,7 +341,8 @@ def _unite_id(conn, nom: str) -> int | None:
 _COLONNES = ("nom_ar", "prenom_ar", "nom_fr", "prenom_fr", "sexe", "categorie", "ppr", "cin", "cadre",
              "grade", "fonction", "cycle", "matiere", "niveau_enseigne", "nb_eleves", "heures_hebdo",
              "adresse", "telephone", "date_affectation", "statut", "date_depart", "remarques",
-             "date_naissance", "date_recrutement", "date_affectation_academie", "date_affectation_direction")
+             "date_naissance", "date_recrutement", "date_affectation_academie", "date_affectation_direction",
+             "exemption_fa", "date_exemption_fa")
 
 
 def enregistrer(conn: sqlite3.Connection, p: Personnel) -> int:

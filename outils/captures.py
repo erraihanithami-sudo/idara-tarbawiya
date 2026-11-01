@@ -61,6 +61,18 @@ def main(sortie: Path) -> None:
 
     f = FenetrePrincipale(dossier)
     f.resize(1280, 800)
+    # تدبير الفائض
+    from idara.services import personnel as rh
+    for prenom, sexe, recrut, direc, etab, naiss in (
+            ("سعيد", "M", "2005-09-16", "2005-09-16", "2016-09-01", "1980-02-01"),
+            ("نادية", "F", "2012-09-16", "2012-09-16", "2019-09-01", "1987-06-10"),
+            ("كريم", "M", "2021-09-16", "2021-09-16", "2024-09-01", "1996-03-03")):
+        rh.enregistrer(f.conn, rh.Personnel(nom_ar="التجريبي", prenom_ar=prenom, sexe=sexe, categorie="enseignant",
+                                            matiere="عربية", date_naissance=naiss, date_recrutement=recrut,
+                                            date_affectation_direction=direc, date_affectation=etab))
+    f.aller_a("تدبير الفائض")
+    f.page_fa.cartes["عربية"].postes.setValue(3)
+    photo(f, "23_fa")
     f.show()
     for page, nom in [("لوحة القيادة", "07_tableau_de_bord"), ("إعداد المؤسسة", "08_etablissement"),
                       ("الوثائق", "10_documents")]:
@@ -126,7 +138,7 @@ def main(sortie: Path) -> None:
     r.c["ppr"].setText("1234567")
     r.c["cin"].setText("AB123456")
     r.c["cadre"].setEditText("أستاذة التعليم الابتدائي")
-    r.c["matiere"].setEditText("العربية")
+    r.matiere.setCurrentIndex(r.matiere.findData("عربية"))
     r.c["heures_hebdo"].setText("30")
     r.classes.item(0).setCheckState(Qt.Checked)
     for k, v in (("date_naissance", "15/03/1980"), ("date_recrutement", "16/09/2003"),

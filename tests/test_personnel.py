@@ -23,7 +23,7 @@ def base(tmp_path, dossier, conn):
 def _prof(**k):
     d = dict(nom_ar="الأستاذة", prenom_ar="فاطمة", sexe="F", categorie="enseignant", ppr="1234567",
              cin="ab 123456", telephone="06 12 34 56 78", cadre="أستاذة التعليم الابتدائي",
-             grade="الدرجة الأولى", fonction="التدريس", cycle="الابتدائي", matiere="العربية",
+             grade="الدرجة الأولى", fonction="التدريس", cycle="الابتدائي", matiere="عربية",
              heures_hebdo="30", adresse="حي تجريبي", date_affectation="2015-09-01")
     d.update(k)
     return rh.Personnel(**d)
@@ -56,7 +56,7 @@ def test_ajout_normalisation_et_lecture(base):
     (dict(cin="123"), "البطاقة"), (dict(telephone="12345"), "الهاتف"), (dict(heures_hebdo="x"), "عدد صحيح"),
     (dict(heures_hebdo="99"), "معقولة"), (dict(date_affectation="2099-01-01"), "المستقبل"),
     (dict(statut="retraite"), "تاريخ المغادرة"), (dict(categorie="directeur"), "إعداد المؤسسة"),
-    (dict(unite="غير موجودة"), "الوحدة"),
+    (dict(unite="غير موجودة"), "الوحدة"), (dict(matiere="الرياضيات"), "اختر من القائمة"),
 ])
 def test_refus(base, modif, message):
     with pytest.raises(rh.ErreurPersonnel, match=message):

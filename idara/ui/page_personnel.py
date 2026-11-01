@@ -125,6 +125,10 @@ class PagePersonnel(QWidget):
             self.c[k] = champ(aide, ltr)
         for k in rh.CHAMPS_SUGGERES:
             self.c[k] = _combo_libre([])
+        self.matiere = QComboBox()
+        self.matiere.addItem("— اختر —", "")
+        for m in rh.MATIERES:
+            self.matiere.addItem(m, m)
         self.r_m, self.r_f = QRadioButton("ذكر"), QRadioButton("أنثى")
         grp = QButtonGroup(self)
         grp.addButton(self.r_m)
@@ -160,6 +164,19 @@ class PagePersonnel(QWidget):
                                      ("الوحدة المدرسية", self.unite)])
         self.dates = {k: (self.date_aff if k == "date_affectation" else ChampDate()) for k, _ in rh.DATES_CARRIERE}
         section("المسار المهني (لتحديد الفائض)", [(lib, self.dates[k]) for k, lib in rh.DATES_CARRIERE])
+        self.exemption = QComboBox()
+        for lib, k in (("لا استثناء", ""), ("أستاذ(ة) مبرز(ة)", "agrege"), ("حامل(ة) الدكتوراه", "doctorat")):
+            self.exemption.addItem(lib, k)
+        self.date_doctorat = ChampDate()
+        self.exemption.currentIndexChanged.connect(
+            lambda _: self.date_doctorat.setEnabled(self.exemption.currentData() == "doctorat"))
+        g_ex = QGridLayout()
+        g_ex.setHorizontalSpacing(16)
+        g_ex.addWidget(etiquette("الاستثناء من الفائض", self.exemption), 0, 0)
+        g_ex.addWidget(self.exemption, 1, 0)
+        g_ex.addWidget(etiquette("تاريخ الحصول على الدكتوراه", self.date_doctorat), 0, 1)
+        g_ex.addWidget(self.date_doctorat, 1, 1)
+        fv.addLayout(g_ex)
         regle = QLabel("من عُيّن بالمديرية قبل إحداث الأكاديميات: يُعتمد 01/09/2002 تاريخاً للتعيين بالأكاديمية "
                        "(يُملأ آلياً عند الحفظ).")
         regle.setObjectName("etiquette")
@@ -188,7 +205,7 @@ class PagePersonnel(QWidget):
         be.addWidget(self.calcul)
         g = QGridLayout()
         g.setHorizontalSpacing(16)
-        for i, (lib, w) in enumerate((("مادة التدريس", self.c["matiere"]),
+        for i, (lib, w) in enumerate((("مادة التدريس", self.matiere),
                                       ("ساعات العمل الأسبوعية", self.c["heures_hebdo"]),
                                       ("مستوى التدريس (يدوي)", self.c["niveau_enseigne"]),
                                       ("عدد التلاميذ (يدوي)", self.c["nb_eleves"]))):
@@ -335,6 +352,14 @@ class PagePersonnel(QWidget):
         if p.sexe:
             (self.r_f if p.sexe == "F" else self.r_m).setChecked(True)
         self.unite.setCurrentIndex(max(0, self.unite.findData(p.unite)))
+        self.exemption.setCurrentIndex(max(0, self.exemption.findData(p.exemption_fa or "")))
+        self.date_doctorat.definir(p.date_exemption_fa or None)
+        self.date_doctorat.setEnabled(p.exemption_fa == "doctorat")
+        i = self.matiere.findData(p.matiere)
+        if i < 0:  # قيمة قديمة مكتوبة يدوياً قبل اعتماد القائمة: تظهر وتُطلب إعادة الاختيار
+            self.matiere.addItem(f"{p.matiere} (اختر من القائمة)", p.matiere)
+            i = self.matiere.count() - 1
+        self.matiere.setCurrentIndex(i)
         for k, w in self.dates.items():
             w.definir(getattr(p, k) or None)
         a = rh.anciennetes(p)
@@ -371,6 +396,12 @@ class PagePersonnel(QWidget):
 
     def lire_formulaire(self) -> rh.Personnel:
         v = {k: (w.currentText() if isinstance(w, QComboBox) else w.text()) for k, w in self.c.items()}
+        v["matiere"] = self.matiere.currentData() or ""
+        v["exemption_fa"] = self.exemption.currentData() or ""
+        try:
+            v["date_exemption_fa"] = self.date_doctorat.iso() if v["exemption_fa"] == "doctorat" else ""
+        except ValueError:
+            raise rh.ErreurPersonnel("تاريخ الحصول على الدكتوراه غير صحيح.") from None
         dates = {}
         for k, lib in rh.DATES_CARRIERE:
             try:

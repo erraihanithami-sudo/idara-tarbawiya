@@ -303,6 +303,8 @@ def test_page_personnel(app, config_tmp):
     p.c["cadre"].setEditText("أستاذة التعليم الابتدائي")
     p.c["telephone"].setText("0612345678")
     p.c["heures_hebdo"].setText("30")
+    assert [p.matiere.itemData(i) for i in range(p.matiere.count())] == ["", "عربية", "فرنسية", "مزدوجة"]
+    p.matiere.setCurrentIndex(p.matiere.findData("مزدوجة"))
     # إسناد قسم: المستوى والعدد محسوبان
     for i in range(p.classes.count()):
         if p.classes.item(i).text().startswith("PS1-PS2"):
@@ -313,7 +315,7 @@ def test_page_personnel(app, config_tmp):
     assert p.liste.rowCount() == 2 and "الأساتذة: 1" in p.effectifs.text()
     assert "ينقص" in p.manquants.text() and "الدرجة" in p.manquants.text()
     assert "ينقص لتحديد الفائض" in p.manquants.text()
-    assert rh.lire(f.conn, pid).cin == "AB123456"
+    assert rh.lire(f.conn, pid).cin == "AB123456" and rh.lire(f.conn, pid).matiere == "مزدوجة"
     # المسار المهني
     p.dates["date_naissance"].setText("15/03/1980")
     p.dates["date_recrutement"].setText("16/09/1995")
@@ -339,4 +341,26 @@ def test_page_personnel(app, config_tmp):
                  if p.liste.item(i, 0).data(Qt.UserRole) != pid)
     selectionner(p.liste, ligne)
     assert not p.categorie.isEnabled() and p.b_depart.isHidden()
+    f.close()
+
+
+def test_page_fa(app, config_tmp):
+    from idara.services import personnel as rh
+    f = _fenetre_avec_eleves(config_tmp)
+    for prenom, recrut, etab, naiss in (("الأقدم", "2003-09-16", "2010-09-01", "1978-01-01"),
+                                        ("الأحدث", "2020-09-16", "2023-09-01", "1995-01-01")):
+        rh.enregistrer(f.conn, rh.Personnel(nom_ar="التجريبي", prenom_ar=prenom, sexe="M", categorie="enseignant",
+                                            matiere="عربية", date_naissance=naiss, date_recrutement=recrut,
+                                            date_affectation_direction=recrut, date_affectation=etab))
+    rh.enregistrer(f.conn, rh.Personnel(nom_ar="ن", prenom_ar="بلا_مادة", sexe="F", categorie="enseignant"))
+    f.aller_a("تدبير الفائض")
+    p = f.page_fa
+    c = p.cartes["عربية"]
+    assert c.table.rowCount() == 2 and c.postes.value() == -1
+    assert "حدد عدد الأساتذة" in c.etat.text()
+    assert "بلا_مادة" in p.message.text()
+    c.postes.setValue(1)
+    assert "الفائض: الأحدث التجريبي" in c.etat.text()
+    assert c.table.item(1, 7).text() == "فائض" and c.table.item(0, 0).text() == "1"
+    assert p.cartes["فرنسية"].table.rowCount() == 0
     f.close()
