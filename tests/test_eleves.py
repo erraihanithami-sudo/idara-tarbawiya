@@ -17,7 +17,7 @@ from tests.test_import_massar import AR, FR
 def base(tmp_path, dossier, conn):
     et.appliquer_configuration_initiale(conn, dossier, et.ConfigurationInitiale(
         etablissement=et.Etablissement(nom_ar="مدرسة تجريبية", direction_ar="م", academie_ar="أ",
-                                       nom_fr="ECOLE TEST", ville_redaction_ar="المدينة"),
+                                       nom_fr="ECOLE TEST", ville_redaction_ar="المدينة", ville_redaction_fr="Ville"),
         directeur=et.Directeur(nom_ar="المدير", prenom_ar="أحمد", sexe="M", nom_fr="MOUDIR",
                                prenom_fr="AHMED"), annee="2026/2027"))
     r = imp.analyser(conn, [classeur(tmp_path / "a.xlsx", AR), classeur(tmp_path / "f.xlsx", FR, "fr")])

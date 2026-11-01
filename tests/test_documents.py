@@ -232,3 +232,22 @@ def test_champs_de_cases_reconnus():
     assert dc.champ_reconnu("convocation_parent", "eleve_7")
     assert not dc.champ_reconnu("convocation_parent", "eleve")
     assert not dc.champ_reconnu("visite_medicale", "eleve_1")
+
+
+@pytest.mark.parametrize("champ_dir, champ_etab, attendu", [
+    (dict(nom_fr="", prenom_fr=""), {}, "اسم المدير ونسبه بالفرنسية"),
+    ({}, dict(nom_fr=""), "اسم المؤسسة بالفرنسية"),
+    ({}, dict(ville_redaction_fr="", commune_fr=""), "مدينة التحرير بالفرنسية"),
+])
+def test_vacances_exige_identite_francaise(dossier, conn, champ_dir, champ_etab, attendu):
+    """ملاحظة المدير (v0.1.15): اسم المدير بالفرنسية لم يظهر، وكُتبت نقط مكانه دون تنبيه."""
+    etab = dict(nom_ar="مدرسة", nom_fr="ECOLE", direction_ar="م", academie_ar="أ",
+                ville_redaction_ar="المدينة", ville_redaction_fr="Ville")
+    direc = dict(nom_ar="المدير", prenom_ar="أحمد", nom_fr="Moudir", prenom_fr="Ahmed", sexe="M")
+    et.appliquer_configuration_initiale(conn, dossier, et.ConfigurationInitiale(
+        etablissement=et.Etablissement(**{**etab, **champ_etab}),
+        directeur=et.Directeur(**{**direc, **champ_dir}), annee="2026/2027"))
+    with pytest.raises(dc.ErreurDocument, match=attendu):
+        dc.champs_attestation_vacances(conn, dc._eleve_exemple(), "5AP", "2026-07-07", "2026-08-31")
+    # المعاينة تبقى ممكنة
+    assert dc.exemple(conn, "attestation_vacances")[0]["du"] == f"07/07/{__import__('datetime').date.today().year}"

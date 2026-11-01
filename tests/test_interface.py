@@ -38,8 +38,11 @@ def remplir_assistant(a, dossier):
     a.f_dir.nom_ar.setText("التجريبي")
     a.f_dir.prenom_ar.setText("أحمد")
     a.f_dir.ppr.setText("1234567")
+    a.f_dir.nom_fr.setText("TAJRIBI")
+    a.f_dir.prenom_fr.setText("Ahmed")
     a.suivant()
     a.f_id.ville_ar.setText("المدينة")
+    a.f_id.ville_fr.setText("Ville")
     a.suivant()
     a.f_donnees.dossier.setText(str(dossier))
 
@@ -256,4 +259,24 @@ def test_page_anciens_tous_champs(app, config_tmp, monkeypatch):
     f.aller_a("التلاميذ")
     f.page_eleves.recherche.setText("فيصل")
     assert f.page_eleves.resultats.rowCount() == 0
+    f.close()
+
+
+
+def test_vacances_sans_nom_francais_du_directeur(app, config_tmp, monkeypatch):
+    from datetime import date
+    from idara.services import bureautique
+    from idara.services import import_eleves as imp
+    from idara.ui.saisie import selectionner
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.conn.execute("UPDATE personnel SET nom_fr=NULL, prenom_fr=NULL")
+    f.conn.commit()
+    f.aller_a("التلاميذ")
+    p = f.page_eleves
+    selectionner(p.resultats, 0)
+    imp.confirmer_niveaux(f.conn, {f.conn.execute("SELECT id FROM inscription WHERE eleve_id=?",
+                                                  (p.eleve_id,)).fetchone()[0]: "4AP"})
+    assert p.vacances(date(2026, 12, 20), date(2027, 1, 4)) is None
+    assert "اسم المدير ونسبه بالفرنسية" in p.message.text() and "إعداد المؤسسة" in p.message.text()
     f.close()

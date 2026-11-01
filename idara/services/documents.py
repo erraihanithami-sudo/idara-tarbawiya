@@ -235,9 +235,27 @@ def champs_certificat_ancien(conn, eleve: Mapping, destinataire_nom: str,
     return v
 
 
+# بيانات المؤسسة بالفرنسية اللازمة لشهادة العطلة: لا تُكتب نقط مكانها.
+REQUIS_FR = (("directeur_fr", "اسم المدير ونسبه بالفرنسية", "المدير"),
+             ("etablissement_fr", "اسم المؤسسة بالفرنسية", "المؤسسة"),
+             ("ville_fr", "مدينة التحرير بالفرنسية", "الهوية البصرية"))
+
+
+def manquants_fr(conn) -> list[str]:
+    """ما ينقص الإعداد لتوليد وثيقة فرنسية، مع القسم الذي يُكمَل فيه."""
+    v = champs_communs(conn)
+    return [f"{lib} (قسم «{ou}»)" for k, lib, ou in REQUIS_FR if v[k] == "............"]
+
+
 def champs_attestation_vacances(conn, eleve: Mapping, niveau_code: str, du: date | str,
-                                au: date | str, le: date | None = None) -> dict[str, str]:
+                                au: date | str, le: date | None = None,
+                                apercu: bool = False) -> dict[str, str]:
     s = _sexe(eleve)
+    if not apercu:
+        manque = manquants_fr(conn)
+        if manque:
+            raise ErreurDocument("شهادة العطلة بالفرنسية وتنقصها بيانات الإعداد: " + "، ".join(manque)
+                                 + ". أكملها من صفحة «إعداد المؤسسة».")
     if tx.en_date(au) < tx.en_date(du):
         raise ErreurDocument("تاريخ نهاية العطلة قبل تاريخ بدايتها.")
     nom = " ".join(x for x in (_txt(eleve.get("nom_fr")), _txt(eleve.get("prenom_fr"))) if x)
@@ -402,7 +420,7 @@ def exemple(conn: sqlite3.Connection, code: str, sexe: str = "M"):
     if code == "attestation_vacances":
         an = date.today().year
         return champs_attestation_vacances(conn, _eleve_exemple(sexe), "5AP",
-                                           date(an, 7, 7), date(an, 8, 31)), None
+                                           date(an, 7, 7), date(an, 8, 31), apercu=True), None
     if code == "visite_medicale":
         return champs_visite_medicale(conn, _eleve_exemple(sexe), "4AP"), None
     if code == "convocation_parent":
