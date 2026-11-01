@@ -93,7 +93,11 @@ class PagePersonnel(QWidget):
         filtres.addWidget(self.voir_partis)
         filtres.addStretch()
         cv.addLayout(filtres)
-        self.liste = tableau(["الاسم", "الفئة", "رقم التأجير", "الملف"])
+        self.liste = tableau(["الاسم", "الفئة", "رقم التأجير", "الملف"], etirer=0)
+        h = self.liste.horizontalHeader()
+        for i, largeur in ((1, 130), (2, 90), (3, 80)):
+            h.setSectionResizeMode(i, h.ResizeMode.Fixed)
+            h.resizeSection(i, largeur)
         self.liste.setMinimumHeight(420)
         self.liste.itemSelectionChanged.connect(self._selection)
         cv.addWidget(self.liste, 1)
