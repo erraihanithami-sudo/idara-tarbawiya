@@ -93,9 +93,9 @@ class PagePersonnel(QWidget):
         filtres.addWidget(self.voir_partis)
         filtres.addStretch()
         cv.addLayout(filtres)
-        self.liste = tableau(["الاسم", "الفئة", "رقم التأجير", "الملف"], etirer=0)
+        self.liste = tableau(["الاسم", "الفئة", "الملف"], etirer=0)
         h = self.liste.horizontalHeader()
-        for i, largeur in ((1, 130), (2, 90), (3, 80)):
+        for i, largeur in ((1, 95), (2, 70)):
             h.setSectionResizeMode(i, h.ResizeMode.Fixed)
             h.resizeSection(i, largeur)
         self.liste.setMinimumHeight(420)
@@ -243,10 +243,10 @@ class PagePersonnel(QWidget):
             m = rh.manquants_documents(self.f.conn, p)
             self.liste.setItem(i, 0, cellule(nom, p.id))
             self.liste.setItem(i, 1, cellule(rh.libelle_categorie(p.categorie, p.sexe)))
-            self.liste.setItem(i, 2, cellule(p.ppr or "—"))
+            self.liste.item(i, 0).setToolTip(f"رقم التأجير: {p.ppr or '—'}")
             it = cellule("مكتمل" if not m else f"ينقص {len(m)}")
             it.setToolTip("، ".join(m))
-            self.liste.setItem(i, 3, it)
+            self.liste.setItem(i, 2, it)
 
     def _selection(self) -> None:
         lignes = {i.row() for i in self.liste.selectedIndexes()}
