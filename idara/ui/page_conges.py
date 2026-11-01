@@ -169,9 +169,9 @@ class PageConges(QWidget):
 
         # ---- اللائحة ----
         c, cv = carte()
-        self.liste = tableau(["الموظف", "من", "إلى", "الحالة"], etirer=0)
+        self.liste = tableau(["الرخصة", "الحالة"], etirer=0)
         h = self.liste.horizontalHeader()
-        for i, l in ((1, 80), (2, 80), (3, 90)):
+        for i, l in ((1, 95),):
             h.setSectionResizeMode(i, h.ResizeMode.Fixed)
             h.resizeSection(i, l)
         self.liste.setMinimumHeight(420)
@@ -299,10 +299,11 @@ class PageConges(QWidget):
         for i, r in enumerate(lignes):
             etat = ("مستأنفة" if r["reprise_id"] else "جارية" if r["date_fin"] >= aujourdhui
                     else "دون استئناف" if any(a["id"] == r["id"] for a in attendues) else "ممدَّدة")
-            self.liste.setItem(i, 0, cellule(f"{r['prenom_ar']} {r['nom_ar']} · {r['type']}", r["id"]))
-            self.liste.setItem(i, 1, cellule(tx.date_chiffres(r["date_debut"])))
-            self.liste.setItem(i, 2, cellule(tx.date_chiffres(r["date_fin"])))
-            self.liste.setItem(i, 3, cellule(etat))
+            it = cellule(f"{r['prenom_ar']} {r['nom_ar']} · {tx.date_chiffres(r['date_debut'])} ← "
+                         f"{tx.date_chiffres(r['date_fin'])}", r["id"])
+            it.setToolTip(r["type"])
+            self.liste.setItem(i, 0, it)
+            self.liste.setItem(i, 1, cellule(etat))
 
     def _selection(self) -> None:
         lignes = {i.row() for i in self.liste.selectedIndexes()}
@@ -533,7 +534,7 @@ class PageSortants(QWidget):
             return
         self.table.setRowCount(len(lignes))
         for i, r in enumerate(lignes):
-            self.table.setItem(i, 0, cellule(cg.numero_affiche(r["numero"], r["code_court"])))
+            self.table.setItem(i, 0, cellule(f"\u2066{cg.numero_affiche(r['numero'], r['code_court'])}\u2069"))
             self.table.setItem(i, 1, cellule(tx.date_chiffres(r["date_courrier"])))
             self.table.setItem(i, 2, cellule(r["objet"]))
 

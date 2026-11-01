@@ -405,7 +405,7 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     assert [r["numero"] for r in cg.sortants(f.conn)] == [2, 1]
     r = cg.proposition_reprise(f.conn, cid)
     assert p.reprise(r) is not None and not p.b_reprise.isEnabled()
-    assert p.liste.item(0, 3).text() == "مستأنفة"
+    assert p.liste.item(0, 1).text() == "مستأنفة"
     # سجل الصادر
     f.aller_a("سجل الصادر")
     s = f.page_sortants
