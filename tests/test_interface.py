@@ -298,7 +298,7 @@ def test_page_personnel(app, config_tmp):
     p.r_f.setChecked(True)
     p.categorie.setCurrentIndex(p.categorie.findData("enseignant"))
     assert not p.bloc_ens.isHidden()
-    p.c["ppr"].setText("1234567")
+    p.c["ppr"].setText("7654321")
     p.c["cin"].setText("ab123456")
     p.c["cadre"].setEditText("أستاذة التعليم الابتدائي")
     p.c["telephone"].setText("0612345678")
