@@ -299,9 +299,8 @@ class PageConges(QWidget):
         for i, r in enumerate(lignes):
             etat = ("مستأنفة" if r["reprise_id"] else "جارية" if r["date_fin"] >= aujourdhui
                     else "دون استئناف" if any(a["id"] == r["id"] for a in attendues) else "ممدَّدة")
-            it = cellule(f"{r['prenom_ar']} {r['nom_ar']} · {tx.date_chiffres(r['date_debut'])} ← "
-                         f"{tx.date_chiffres(r['date_fin'])}", r["id"])
-            it.setToolTip(r["type"])
+            it = cellule(f"{r['prenom_ar']} {r['nom_ar']} · {tx.date_chiffres(r['date_debut'])}", r["id"])
+            it.setToolTip(f"{r['type']}: من {tx.date_chiffres(r['date_debut'])} إلى {tx.date_chiffres(r['date_fin'])}")
             self.liste.setItem(i, 0, it)
             self.liste.setItem(i, 1, cellule(etat))
 
