@@ -58,7 +58,7 @@ def main(sortie: Path) -> None:
     f.resize(1280, 800)
     f.show()
     for page, nom in [("لوحة القيادة", "07_tableau_de_bord"), ("إعداد المؤسسة", "08_etablissement"),
-                      ("التلاميذ", "09_page_a_venir"), ("الوثائق", "10_documents")]:
+                      ("الوثائق", "10_documents")]:
         f.aller_a(page)
         photo(f, nom)
     # الاستيراد بلوائح وهمية بنفس بنية مسار
@@ -76,6 +76,39 @@ def main(sortie: Path) -> None:
     photo(f, "12_import_niveaux")
     f.aller_a("لوحة القيادة")
     photo(f, "13_tableau_apres_import")
+    # التلاميذ: البحث ثم البطاقة
+    from datetime import date, timedelta
+    from idara.services import bureautique
+    bureautique.ouvrir = lambda p: None
+    f.aller_a("التلاميذ")
+    photo(f, "14_eleves_liste")
+    e = f.page_eleves
+    e.recherche.setText("يوسف")
+    e.resultats.selectRow(0)
+    photo(f, "15_eleve_fiche")
+    from idara.ui.page_eleves import DialogueVacances
+    d = DialogueVacances(e.titre.text(), f)
+    d.show()
+    photo(d, "16_dialogue_vacances")
+    d.close()
+    e.vacances(date.today(), date.today() + timedelta(days=10))
+    photo(f, "17_eleve_niveau_non_confirme")
+    f.aller_a("التلاميذ القدامى")
+    a2 = f.page_anciens
+    photo(f, "18_anciens_vide")
+    a2.c_num.setText("8173")
+    a2.c_nom.setText("القديم")
+    a2.c_prenom.setText("فيصل")
+    a2.r_m.setChecked(True)
+    a2.c_naissance.setText("01/01/1985")
+    a2.c_lieu.setText("الخميسات")
+    a2.c_entree.setText("15/10/1992")
+    a2.c_sortie.setText("30/06/1998")
+    a2.c_niveau.setCurrentIndex(4)
+    a2.c_dest.setText("فيصل القديم")
+    a2.c_cin.setText("A000000")
+    a2.generer()
+    photo(f, "19_anciens_certificat")
     f.close()
     app.quit()
     print("captures:", sorted(p.name for p in sortie.glob("*.png")))

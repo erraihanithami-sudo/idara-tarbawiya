@@ -23,6 +23,8 @@ from idara.ui.composants import carte, entete, page_defilante
 from idara.ui.formulaires import FormDirecteur, FormEtablissement, FormIdentite
 from idara.ui.page_documents import PageDocuments
 from idara.ui.page_import import PageImport
+from idara.ui.page_eleves import PageEleves
+from idara.ui.page_anciens import PageAnciens
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
 
 
@@ -219,7 +221,8 @@ class PageAVenir(QWidget):
 class FenetrePrincipale(QMainWindow):
     PAGES = [
         ("لوحة القيادة", None),
-        ("التلاميذ", "المرحلة 4"),
+        ("التلاميذ", None),
+        ("التلاميذ القدامى", None),
         ("الاستيراد من مسار", None),
         ("الوثائق", None),
         ("الموارد البشرية", "المرحلتين 6 و7"),
@@ -245,6 +248,12 @@ class FenetrePrincipale(QMainWindow):
         for nom, etape in self.PAGES:
             if nom == "لوحة القيادة":
                 self.pile.addWidget(page_defilante(self.tableau))
+            elif nom == "التلاميذ":
+                self.page_eleves = PageEleves(self)
+                self.pile.addWidget(page_defilante(self.page_eleves))
+            elif nom == "التلاميذ القدامى":
+                self.page_anciens = PageAnciens(self)
+                self.pile.addWidget(page_defilante(self.page_anciens))
             elif nom == "الاستيراد من مسار":
                 self.page_import = PageImport(self)
                 self.pile.addWidget(page_defilante(self.page_import))
@@ -329,6 +338,10 @@ class FenetrePrincipale(QMainWindow):
             self.tableau.rafraichir()
         elif self.PAGES[i][0] == "الوثائق":
             self.page_docs.rafraichir()
+        elif self.PAGES[i][0] == "التلاميذ":
+            self.page_eleves.rafraichir()
+        elif self.PAGES[i][0] == "التلاميذ القدامى":
+            self.page_anciens.rafraichir()
         elif self.PAGES[i][0] == "الاستيراد من مسار":
             self.page_import.rafraichir()
         self.pile.setCurrentIndex(i)

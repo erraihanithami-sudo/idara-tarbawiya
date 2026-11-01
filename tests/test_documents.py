@@ -162,10 +162,21 @@ def test_periode_inversee(pret):
         dc.champs_attestation_vacances(pret, dc._eleve_exemple(), "5AP", "2026-08-31", "2026-07-07")
 
 
-def test_certificat_dates_inconnues_en_pointilles(pret):
-    e = dc._eleve_exemple("M", num_registre=5, date_entree=None, date_sortie=None)
-    v = dc.champs_certificat_ancien(pret, e, "x", "y")
-    assert v["date_entree"] == v["date_sortie_lettres"] == "............"
+@pytest.mark.parametrize("champ", ["date_entree", "date_sortie", "date_naissance", "lieu_ar",
+                                   "dernier_niveau", "num_registre"])
+def test_certificat_tous_les_champs_obligatoires(pret, champ):
+    e = dc._eleve_exemple("M", num_registre=5, date_naissance="1985-01-01", date_entree="1992-10-15",
+                          date_sortie="1998-06-30", dernier_niveau="الخامس")
+    e[champ] = None
+    with pytest.raises(dc.ErreurDocument):
+        dc.champs_certificat_ancien(pret, e, "x", "y")
+
+
+def test_certificat_dates_incoherentes(pret):
+    e = dc._eleve_exemple("M", num_registre=5, date_naissance="1985-01-01", date_entree="1998-10-15",
+                          date_sortie="1992-06-30", dernier_niveau="الخامس")
+    with pytest.raises(dc.ErreurDocument, match="منطقية"):
+        dc.champs_certificat_ancien(pret, e, "x", "y")
 
 
 def test_sans_configuration(conn):

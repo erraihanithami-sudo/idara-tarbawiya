@@ -163,3 +163,97 @@ def test_page_import_et_confirmation(app, config_tmp):
     assert page.choix_classe.count() == 1
     f.aller(0)
     f.close()
+
+
+def _fenetre_avec_eleves(config_tmp):
+    from tests.fabrique_massar import classeur
+    from tests.test_import_massar import AR, FR
+    from idara.services import import_eleves as imp
+    from idara.ui.assistant import AssistantPremierLancement
+    from idara.ui.fenetre import FenetrePrincipale
+    a = AssistantPremierLancement()
+    remplir_assistant(a, config_tmp / "الإدارة التربوية")
+    a.f_donnees.annee.setCurrentText("2026/2027")
+    f = FenetrePrincipale(a.terminer())
+    r = imp.analyser(f.conn, [classeur(config_tmp / "ar.xlsx", AR), classeur(config_tmp / "fr.xlsx", FR, "fr")])
+    imp.appliquer(f.conn, f.dossier, r)
+    return f
+
+
+def test_page_eleves_recherche_et_documents(app, config_tmp, monkeypatch):
+    from datetime import date
+    from idara.services import bureautique
+    from idara.services import import_eleves as imp
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("التلاميذ")
+    p = f.page_eleves
+    assert p.resultats.rowCount() == 5 and p.c_fiche.isHidden()
+    p.recherche.setText("يوسف")
+    assert p.resultats.rowCount() == 1
+    p.resultats.selectRow(0)
+    assert not p.c_fiche.isHidden() and "يوسف" in p.titre.text()
+    # المستوى غير مؤكد: رسالة واضحة بدل وثيقة خاطئة
+    assert p.vacances(date(2026, 12, 20), date(2027, 1, 4)) is None
+    assert p.message.objectName() == "erreur"
+    ins = f.conn.execute("SELECT id FROM inscription WHERE eleve_id=?", (p.eleve_id,)).fetchone()[0]
+    imp.confirmer_niveaux(f.conn, {ins: "4AP"})
+    doc = p.vacances(date(2026, 12, 20), date(2027, 1, 4))
+    assert doc is not None and ouverts == [doc.chemin], p.message.text()
+    assert p.docs.rowCount() == 1
+    # تعديل الهوية
+    p.c_prenom_fr.setText("Youssef-Amine")
+    assert p.enregistrer() == ["prenom_fr"]
+    assert "prenom_fr" in p.verrous.text()
+    p.c_date.setText("31/02/2015")
+    assert p.enregistrer() is None and p.message.objectName() == "erreur"
+    # الوضعية
+    assert not p.statut("parti", "2026-12-01")
+    assert p.statut("parti", "2026-12-01", "مدرسة أخرى")
+    assert "مغادر" in p.sous_titre.text()
+    # استدعاءات متعددة
+    p.recherche.clear()
+    p.resultats.selectAll()
+    docs = p.convocations()
+    assert docs is not None and len(docs) == 5
+    f.close()
+
+
+def test_page_anciens_tous_champs(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("التلاميذ القدامى")
+    p = f.page_anciens
+    assert p.resultats.rowCount() == 0
+    p.c_num.setText("8173")
+    p.c_nom.setText("القديم")
+    p.c_prenom.setText("فيصل")
+    assert p.generer() is None and "متسلم" in p.message.text()
+    p.c_dest.setText("فيصل القديم")
+    p.c_cin.setText("a000000")
+    assert p.generer() is None and "إجبارية" in p.message.text()
+    p.r_m.setChecked(True)
+    p.c_naissance.setText("01/01/1985")
+    p.c_approx.setChecked(True)
+    p.c_lieu.setText("الخميسات")
+    p.c_entree.setText("15/10/1992")
+    p.c_sortie.setText("30/06/1998")
+    p.c_niveau.setCurrentIndex(4)
+    doc = p.generer()
+    assert doc is not None, p.message.text()
+    assert ouverts == [doc.chemin] and p.remises.rowCount() == 1
+    p.nouveau()
+    assert p.c_num.text() == "" and p.eleve_id is None
+    p.recherche.setText("8173")
+    assert p.resultats.rowCount() == 1
+    p.resultats.selectRow(0)
+    assert p.c_lieu.text() == "الخميسات" and p.c_niveau.currentText() == "الخامس"
+    assert p._reimprimer(0, 0) is not None and len(ouverts) == 2
+    # لا يختلط بتلاميذ مسار
+    f.aller_a("التلاميذ")
+    f.page_eleves.recherche.setText("فيصل")
+    assert f.page_eleves.resultats.rowCount() == 0
+    f.close()

@@ -205,24 +205,29 @@ def _nom_ar(eleve: Mapping) -> str:
 
 def champs_certificat_ancien(conn, eleve: Mapping, destinataire_nom: str,
                              destinataire_cin: str, le: date | None = None) -> dict[str, str]:
-    """الشهادة المدرسية للتلاميذ ما قبل مسار."""
+    """الشهادة المدرسية للتلاميذ ما قبل مسار. كل حقول النموذج إجبارية (قرار المدير)."""
     s = _sexe(eleve)
+    entree = _requis(eleve.get("date_entree"), "تاريخ الالتحاق بالمؤسسة إجباري.")
+    sortie = _requis(eleve.get("date_sortie"), "تاريخ الانقطاع إجباري.")
+    naissance = _requis(eleve.get("date_naissance"), "تاريخ الازدياد إجباري.")
+    if not (naissance < entree <= sortie):
+        raise ErreurDocument("التواريخ غير منطقية: يجب أن يكون الازدياد قبل الالتحاق، والالتحاق قبل الانقطاع.")
     v = champs_communs(conn)
     v.update({
         "date_redaction": tx.date_ar(le or date.today()),
         "sayyid": tx.accord(s, "السيد", "السيدة"),
         "nom_complet": _nom_ar(eleve),
         "almozdad": tx.accord(s, "المزداد", "المزدادة"),
-        "date_naissance": _optionnel(eleve.get("date_naissance"), tx.date_chiffres),
-        "lieu_naissance": _optionnel(eleve.get("lieu_ar")),
+        "date_naissance": tx.date_chiffres(naissance),
+        "lieu_naissance": _requis(eleve.get("lieu_ar"), "مكان الازدياد إجباري."),
         "kana_yutabi": tx.accord(s, "كان يتابع دراسته", "كانت تتابع دراستها"),
         "num_registre": _requis(eleve.get("num_registre"), "رقم التسجيل في السجل العام إجباري."),
-        "date_entree": _optionnel(eleve.get("date_entree"), tx.date_chiffres),
-        "date_sortie": _optionnel(eleve.get("date_sortie"), tx.date_chiffres),
+        "date_entree": tx.date_chiffres(entree),
+        "date_sortie": tx.date_chiffres(sortie),
         "daras": tx.accord(s, "درس", "درست"),
-        "dernier_niveau": _optionnel(eleve.get("dernier_niveau")),
+        "dernier_niveau": _requis(eleve.get("dernier_niveau"), "آخر قسم درس به إجباري."),
         "inqata": tx.accord(s, "انقطع", "انقطعت"),
-        "date_sortie_lettres": _optionnel(eleve.get("date_sortie"), tx.date_ar),
+        "date_sortie_lettres": tx.date_ar(sortie),
         "lahu": tx.accord(s, "له", "لها"),
         "destinataire_nom": _requis(destinataire_nom, "اسم متسلم الشهادة إجباري."),
         "destinataire_cin": _requis(destinataire_cin, "رقم بطاقة متسلم الشهادة إجباري."),
