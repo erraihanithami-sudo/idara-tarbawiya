@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -20,6 +21,7 @@ from idara.data.journal import journaliser
 from idara.services import annee as annee_srv
 from idara.services import etablissement as etab_srv
 from idara.services import moteur_docx as moteur
+from idara.services.identite_docx import Image, appliquer_identite
 from idara.services import textes as tx
 
 DOSSIER_MODELES_DEFAUT = Path(__file__).resolve().parent.parent / "resources" / "modeles"
@@ -80,7 +82,19 @@ def chemin_modele(dossier: DossierDonnees, code: str) -> Path:
     if not cible.exists():
         cible.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(chemin_defaut(code), cible)
+    elif _empreinte(cible) in _anciennes_versions().get(code, []):
+        # نسخة أصلية من إصدار سابق لم يعدلها المدير: تُحدَّث إلى القالب الجديد
+        shutil.copyfile(chemin_defaut(code), cible)
     return cible
+
+
+def _empreinte(chemin: Path) -> str:
+    return hashlib.sha256(chemin.read_bytes()).hexdigest()
+
+
+def _anciennes_versions() -> dict[str, list[str]]:
+    f = DOSSIER_MODELES_DEFAUT / "anciennes_versions.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
 
 
 @dataclass
@@ -264,6 +278,27 @@ def champs_convocation(conn, eleves: list[Mapping]) -> tuple[dict[str, str], lis
     return champs_communs(conn), pages
 
 
+# ---------- الهوية البصرية ----------
+
+def identite(conn: sqlite3.Connection, dossier: DossierDonnees) -> tuple[Image | None, Image | None, str]:
+    """الترويسة والعلامة المائية والتذييل كما حُددت في إعداد المؤسسة."""
+    etab = etab_srv.lire_etablissement(conn)
+    if etab is None:
+        return None, None, ""
+    images = []
+    for rel, nom in ((etab.logo_path, "الترويسة"), (etab.filigrane_path, "العلامة المائية")):
+        if not rel:
+            images.append(None)
+            continue
+        chemin = dossier.racine / rel
+        try:
+            images.append(Image.depuis_fichier(chemin))
+        except Exception as e:  # noqa: BLE001
+            raise ErreurDocument(f"تعذرت قراءة صورة {nom} ({chemin.name}). "
+                                 "أعد اختيارها من إعداد المؤسسة.") from e
+    return images[0], images[1], etab.pied_page or ""
+
+
 # ---------- التوليد والأرشفة ----------
 
 @dataclass
@@ -292,6 +327,7 @@ def generer(conn: sqlite3.Connection, dossier: DossierDonnees, code: str,
         contenu = moteur.remplir(etat.chemin, valeurs, pages)
     except moteur.ErreurModele as e:
         raise ErreurDocument(str(e)) from e
+    contenu = appliquer_identite(contenu, *identite(conn, dossier))
 
     maintenant = datetime.now()
     a = annee_srv.annee_courante(conn)

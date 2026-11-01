@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QFileDialog, QFrame, QGridLayout, QHBoxLayout, QL
 
 from idara.services import bureautique
 from idara.services import documents as dc
+from idara.services import etablissement as etab_srv
 from idara.ui.composants import carte, entete
 
 
@@ -84,8 +85,11 @@ class PageDocuments(QWidget):
             ligne = LigneModele(self, code)
             self.lignes[code] = ligne
             cv.addWidget(ligne)
-        note = QLabel("الترويسة والتذييل والعلامة المائية صور مأخوذة من نماذجك. لتغييرها: "
-                      "«خيارات القالب» ثم «تعديل القالب في Word»، ثم احفظ الملف وأغلقه. "
+        self.etat_identite = QLabel()
+        self.etat_identite.setWordWrap(True)
+        cv.addWidget(self.etat_identite)
+        note = QLabel("الترويسة والعلامة المائية والتذييل تُؤخذ من «إعداد المؤسسة» وتُوضع آلياً في الوثائق المولدة؛ "
+                      "ما لم يُحدَّد منها يبقى كما في نماذجك. "
                       "التلاميذ ما قبل مسار لهم الشهادة المدرسية من هنا؛ تلاميذ مسار تُستخرج شهادتهم من المنصة.")
         note.setObjectName("etiquette")
         note.setWordWrap(True)
@@ -108,6 +112,11 @@ class PageDocuments(QWidget):
     # ---------- العرض ----------
 
     def rafraichir(self) -> None:
+        etab = etab_srv.lire_etablissement(self.f.conn)
+        elements = [("الترويسة", etab and etab.logo_path), ("العلامة المائية", etab and etab.filigrane_path),
+                    ("التذييل", etab and etab.pied_page)]
+        self.etat_identite.setText("الهوية البصرية من إعداد المؤسسة:  " + "   ·   ".join(
+            f"{nom}: {'محددة' if v else 'من القالب'}" for nom, v in elements))
         for code, ligne in self.lignes.items():
             ligne.actualiser(dc.etat_modele(self.f.dossier, code))
         while self.grille.count():

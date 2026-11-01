@@ -1,0 +1,7 @@
+{
+  "_note": "بصمات SHA-256 للقوالب الأصلية التي وُزعت في إصدارات سابقة. نسخة المؤسسة المطابقة لإحداها لم يعدلها المدير، فتُحدَّث آلياً إلى القالب الجديد. القالب الذي عدله المدير لا يُمس أبداً.",
+  "certificat_scolarite_ancien": ["69cb1e92b3f8257a7f79737f1537b61feedda8f668ebfcfdb00fbfa99113db3a"],
+  "attestation_vacances": ["544a779e658e88059d76a000ad6c48dccea445c4fbdbb0d706c2b07fc5db627c"],
+  "convocation_parent": [],
+  "visite_medicale": ["05b6fe975c74b466354d28083e4fca749824782bb8fa5b9a4bdc81fd08a1fad3"]
+}

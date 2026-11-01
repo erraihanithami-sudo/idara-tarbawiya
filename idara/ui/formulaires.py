@@ -207,13 +207,14 @@ class FormIdentite(QWidget):
         self.ville_fr = g.ajouter("مدينة التحرير بالفرنسية", champ("Fait à ...", ltr=True))
         self.telephone = g.ajouter("الهاتف المهني", champ(ltr=True))
         self.adresse = g.ajouter("العنوان", champ())
-        self.logo = g.ajouter("شعار المؤسسة", SelecteurFichier("اختيار الشعار"), pleine_largeur=True)
+        self.logo = g.ajouter("الترويسة (صورة تُوضع أعلى الوثائق)", SelecteurFichier("اختيار صورة الترويسة"), pleine_largeur=True)
         self.filigrane = g.ajouter("العلامة المائية (اختياري)", SelecteurFichier("اختيار العلامة المائية"),
                                    pleine_largeur=True)
         self.pied = g.ajouter("نص التذييل", champ("العنوان والهاتف كما في أسفل الوثائق"),
                               pleine_largeur=True)
         v.addWidget(g)
-        note = QLabel("الوثائق الفعلية تُولَّد من قوالبك الحقيقية في Word، وهذه المعلومات تملأ حقولها.")
+        note = QLabel("تعوّض الترويسةُ والعلامةُ المائية ونصُّ التذييل ما في قوالبك آلياً في كل الوثائق المولدة. "
+                      "أفضل ترويسة: صورة عريضة (العرض 5 أضعاف الارتفاع تقريباً). اترك الحقل فارغاً لإبقاء الحالي.")
         note.setObjectName("etiquette")
         note.setWordWrap(True)
         v.addWidget(note)
