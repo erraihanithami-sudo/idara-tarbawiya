@@ -172,6 +172,29 @@ def _dupliquer_pages(racine, n: int) -> list[list[etree._Element]]:
 
 # ---------- الملء ----------
 
+# قيمة خاصة: الفقرة التي تحمل هذا الحقل تُحذف كلها (أسطر اختيارية: مرفقات ورقة الإرسال...)
+SUPPRIMER = "\ue000supprimer\ue000"
+
+
+def _sauts_de_ligne(p: etree._Element) -> None:
+    """"\n" في قيمة حقل ← سطر جديد داخل نفس الفقرة (w:br)."""
+    for t in list(p.iter(_q(W, "t"))):
+        if not t.text or "\n" not in t.text:
+            continue
+        morceaux = t.text.split("\n")
+        t.text = morceaux[0]
+        t.set(XML_SPACE, "preserve")
+        apres = t
+        for m in morceaux[1:]:
+            br = etree.Element(_q(W, "br"))
+            nt = etree.Element(_q(W, "t"))
+            nt.text = m
+            nt.set(XML_SPACE, "preserve")
+            apres.addnext(br)
+            br.addnext(nt)
+            apres = nt
+
+
 def _remplir_elements(elements, valeurs: dict[str, str], manquants: set[str]) -> None:
     def remplacement(m):
         nom = m.group(1)
@@ -183,6 +206,11 @@ def _remplir_elements(elements, valeurs: dict[str, str], manquants: set[str]) ->
     for el in elements:
         for p in paragraphes(el):
             remplacer_dans_paragraphe(p, MOTIF_CHAMP, remplacement)
+            if SUPPRIMER in texte_paragraphe(p):
+                if p.getparent() is not None:
+                    p.getparent().remove(p)
+                continue
+            _sauts_de_ligne(p)
 
 
 def remplir(modele: Path | bytes, valeurs: dict[str, str],

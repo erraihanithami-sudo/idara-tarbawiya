@@ -44,6 +44,10 @@ _COMMUNS = ("etablissement", "etablissement_fr", "ville", "ville_fr", "directeur
             "sayyid_directeur", "bisifat_directeur", "mudir", "mudir_moassasa", "soussigne",
             "titre_directeur_fr", "du_directeur")
 
+# حقول مشتركة بين وثائق الرخص: صيغ المدير والجهة المرسل إليها
+_RH = ("date_redaction", "sayyid_mudir", "rai_mudir", "ana_mouwaqqi", "bisifati", "destinataire", "dest_titre",
+       "dest_ministere", "dest_service", "dest_bureau")
+
 MODELES: dict[str, DefModele] = {d.code: d for d in [
     DefModele("certificat_scolarite_ancien", "شهادة مدرسية (ما قبل مسار)", "ar", _COMMUNS + (
         "date_redaction", "sayyid", "nom_complet", "almozdad", "date_naissance", "lieu_naissance",
@@ -56,6 +60,22 @@ MODELES: dict[str, DefModele] = {d.code: d for d in [
               _COMMUNS + ("eleve_N", "tilmidh_N", "ibn_N"), cases_par_page=2),
     DefModele("visite_medicale", "ورقة الزيارة الطبية", "ar",
               _COMMUNS + ("tilmidh", "eleve", "niveau")),
+    # وثائق الرخص (المرحلة 7)
+    DefModele("demande_conge", "طلب رخصة", "ar", _COMMUNS + _RH + (
+        "sayyid_label", "nom_complet", "ppr", "cin", "cadre", "fonction", "cycle", "matiere", "niveau",
+        "nb_eleves", "heures", "objet", "motif", "duree", "du", "au", "adresse_conge", "pieces", "avis",
+        "mesures", "numero", "date_enregistrement", "h_type", "h_duree", "h_du", "h_au", "h_obs")),
+    DefModele("recu_certificat", "إيصال باستلام شهادة طبية", "ar", _COMMUNS + _RH + (
+        "date_reception", "deposant", "deposant_cin", "medecin", "specialite", "duree", "du", "bi_sayyid",
+        "nom_complet", "ppr", "cadre", "matiere", "adresse", "remarques")),
+    DefModele("demande_remplacement", "طلب تعويض أستاذ(ة) في رخصة", "ar", _COMMUNS + _RH + (
+        "ostadh", "al_ostadh", "nom_complet", "alladhi", "yaamal", "ppr", "matiere", "type_conge", "duree",
+        "du", "litaawid")),
+    DefModele("bordereau_envoi", "ورقة إرسال", "ar", _COMMUNS + _RH + (
+        "numero", "date_enregistrement", "piece_N", "nb_N")),
+    DefModele("pv_reprise", "محضر استئناف العمل", "ar", _COMMUNS + _RH + (
+        "sayyid", "prenom", "nom", "ppr", "cin", "cadre", "grade", "istaanafa", "date_reprise", "duree", "du",
+        "au", "fonction", "adresse", "telephone", "autres_contacts", "cas_N")),
 ]}
 
 
@@ -426,4 +446,10 @@ def exemple(conn: sqlite3.Connection, code: str, sexe: str = "M"):
     if code == "convocation_parent":
         eleves = [_eleve_exemple("M"), _eleve_exemple("F"), _eleve_exemple("M", prenom_ar="يوسف")]
         return champs_convocation(conn, eleves)
+    if code in ("demande_conge", "recu_certificat", "demande_remplacement", "bordereau_envoi", "pv_reprise"):
+        from idara.services import conges  # تفادي الاستيراد الدائري
+        try:
+            return conges.exemple(conn, code, sexe), None
+        except conges.ErreurConge as e:
+            raise ErreurDocument(str(e)) from e
     raise ErreurDocument(f"قالب غير معروف: {code}")

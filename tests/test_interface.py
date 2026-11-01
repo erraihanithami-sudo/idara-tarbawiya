@@ -126,7 +126,7 @@ def test_page_documents(app, config_tmp, monkeypatch):
     f = FenetrePrincipale(a.terminer())
     f.aller_a("الوثائق")
     page = f.page_docs
-    assert len(page.lignes) == 4
+    assert len(page.lignes) == 9
     page.rafraichir()
     page.rafraichir()
     assert sum(1 for i in range(page.grille.count()) if page.grille.itemAt(i).widget()) == 1
@@ -134,7 +134,7 @@ def test_page_documents(app, config_tmp, monkeypatch):
         assert ligne.etat.objectName() == "ok", ligne.etat.text()
         chemin = page.apercu(code)
         assert chemin is not None and chemin.exists(), page.message.text()
-    assert len(ouverts) == 4
+    assert len(ouverts) == 9
     assert page.apercu("visite_medicale", pdf=True).suffix == ".pdf"
     f.close()
 
