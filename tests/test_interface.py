@@ -364,3 +364,52 @@ def test_page_fa(app, config_tmp):
     assert c.table.item(1, 7).text() == "فائض" and c.table.item(0, 0).text() == "1"
     assert p.cartes["فرنسية"].table.rowCount() == 0
     f.close()
+
+
+def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
+    from idara.services import conges as cg
+    from idara.services import personnel as rh
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    pid = rh.enregistrer(f.conn, rh.Personnel(
+        nom_ar="التجريبية", prenom_ar="سلمى", sexe="F", categorie="enseignant", ppr="7654321", cin="AB1",
+        cadre="أستاذة التعليم الابتدائي", grade="الأولى", fonction="التدريس", cycle="ابتدائي", matiere="عربية",
+        niveau_enseigne="الرابع", nb_eleves=28, heures_hebdo=30, adresse="حي", telephone="0600000000"))
+    f.aller_a("الرخص")
+    p = f.page_conges
+    assert p.liste.rowCount() == 0 and not p.zone_docs.isEnabled()
+    p.personnel.setCurrentIndex(p.personnel.findData(pid))
+    assert p.motif.text() == "مرض"
+    assert p.enregistrer() is None and "تاريخ بداية الرخصة" in p.message.text()
+    p.debut.setText("10/11/2026")
+    p.duree.setValue(10)
+    assert "19 نونبر 2026" in p.fin.text()
+    p.adresse.setText("حي تجريبي")
+    p.avis.setText("أستاذة منضبطة")
+    p.mesures.setText("توزيع التلاميذ")
+    p.medecin.setText("الدكتور الطبيب")
+    p.specialite.setText("الطب العام")
+    p.recu_le.setText("10/11/2026")
+    p.deposant.setText("المدلي")
+    p.deposant_cin.setText("CD1")
+    cid = p.enregistrer()
+    assert cid is not None, p.message.text()
+    assert p.zone_docs.isEnabled() and p.liste.rowCount() == 1
+    for b in (p.b_demande, p.b_recu, p.b_remp):
+        b.click()
+        assert p.message.objectName() == "info", p.message.text()
+    assert len(ouverts) == 3 and p.docs.rowCount() == 3
+    assert p.bordereau(cg.pieces_proposees(f.conn, cg.lire(f.conn, cid)), "ملف رخصة") is not None
+    assert [r["numero"] for r in cg.sortants(f.conn)] == [2, 1]
+    r = cg.proposition_reprise(f.conn, cid)
+    assert p.reprise(r) is not None and not p.b_reprise.isEnabled()
+    assert p.liste.item(0, 3).text() == "مستأنفة"
+    # سجل الصادر
+    f.aller_a("سجل الصادر")
+    s = f.page_sortants
+    assert s.table.rowCount() == 2 and "3" in s.prochain.text()
+    s.objet.setText("مراسلة يدوية")
+    assert s.ajouter() == "3/26-27" and s.table.rowCount() == 3
+    f.close()
