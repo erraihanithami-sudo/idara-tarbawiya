@@ -124,6 +124,9 @@ def test_page_documents(app, config_tmp, monkeypatch):
     f.aller(2)
     page = f.page_docs
     assert len(page.lignes) == 4
+    page.rafraichir()
+    page.rafraichir()
+    assert sum(1 for i in range(page.grille.count()) if page.grille.itemAt(i).widget()) == 1
     for code, ligne in page.lignes.items():
         assert ligne.etat.objectName() == "ok", ligne.etat.text()
         chemin = page.apercu(code)

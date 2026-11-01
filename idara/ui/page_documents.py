@@ -37,7 +37,7 @@ class LigneModele(QFrame):
         self.b_pdf.setToolTip("نفس المعاينة، محوّلة إلى PDF عبر Word")
         self.b_pdf.clicked.connect(lambda: self.page.apercu(code, pdf=True))
         plus = QToolButton()
-        plus.setText("القالب ▾")
+        plus.setText("خيارات القالب")
         plus.setPopupMode(QToolButton.InstantPopup)
         menu = QMenu(plus)
         menu.addAction("تعديل القالب في Word", lambda: self.page.modifier(code))
@@ -85,7 +85,7 @@ class PageDocuments(QWidget):
             self.lignes[code] = ligne
             cv.addWidget(ligne)
         note = QLabel("الترويسة والتذييل والعلامة المائية صور مأخوذة من نماذجك. لتغييرها: "
-                      "«القالب ▾» ثم «تعديل القالب في Word»، ثم احفظ الملف وأغلقه. "
+                      "«خيارات القالب» ثم «تعديل القالب في Word»، ثم احفظ الملف وأغلقه. "
                       "التلاميذ ما قبل مسار لهم الشهادة المدرسية من هنا؛ تلاميذ مسار تُستخرج شهادتهم من المنصة.")
         note.setObjectName("etiquette")
         note.setWordWrap(True)
@@ -113,6 +113,8 @@ class PageDocuments(QWidget):
         while self.grille.count():
             w = self.grille.takeAt(0).widget()
             if w:
+                w.hide()
+                w.setParent(None)
                 w.deleteLater()
         recents = dc.documents_recents(self.f.conn, 10)
         if not recents:
