@@ -78,8 +78,9 @@ class DialogueStatut(QDialog):
         v.addWidget(QLabel(nom))
         f = QFormLayout()
         self.statut = QComboBox()
-        for code in ("parti", "interrompu", "arrive", "inscrit"):
+        for code in ("parti", "interrompu", "exclu", "arrive", "inscrit"):
             self.statut.addItem({"parti": "مغادر (انتقال إلى مؤسسة أخرى)", "interrompu": "منقطع",
+                                 "exclu": "مفصول (السبب ومرجع القرار في خانة السبب)",
                                  "arrive": "وافد من مؤسسة أخرى", "inscrit": "مسجّل (إلغاء مغادرة أو انقطاع)"}[code], code)
         self.le = ChampDate()
         self.le.definir(date.today().isoformat())

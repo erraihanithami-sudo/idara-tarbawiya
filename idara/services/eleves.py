@@ -14,7 +14,8 @@ from idara.services import documents as dc
 from idara.services import textes as tx
 from idara.services.massar import MOTIF_CODE, normaliser
 
-STATUTS = {"inscrit": "مسجّل", "arrive": "وافد", "parti": "مغادر", "interrompu": "منقطع"}
+STATUTS = {"inscrit": "مسجّل", "arrive": "وافد", "parti": "مغادر", "interrompu": "منقطع", "exclu": "مفصول"}
+SORTIES = ("parti", "interrompu", "exclu")  # وضعيات تُخرج التلميذ من لائحة الحاضرين
 CHAMPS_MODIFIABLES = ("nom_ar", "prenom_ar", "nom_fr", "prenom_fr", "sexe", "date_naissance")
 
 
@@ -161,12 +162,14 @@ def changer_statut(conn: sqlite3.Connection, eleve_id: int, statut: str, le: str
     r = fiche(conn, eleve_id)
     if r["inscription_id"] is None:
         raise ErreurEleve("التلميذ غير مسجل في السنة الجارية.")
-    if statut in ("parti", "interrompu") and not le:
-        raise ErreurEleve("تاريخ المغادرة أو الانقطاع إجباري.")
+    if statut in SORTIES and not le:
+        raise ErreurEleve("تاريخ المغادرة أو الانقطاع أو الفصل إجباري.")
+    if statut == "exclu" and not motif.strip():
+        raise ErreurEleve("سبب الفصل ومرجع القرار إجباريان.")
     if statut == "parti" and not etablissement.strip():
         raise ErreurEleve("المؤسسة المستقبلة إجبارية للمغادر.")
     with conn:
-        if statut in ("parti", "interrompu"):
+        if statut in SORTIES:
             conn.execute("UPDATE inscription SET statut=?, date_sortie=?, etab_destination=?, motif_sortie=? "
                          "WHERE id=?", (statut, le, etablissement.strip() or None, motif.strip() or None,
                                         r["inscription_id"]))

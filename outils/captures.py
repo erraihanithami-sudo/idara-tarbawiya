@@ -201,6 +201,13 @@ def main(sortie: Path) -> None:
     f.page_mouvements.r_parti.setChecked(True)
     __import__("idara.ui.saisie", fromlist=["x"]).selectionner(f.page_mouvements.liste, 0)
     photo(f, "32_mouvements_depart")
+    from idara.services import comportement as cpt
+    yid = f.conn.execute("SELECT id FROM eleve WHERE code_massar='X000000001'").fetchone()[0]
+    cpt.enregistrer(f.conn, cpt.Observation(yid, "2026-10-05", "شغب في القسم", "", "أستاذ القسم", "تنبيه شفوي"))
+    cpt.enregistrer(f.conn, cpt.Observation(yid, "2026-10-12", "عنف لفظي", "", "أستاذ القسم", ""))
+    f.aller_a("تتبع السلوك")
+    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(f.page_comportement.liste, 0)
+    photo(f, "33_comportement")
     f.aller_a("التقييم")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")

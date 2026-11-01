@@ -53,13 +53,13 @@ class PageMouvements(QWidget):
         c, cv = carte()
         h = QHBoxLayout()
         self.r_arrive, self.r_parti = QRadioButton("الوافدون"), QRadioButton("المغادرون")
+        self.r_autres = QRadioButton("المنقطعون والمفصولون")
         self.r_arrive.setChecked(True)
         g = QButtonGroup(self)
-        g.addButton(self.r_arrive)
-        g.addButton(self.r_parti)
-        self.r_arrive.toggled.connect(lambda _: self.chercher())
-        h.addWidget(self.r_arrive)
-        h.addWidget(self.r_parti)
+        for r in (self.r_arrive, self.r_parti, self.r_autres):
+            g.addButton(r)
+            r.toggled.connect(lambda on: on and self.chercher())
+            h.addWidget(r)
         h.addStretch()
         cv.addLayout(h)
         self.recherche = QLineEdit()
@@ -179,7 +179,7 @@ class PageMouvements(QWidget):
     # ---------- اللائحة ----------
 
     def sens(self) -> str:
-        return "arrive" if self.r_arrive.isChecked() else "parti"
+        return "arrive" if self.r_arrive.isChecked() else "parti" if self.r_parti.isChecked() else "autres"
 
     def rafraichir(self) -> None:
         try:
@@ -206,6 +206,18 @@ class PageMouvements(QWidget):
         self.chercher()
 
     def chercher(self) -> None:
+        if self.sens() == "autres":
+            lignes = mv.sorties_sans_transfert(self.f.conn, self.recherche.text())
+            self.liste.setRowCount(len(lignes))
+            for i, r in enumerate(lignes):
+                it = cellule(f"{r['prenom_ar']} {r['nom_ar']} · {r['motif_sortie'] or '—'}", None)
+                it.setToolTip(r["code_massar"])
+                self.liste.setItem(i, 0, it)
+                self.liste.setItem(i, 1, cellule(f"{el.STATUTS[r['statut']]} {tx.date_chiffres(r['date_sortie'])}"))
+            for b in (self.b_demande, self.b_rappel, self.b_recu, self.b_envoi, self.b_envoye, self.b_annuler):
+                b.setVisible(False)
+            return
+        self.b_annuler.setVisible(True)
         try:
             lignes = mv.lister(self.f.conn, self.sens(), self.recherche.text())
         except mv.ErreurMouvement:
@@ -227,6 +239,8 @@ class PageMouvements(QWidget):
         return [self.liste.item(r, 0).data(Qt.UserRole) for r in lignes]
 
     def _selection(self) -> None:
+        if self.sens() == "autres":
+            return
         ids = self.ids()
         if len(ids) == 1:
             self.afficher(ids[0])
@@ -262,7 +276,7 @@ class PageMouvements(QWidget):
         self.mid = None
         self.liste.clearSelection()
         self.titre.setText("حركة جديدة")
-        (self.f_arrive if self.sens() == "arrive" else self.f_parti).setChecked(True)
+        (self.f_parti if self.sens() == "parti" else self.f_arrive).setChecked(True)
         for w in (self.code, self.nom, self.prenom, self.ref_num, self.remarques, self.date_mv, self.ref_date):
             w.clear()
         for w in (self.etab, self.direction, self.academie, self.niveau):

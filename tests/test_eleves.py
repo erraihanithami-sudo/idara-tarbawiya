@@ -191,3 +191,18 @@ def test_ancien_certificat_sans_destinataire(base, dossier):
     eid = an.enregistrer(base, _ancien())
     with pytest.raises(Exception, match="متسلم"):
         an.generer_certificat(base, dossier, eid, "", "")
+
+
+def test_statut_exclu(base):
+    """طلب المدير: وضعية «مفصول» بتاريخ وسبب/مرجع القرار؛ يخرج من الحاضرين ولا يُحذف."""
+    eid = _id(base, "X000000002")
+    with pytest.raises(el.ErreurEleve, match="إجباري"):
+        el.changer_statut(base, eid, "exclu", "2026-12-01")
+    el.changer_statut(base, eid, "exclu", "2026-12-01", "", "قرار مجلس القسم رقم 3")
+    r = el.fiche(base, eid)
+    assert r["statut"] == "exclu" and el.STATUTS["exclu"] == "مفصول"
+    assert base.execute("SELECT COUNT(*) FROM inscription WHERE statut IN ('inscrit','arrive')").fetchone()[0] == 4
+    p = el.parcours(base, eid)[0]
+    assert p["date_sortie"] == "2026-12-01"
+    el.changer_statut(base, eid, "inscrit")
+    assert el.fiche(base, eid)["statut"] == "inscrit"

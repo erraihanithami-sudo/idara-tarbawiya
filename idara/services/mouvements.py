@@ -359,3 +359,17 @@ def exemple(conn, code: str) -> dict[str, str]:
     v.update({"numero": "1/26-27", "tadhkir": "", "rappel": "", "bina": "",
               "reference": "المرجع: شهادة المغادرة رقم: [الرقم] بتاريخ: [التاريخ]"})
     return v
+
+
+def sorties_sans_transfert(conn: sqlite3.Connection, texte: str = "") -> list[sqlite3.Row]:
+    """المنقطعون والمفصولون في السنة الجارية (لا ملف يُرسل)."""
+    a = _annee(conn)
+    lignes = conn.execute(
+        "SELECT e.id AS eleve_id, e.code_massar, e.nom_ar, e.prenom_ar, i.statut, i.date_sortie, i.motif_sortie "
+        "FROM inscription i JOIN eleve e ON e.id=i.eleve_id WHERE i.annee_id=? AND i.statut IN ('interrompu','exclu') "
+        "ORDER BY i.date_sortie DESC", (a["id"],)).fetchall()
+    cible = normaliser(texte)
+    if cible:
+        lignes = [r for r in lignes if any(cible in normaliser(x) for x in (
+            r["code_massar"], f"{r['nom_ar']}{r['prenom_ar']}", f"{r['prenom_ar']}{r['nom_ar']}"))]
+    return lignes

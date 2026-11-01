@@ -28,6 +28,7 @@ from idara.ui.page_anciens import PageAnciens
 from idara.ui.page_personnel import PagePersonnel
 from idara.ui.page_fa import PageFa
 from idara.ui.page_mouvements import PageMouvements
+from idara.ui.page_comportement import PageComportement
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
 
@@ -232,7 +233,7 @@ class PageAVenir(QWidget):
 # الأقسام (اقتراح المدير 2026-11-01): كل قسم في القائمة الجانبية، وصفحاته في ألسنة داخله.
 SECTIONS = [
     ("لوحة القيادة", ["لوحة القيادة"]),
-    ("التلاميذ", ["التلاميذ", "حركية التلاميذ", "التلاميذ القدامى", "الاستيراد من مسار"]),
+    ("التلاميذ", ["التلاميذ", "حركية التلاميذ", "تتبع السلوك", "التلاميذ القدامى", "الاستيراد من مسار"]),
     ("الموارد البشرية", ["الموارد البشرية", "الرخص", "تدبير الفائض"]),
     ("التدبير التربوي", []),
     ("التقييم", []),
@@ -285,6 +286,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_anciens = PageAnciens(self)
         self.page_import = PageImport(self)
         self.page_mouvements = PageMouvements(self)
+        self.page_comportement = PageComportement(self)
         self.page_rh = PagePersonnel(self)
         self.page_conges = PageConges(self)
         self.page_fa = PageFa(self)
@@ -292,7 +294,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_docs = PageDocuments(self)
         self.pages = {"لوحة القيادة": self.tableau, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
-                      "حركية التلاميذ": self.page_mouvements, "الاستيراد من مسار": self.page_import,
+                      "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs}
         self.emplacement = {}   # اسم الصفحة ← (رقم القسم، رقم اللسان)

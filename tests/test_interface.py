@@ -489,3 +489,35 @@ def test_champ_date_calendrier(app):
     cal = c.ouvrir_calendrier()  # فارغ: اليومية على تاريخ اليوم
     assert cal.selectedDate() == QDate.currentDate()
     c.popup.close()
+
+
+
+def test_page_comportement_et_exclus(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
+    from idara.services import eleves as el
+    from idara.ui.saisie import selectionner
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("تتبع السلوك")
+    p = f.page_comportement
+    assert p.liste.rowCount() == 0 and not p.b_save.isEnabled()
+    p.recherche.setText("يوسف")
+    selectionner(p.liste, 0)
+    assert p.b_save.isEnabled() and "يوسف" in p.titre.text()
+    assert p.enregistrer(False) is None and "إجبارية" in p.message.text()
+    p.nature.setEditText("شغب في القسم")
+    assert p.enregistrer(False) is not None and p.obs.rowCount() == 1
+    p.nature.setEditText("عنف لفظي")
+    assert p.enregistrer(True) is not None and len(ouverts) == 1
+    assert "استدعاء" in p.obs.item(0, 2).text()
+    p.recherche.clear()
+    assert p.liste.rowCount() == 1 and p.liste.item(0, 1).text() == "2"
+    # المفصولون في صفحة الحركية
+    eid = f.conn.execute("SELECT id FROM eleve WHERE code_massar='X000000002'").fetchone()[0]
+    el.changer_statut(f.conn, eid, "exclu", "2026-10-20", "", "قرار المجلس")
+    f.aller_a("حركية التلاميذ")
+    m = f.page_mouvements
+    m.r_autres.setChecked(True)
+    assert m.liste.rowCount() == 1 and "مفصول" in m.liste.item(0, 1).text() and m.b_demande.isHidden()
+    f.close()
