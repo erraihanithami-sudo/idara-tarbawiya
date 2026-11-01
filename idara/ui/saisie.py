@@ -53,6 +53,9 @@ def tableau(colonnes: list[str], etirer: int = 1) -> QTableWidget:
     h = t.horizontalHeader()
     h.setSectionResizeMode(QHeaderView.ResizeToContents)
     h.setSectionResizeMode(etirer, QHeaderView.Stretch)
+    h.setStretchLastSection(False)
+    t.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    t.setTextElideMode(Qt.ElideLeft)
     return t
 
 

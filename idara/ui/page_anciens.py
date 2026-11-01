@@ -113,6 +113,7 @@ class PageAnciens(QWidget):
         self.c_le = QDateEdit()
         self.c_le.setCalendarPopup(True)
         self.c_le.setDisplayFormat("dd/MM/yyyy")
+        self.c_le.setLayoutDirection(Qt.LeftToRight)
         self.c_le.setDate(QDate.currentDate())
         b_lui = QPushButton("التلميذ نفسه")
         b_lui.clicked.connect(lambda: self.c_dest.setText(f"{self.c_prenom.text()} {self.c_nom.text()}".strip()))
@@ -253,7 +254,7 @@ class PageAnciens(QWidget):
             message(self.message, str(e), True)
             return None
         self.afficher(self.eleve_id)
-        message(self.message, f"وُلّدت الشهادة وسُجّل تسليمها: {doc.chemin.name}")
+        message(self.message, f"وُلّدت الشهادة وسُجّل تسليمها: \u2066{doc.chemin.name}\u2069")
         self._ouvrir(doc.chemin)
         return doc
 
@@ -264,7 +265,7 @@ class PageAnciens(QWidget):
         except dc.ErreurDocument as e:
             message(self.message, str(e), True)
             return None
-        message(self.message, f"أُعيد توليد الشهادة: {doc.chemin.name}")
+        message(self.message, f"أُعيد توليد الشهادة: \u2066{doc.chemin.name}\u2069")
         self._ouvrir(doc.chemin)
         return doc
 

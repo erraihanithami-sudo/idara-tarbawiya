@@ -40,6 +40,7 @@ class DialogueVacances(QDialog):
         self.du, self.au, self.le = QDateEdit(), QDateEdit(), QDateEdit()
         for w, d in ((self.du, aujourdhui), (self.au, aujourdhui + timedelta(days=14)), (self.le, aujourdhui)):
             w.setCalendarPopup(True)
+            w.setLayoutDirection(Qt.LeftToRight)
             w.setDisplayFormat("dd/MM/yyyy")
             w.setDate(_qdate(d))
         f.addRow("بداية العطلة *", self.du)
@@ -123,7 +124,7 @@ class PageEleves(QWidget):
         self.recherche.textChanged.connect(self.chercher)
         cv.addWidget(etiquette("بحث", self.recherche))
         cv.addWidget(self.recherche)
-        self.resultats = tableau(["الرمز", "الاسم", "القسم", "المستوى", "الوضعية"])
+        self.resultats = tableau(["الرمز", "الاسم", "القسم", "الوضعية"])
         self.resultats.setSelectionMode(self.resultats.SelectionMode.ExtendedSelection)
         self.resultats.itemSelectionChanged.connect(self._selection)
         self.resultats.setMinimumHeight(420)
@@ -230,10 +231,7 @@ class PageEleves(QWidget):
         lignes = el.rechercher(self.f.conn, texte)
         self.resultats.setRowCount(len(lignes))
         for i, r in enumerate(lignes):
-            niveau = tx.niveau_ar(r["niveau"]) if r["niveau"] in tx.NIVEAUX else "—"
-            if r["niveau"] and not r["niveau_confirme"]:
-                niveau += " (مقترح)"
-            for j, v in enumerate([r["code_massar"], el.nom_complet(r), r["classe"] or "—", niveau,
+            for j, v in enumerate([r["code_massar"], el.nom_complet(r), r["classe"] or "—",
                                    el.STATUTS.get(r["statut"], "غير مسجل")]):
                 self.resultats.setItem(i, j, cellule(v, r["id"]))
         self.nb.setText(f"{len(lignes)} نتيجة" if texte.strip() else f"تلاميذ السنة الجارية: {len(lignes)}")
@@ -256,8 +254,9 @@ class PageEleves(QWidget):
         niveau = tx.niveau_ar(r["niveau"]) if r["niveau"] in tx.NIVEAUX else "غير محدد"
         if r["niveau"] and not r["niveau_confirme"]:
             niveau += " (مقترح، لم يُؤكَّد)"
-        self.sous_titre.setText(f"{r['code_massar']} · {r['classe'] or '—'} · المستوى: {niveau} · "
-                                f"{el.STATUTS.get(r['statut'], 'غير مسجل في السنة الجارية')}")
+        self.sous_titre.setText(
+            f"رمز مسار: \u2066{r['code_massar']}\u2069    القسم: \u2066{r['classe'] or '—'}\u2069\n"
+            f"المستوى: {niveau}    الوضعية: {el.STATUTS.get(r['statut'], 'غير مسجل في السنة الجارية')}")
         self.c_nom_ar.setText(r["nom_ar"] or "")
         self.c_prenom_ar.setText(r["prenom_ar"] or "")
         self.c_nom_fr.setText(r["nom_fr"] or "")
@@ -306,7 +305,7 @@ class PageEleves(QWidget):
     # ---------- الوثائق ----------
 
     def _resultat(self, doc) -> None:
-        message(self.message, f"وُلّدت الوثيقة وحُفظت في الأرشيف: {doc.chemin.name}")
+        message(self.message, f"وُلّدت الوثيقة وحُفظت في الأرشيف: \u2066{doc.chemin.name}\u2069")
         try:
             bureautique.ouvrir(doc.chemin)
         except OSError as e:
