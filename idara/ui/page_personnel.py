@@ -1,0 +1,412 @@
+"""صفحة الموظفين: لائحة، بحث، ملف كامل يُدخل مرة واحدة لوثائق الرخص ومحضر التسليم."""
+
+from __future__ import annotations
+
+from datetime import date
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+                               QGridLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+                               QPlainTextEdit, QPushButton, QRadioButton, QVBoxLayout, QWidget)
+
+from idara.services import etablissement as et
+from idara.services import personnel as rh
+from idara.ui.composants import carte, entete
+from idara.ui.formulaires import champ, etiquette
+from idara.ui.saisie import ChampDate, cellule, message, selectionner, tableau
+
+
+def _combo_libre(valeurs: list[str]) -> QComboBox:
+    c = QComboBox()
+    c.setEditable(True)
+    c.addItems(valeurs)
+    c.setCurrentIndex(-1)
+    c.setInsertPolicy(QComboBox.NoInsert)
+    return c
+
+
+class DialogueDepart(QDialog):
+    def __init__(self, nom: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("مغادرة الموظف")
+        self.setLayoutDirection(Qt.RightToLeft)
+        v = QVBoxLayout(self)
+        v.addWidget(QLabel(f"{nom}: الملف يبقى محفوظاً، ويُرفع من لائحة العاملين."))
+        f = QFormLayout()
+        self.statut = QComboBox()
+        for k in ("mute", "retraite", "autre"):
+            self.statut.addItem(rh.STATUTS[k], k)
+        self.le = ChampDate()
+        self.le.definir(date.today().isoformat())
+        self.remarque = champ("مثال: انتقال إلى مدرسة ...")
+        f.addRow("الوضعية", self.statut)
+        f.addRow("تاريخ المغادرة", self.le)
+        f.addRow("ملاحظة (اختيارية)", self.remarque)
+        v.addLayout(f)
+        b = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        b.button(QDialogButtonBox.Ok).setText("تسجيل المغادرة")
+        b.button(QDialogButtonBox.Cancel).setText("إلغاء")
+        b.accepted.connect(self.accept)
+        b.rejected.connect(self.reject)
+        v.addWidget(b)
+
+
+class PagePersonnel(QWidget):
+    def __init__(self, fenetre):
+        super().__init__()
+        self.f = fenetre
+        self.pid: int | None = None
+        self.categorie_dir = False
+        racine = QVBoxLayout(self)
+        racine.setContentsMargins(40, 32, 40, 32)
+        racine.setSpacing(16)
+        racine.addWidget(entete("الموارد البشرية",
+                                "ملف كل موظف يُدخل مرة واحدة، ومنه تُملأ وثائق الرخص ومحضر الاستئناف ومحضر التسليم."))
+        self.effectifs = QLabel()
+        self.effectifs.setObjectName("etiquette")
+        racine.addWidget(self.effectifs)
+        self.message = QLabel()
+        self.message.setWordWrap(True)
+        self.message.hide()
+        racine.addWidget(self.message)
+        corps = QHBoxLayout()
+        corps.setSpacing(20)
+        racine.addLayout(corps, 1)
+
+        # ---- اللائحة ----
+        c, cv = carte()
+        self.recherche = QLineEdit()
+        self.recherche.setPlaceholderText("الاسم، رقم التأجير أو البطاقة الوطنية")
+        self.recherche.setClearButtonEnabled(True)
+        self.recherche.textChanged.connect(self.chercher)
+        cv.addWidget(etiquette("بحث", self.recherche))
+        cv.addWidget(self.recherche)
+        filtres = QHBoxLayout()
+        self.filtre_cat = QComboBox()
+        self.filtre_cat.addItem("كل الفئات", None)
+        for k, (_, _, pl) in rh.CATEGORIES.items():
+            self.filtre_cat.addItem(pl, k)
+        self.filtre_cat.currentIndexChanged.connect(lambda _: self.chercher())
+        self.voir_partis = QCheckBox("إظهار المغادرين")
+        self.voir_partis.toggled.connect(lambda _: self.chercher())
+        filtres.addWidget(self.filtre_cat)
+        filtres.addWidget(self.voir_partis)
+        filtres.addStretch()
+        cv.addLayout(filtres)
+        self.liste = tableau(["الاسم", "الفئة", "رقم التأجير", "الملف"])
+        self.liste.setMinimumHeight(420)
+        self.liste.itemSelectionChanged.connect(self._selection)
+        cv.addWidget(self.liste, 1)
+        b = QPushButton("+ موظف جديد")
+        b.clicked.connect(self.nouveau)
+        cv.addWidget(b)
+        corps.addWidget(c, 5)
+
+        # ---- الملف ----
+        c2, fv = carte()
+        self.titre = QLabel("موظف جديد")
+        self.titre.setObjectName("titreCarte")
+        fv.addWidget(self.titre)
+        note = QLabel("الحقول المعلَّمة بـ * إجبارية للحفظ. الباقي يُطلب عند توليد وثيقة تحتاجه.")
+        note.setObjectName("etiquette")
+        note.setWordWrap(True)
+        fv.addWidget(note)
+
+        self.c = {}
+        for k, aide, ltr in (("nom_ar", "", False), ("prenom_ar", "", False), ("nom_fr", "", True),
+                             ("prenom_fr", "", True), ("ppr", "أرقام فقط", True), ("cin", "AB123456", True),
+                             ("adresse", "", False), ("telephone", "06XXXXXXXX", True),
+                             ("niveau_enseigne", "إن لم يُسند قسم", False),
+                             ("nb_eleves", "إن لم يُسند قسم", True), ("heures_hebdo", "", True)):
+            self.c[k] = champ(aide, ltr)
+        for k in rh.CHAMPS_SUGGERES:
+            self.c[k] = _combo_libre([])
+        self.r_m, self.r_f = QRadioButton("ذكر"), QRadioButton("أنثى")
+        grp = QButtonGroup(self)
+        grp.addButton(self.r_m)
+        grp.addButton(self.r_f)
+        sexe = QWidget()
+        sl = QHBoxLayout(sexe)
+        sl.setContentsMargins(0, 0, 0, 0)
+        sl.addWidget(self.r_m)
+        sl.addWidget(self.r_f)
+        sl.addStretch()
+        self.categorie = QComboBox()
+        self.unite = QComboBox()
+        self.date_aff = ChampDate()
+
+        def section(titre: str, champs: list[tuple[str, QWidget]]) -> None:
+            t = QLabel(titre)
+            t.setObjectName("titreCarte")
+            fv.addWidget(t)
+            g = QGridLayout()
+            g.setHorizontalSpacing(16)
+            g.setVerticalSpacing(4)
+            for i, (lib, w) in enumerate(champs):
+                g.addWidget(etiquette(lib, w), (i // 2) * 2, i % 2)
+                g.addWidget(w, (i // 2) * 2 + 1, i % 2)
+            fv.addLayout(g)
+
+        section("الهوية", [("النسب *", self.c["nom_ar"]), ("الاسم *", self.c["prenom_ar"]),
+                           ("Nom", self.c["nom_fr"]), ("Prénom", self.c["prenom_fr"]),
+                           ("النوع *", sexe), ("الفئة *", self.categorie)])
+        section("الوضعية الإدارية", [("رقم التأجير", self.c["ppr"]), ("رقم البطاقة الوطنية", self.c["cin"]),
+                                     ("الإطار", self.c["cadre"]), ("الدرجة", self.c["grade"]),
+                                     ("المهمة", self.c["fonction"]), ("السلك", self.c["cycle"]),
+                                     ("الوحدة المدرسية", self.unite),
+                                     ("تاريخ التعيين بالمؤسسة", self.date_aff)])
+        self.bloc_ens = QWidget()
+        be = QVBoxLayout(self.bloc_ens)
+        be.setContentsMargins(0, 0, 0, 0)
+        t = QLabel("التدريس")
+        t.setObjectName("titreCarte")
+        be.addWidget(t)
+        aide = QLabel("أسند أقسام السنة الجارية: يُحسب مستوى التدريس وعدد التلاميذ آلياً من لوائح مسار.")
+        aide.setObjectName("etiquette")
+        aide.setWordWrap(True)
+        be.addWidget(aide)
+        self.classes = QListWidget()
+        self.classes.setMaximumHeight(120)
+        self.classes.itemChanged.connect(lambda _: self._maj_enseignement())
+        be.addWidget(self.classes)
+        self.calcul = QLabel()
+        self.calcul.setWordWrap(True)
+        be.addWidget(self.calcul)
+        g = QGridLayout()
+        g.setHorizontalSpacing(16)
+        for i, (lib, w) in enumerate((("مادة التدريس", self.c["matiere"]),
+                                      ("ساعات العمل الأسبوعية", self.c["heures_hebdo"]),
+                                      ("مستوى التدريس (يدوي)", self.c["niveau_enseigne"]),
+                                      ("عدد التلاميذ (يدوي)", self.c["nb_eleves"]))):
+            g.addWidget(etiquette(lib, w), (i // 2) * 2, i % 2)
+            g.addWidget(w, (i // 2) * 2 + 1, i % 2)
+        be.addLayout(g)
+        fv.addWidget(self.bloc_ens)
+        self.categorie.currentIndexChanged.connect(lambda _: self._maj_categorie())
+
+        section("التواصل", [("العنوان الشخصي", self.c["adresse"]), ("الهاتف", self.c["telephone"])])
+        self.dossier = QCheckBox("الملف الإداري للموظف متوفر بالمؤسسة")
+        fv.addWidget(self.dossier)
+        self.remarques = QPlainTextEdit()
+        self.remarques.setPlaceholderText("ملاحظات (تظهر في محضر التسليم)")
+        self.remarques.setMaximumHeight(70)
+        fv.addWidget(self.remarques)
+        self.manquants = QLabel()
+        self.manquants.setWordWrap(True)
+        fv.addWidget(self.manquants)
+        boutons = QHBoxLayout()
+        b_save = QPushButton("حفظ")
+        b_save.setObjectName("principal")
+        b_save.clicked.connect(self.enregistrer)
+        self.b_depart = QPushButton("مغادرة (انتقال، تقاعد...)")
+        self.b_depart.clicked.connect(self.dialogue_depart)
+        self.b_retour = QPushButton("إرجاع إلى العمل")
+        self.b_retour.clicked.connect(self.reintegrer)
+        for b in (b_save, self.b_depart, self.b_retour):
+            boutons.addWidget(b)
+        boutons.addStretch()
+        fv.addLayout(boutons)
+        fv.addStretch()
+        corps.addWidget(c2, 7)
+        self.rafraichir()
+        self.nouveau()
+
+    # ---------- اللائحة ----------
+
+    def rafraichir(self) -> None:
+        eff = rh.effectifs(self.f.conn)
+        self.effectifs.setText("العاملون حالياً:  " + "   ·   ".join(
+            f"{rh.CATEGORIES[k][2]}: {n}" for k, n in eff.items() if n))
+        self.unite.clear()
+        self.unite.addItem("—", "")
+        for u in et.unites(self.f.conn):
+            self.unite.addItem(u, u)
+        for k in rh.CHAMPS_SUGGERES:
+            w, t = self.c[k], self.c[k].currentText()
+            w.clear()
+            w.addItems(rh.suggestions(self.f.conn, k))
+            w.setEditText(t)
+        self.chercher()
+
+    def chercher(self, _=None) -> None:
+        lignes = rh.lister(self.f.conn, self.recherche.text(), self.filtre_cat.currentData(),
+                           not self.voir_partis.isChecked())
+        self.liste.setRowCount(len(lignes))
+        for i, p in enumerate(lignes):
+            nom = f"{p.prenom_ar} {p.nom_ar}"
+            if p.statut != "actif":
+                nom += f" ({rh.STATUTS[p.statut]})"
+            m = rh.manquants_documents(self.f.conn, p)
+            self.liste.setItem(i, 0, cellule(nom, p.id))
+            self.liste.setItem(i, 1, cellule(rh.libelle_categorie(p.categorie, p.sexe)))
+            self.liste.setItem(i, 2, cellule(p.ppr or "—"))
+            it = cellule("مكتمل" if not m else f"ينقص {len(m)}")
+            it.setToolTip("، ".join(m))
+            self.liste.setItem(i, 3, it)
+
+    def _selection(self) -> None:
+        lignes = {i.row() for i in self.liste.selectedIndexes()}
+        if len(lignes) == 1:
+            self.afficher(self.liste.item(lignes.pop(), 0).data(Qt.UserRole))
+
+    # ---------- الملف ----------
+
+    def _categories(self, directeur: bool) -> None:
+        self.categorie.blockSignals(True)
+        self.categorie.clear()
+        for k, (m, f, _) in rh.CATEGORIES.items():
+            if (k == "directeur") == directeur:
+                self.categorie.addItem(m if k == "directeur" else f"{m} / {f}", k)
+        self.categorie.setEnabled(not directeur)
+        self.categorie.blockSignals(False)
+
+    def _remplir_classes(self, coches: list[int]) -> None:
+        self.classes.blockSignals(True)
+        self.classes.clear()
+        for r in rh.classes_annee(self.f.conn):
+            texte = f"{r['code']}  ·  {r['effectif']} تلميذاً"
+            if r["enseignants"] and r["id"] not in coches:
+                texte += f"  ·  مسند إلى: {r['enseignants']}"
+            it = QListWidgetItem(texte)
+            it.setData(Qt.UserRole, r["id"])
+            it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
+            it.setCheckState(Qt.Checked if r["id"] in coches else Qt.Unchecked)
+            self.classes.addItem(it)
+        if not self.classes.count():
+            self.classes.addItem("لا أقسام في السنة الجارية بعد (استورد لوائح مسار).")
+        self.classes.blockSignals(False)
+
+    def classes_cochees(self) -> list[int]:
+        return [self.classes.item(i).data(Qt.UserRole) for i in range(self.classes.count())
+                if self.classes.item(i).data(Qt.UserRole) is not None
+                and self.classes.item(i).checkState() == Qt.Checked]
+
+    def _maj_categorie(self) -> None:
+        self.bloc_ens.setVisible(self.categorie.currentData() in ("enseignant", "educatrice"))
+
+    def _maj_enseignement(self) -> None:
+        ids = self.classes_cochees()
+        manuel = not ids
+        for k in ("niveau_enseigne", "nb_eleves"):
+            self.c[k].setEnabled(manuel)
+        if ids:
+            e = rh.enseignement(self.f.conn, rh.Personnel(classes=ids))
+            self.calcul.setText(f"محسوب من الأقسام: {e['niveau']} · {e['nb_eleves']} تلميذاً")
+            self.calcul.show()
+        else:
+            self.calcul.hide()
+
+    def nouveau(self) -> None:
+        self.pid = None
+        self.liste.clearSelection()
+        self.afficher_personnel(rh.Personnel())
+        self.titre.setText("موظف جديد")
+        self.c["nom_ar"].setFocus()
+
+    def afficher(self, pid: int) -> None:
+        self.afficher_personnel(rh.lire(self.f.conn, pid))
+
+    def afficher_personnel(self, p: rh.Personnel) -> None:
+        self.pid = p.id
+        self._categories(p.categorie == "directeur")
+        self.categorie.setCurrentIndex(max(0, self.categorie.findData(p.categorie)))
+        for k, w in self.c.items():
+            v = getattr(p, k)
+            v = "" if v is None else str(v)
+            w.setEditText(v) if isinstance(w, QComboBox) else w.setText(v)
+        for r in (self.r_m, self.r_f):
+            r.setAutoExclusive(False)
+            r.setChecked(False)
+            r.setAutoExclusive(True)
+        if p.sexe:
+            (self.r_f if p.sexe == "F" else self.r_m).setChecked(True)
+        self.unite.setCurrentIndex(max(0, self.unite.findData(p.unite)))
+        self.date_aff.definir(p.date_affectation or None)
+        self.dossier.setChecked(p.dossier_disponible)
+        self.remarques.setPlainText(p.remarques)
+        self._remplir_classes(p.classes)
+        self._maj_categorie()
+        self._maj_enseignement()
+        self.statut, self.date_depart = p.statut, p.date_depart
+        if p.id:
+            etat = "" if p.statut == "actif" else f" · {rh.STATUTS[p.statut]} منذ {p.date_depart}"
+            self.titre.setText(f"{p.prenom_ar} {p.nom_ar} · {rh.libelle_categorie(p.categorie, p.sexe)}{etat}")
+            m = rh.manquants_documents(self.f.conn, p)
+            self.manquants.setObjectName("alerte" if m else "ok")
+            self.manquants.setText("ينقص لوثائق الرخص ومحضر الاستئناف: " + "، ".join(m) if m
+                                   else "الملف مكتمل لوثائق الرخص ومحضر الاستئناف.")
+            self.manquants.style().unpolish(self.manquants)
+            self.manquants.style().polish(self.manquants)
+            self.manquants.show()
+        else:
+            self.manquants.hide()
+        self.b_depart.setVisible(bool(p.id) and p.statut == "actif" and p.categorie != "directeur")
+        self.b_retour.setVisible(bool(p.id) and p.statut != "actif")
+        self.message.hide()
+
+    def lire_formulaire(self) -> rh.Personnel:
+        v = {k: (w.currentText() if isinstance(w, QComboBox) else w.text()) for k, w in self.c.items()}
+        try:
+            date_aff = self.date_aff.iso()
+        except ValueError:
+            raise rh.ErreurPersonnel("تاريخ التعيين غير صحيح.") from None
+        ids = self.classes_cochees()
+        if ids:
+            v["niveau_enseigne"], v["nb_eleves"] = "", ""
+        sexe = "F" if self.r_f.isChecked() else "M" if self.r_m.isChecked() else ""
+        return rh.Personnel(**v, sexe=sexe, categorie=self.categorie.currentData(),
+                            unite=self.unite.currentData() or "", date_affectation=date_aff,
+                            dossier_disponible=self.dossier.isChecked(),
+                            remarques=self.remarques.toPlainText().strip(), id=self.pid,
+                            classes=ids if self.categorie.currentData() in ("enseignant", "educatrice") else [],
+                            statut=getattr(self, "statut", "actif"), date_depart=getattr(self, "date_depart", ""))
+
+    def enregistrer(self) -> int | None:
+        try:
+            pid = rh.enregistrer(self.f.conn, self.lire_formulaire())
+        except rh.ErreurPersonnel as e:
+            message(self.message, str(e), True)
+            return None
+        self.rafraichir()
+        self.afficher(pid)
+        ligne = next((i for i in range(self.liste.rowCount())
+                      if self.liste.item(i, 0).data(Qt.UserRole) == pid), None)
+        if ligne is not None:
+            self.liste.blockSignals(True)
+            selectionner(self.liste, ligne)
+            self.liste.blockSignals(False)
+        message(self.message, "حُفظ ملف الموظف.")
+        return pid
+
+    def dialogue_depart(self) -> None:
+        d = DialogueDepart(self.titre.text(), self)
+        if d.exec() == QDialog.Accepted:
+            try:
+                le = d.le.iso()
+            except ValueError:
+                message(self.message, "التاريخ غير صحيح.", True)
+                return
+            self.depart(d.statut.currentData(), le, d.remarque.text())
+
+    def depart(self, statut: str, le: str, remarque: str = "") -> bool:
+        try:
+            rh.depart(self.f.conn, self.pid, statut, le, remarque)
+        except rh.ErreurPersonnel as e:
+            message(self.message, str(e), True)
+            return False
+        pid = self.pid
+        self.rafraichir()
+        self.afficher(pid)
+        message(self.message, f"سُجّلت المغادرة ({rh.STATUTS[statut]}). الملف محفوظ ويظهر بتفعيل «إظهار المغادرين».")
+        return True
+
+    def reintegrer(self) -> None:
+        try:
+            rh.reintegrer(self.f.conn, self.pid)
+        except rh.ErreurPersonnel as e:
+            message(self.message, str(e), True)
+            return
+        pid = self.pid
+        self.rafraichir()
+        self.afficher(pid)
+        message(self.message, "أُرجع الموظف إلى لائحة العاملين.")

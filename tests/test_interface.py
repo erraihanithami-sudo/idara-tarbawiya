@@ -280,3 +280,51 @@ def test_vacances_sans_nom_francais_du_directeur(app, config_tmp, monkeypatch):
     assert p.vacances(date(2026, 12, 20), date(2027, 1, 4)) is None
     assert "اسم المدير ونسبه بالفرنسية" in p.message.text() and "إعداد المؤسسة" in p.message.text()
     f.close()
+
+
+def test_page_personnel(app, config_tmp):
+    from idara.services import personnel as rh
+    from idara.ui.saisie import selectionner
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("الموارد البشرية")
+    p = f.page_rh
+    assert p.liste.rowCount() == 1  # المدير من الإعداد
+    assert "الإدارة: 1" in p.effectifs.text()
+    # حفظ ناقص
+    p.nouveau()
+    p.c["nom_ar"].setText("الأستاذة")
+    assert p.enregistrer() is None and "إجبارية" in p.message.text()
+    p.c["prenom_ar"].setText("فاطمة")
+    p.r_f.setChecked(True)
+    p.categorie.setCurrentIndex(p.categorie.findData("enseignant"))
+    assert not p.bloc_ens.isHidden()
+    p.c["ppr"].setText("1234567")
+    p.c["cin"].setText("ab123456")
+    p.c["cadre"].setEditText("أستاذة التعليم الابتدائي")
+    p.c["telephone"].setText("0612345678")
+    p.c["heures_hebdo"].setText("30")
+    # إسناد قسم: المستوى والعدد محسوبان
+    for i in range(p.classes.count()):
+        if p.classes.item(i).text().startswith("PS1-PS2"):
+            p.classes.item(i).setCheckState(Qt.Checked)
+    assert not p.c["nb_eleves"].isEnabled() and "2 تلميذاً" in p.calcul.text()
+    pid = p.enregistrer()
+    assert pid is not None, p.message.text()
+    assert p.liste.rowCount() == 2 and "الأساتذة: 1" in p.effectifs.text()
+    assert "ينقص" in p.manquants.text() and "الدرجة" in p.manquants.text()
+    assert rh.lire(f.conn, pid).cin == "AB123456"
+    # اقتراح الإطار في الملف الجديد
+    p.nouveau()
+    assert p.c["cadre"].findText("أستاذة التعليم الابتدائي") >= 0
+    # المغادرة
+    p.afficher(pid)
+    assert p.depart("mute", "2026-12-01", "انتقال")
+    assert p.liste.rowCount() == 1 and not p.b_retour.isHidden()
+    p.voir_partis.setChecked(True)
+    assert p.liste.rowCount() == 2
+    # المدير: الفئة مقفلة، لا زر مغادرة
+    ligne = next(i for i in range(p.liste.rowCount())
+                 if p.liste.item(i, 0).data(Qt.UserRole) != pid)
+    selectionner(p.liste, ligne)
+    assert not p.categorie.isEnabled() and p.b_depart.isHidden()
+    f.close()

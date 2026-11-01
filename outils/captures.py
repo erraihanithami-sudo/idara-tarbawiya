@@ -11,6 +11,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from idara.app import creer_application  # noqa: E402
@@ -113,6 +114,26 @@ def main(sortie: Path) -> None:
     a2.c_cin.setText("A000000")
     a2.generer()
     photo(f, "19_anciens_certificat")
+    # الموارد البشرية
+    f.aller_a("الموارد البشرية")
+    r = f.page_rh
+    photo(f, "20_personnel_liste")
+    r.nouveau()
+    r.c["nom_ar"].setText("التجريبية")
+    r.c["prenom_ar"].setText("فاطمة")
+    r.r_f.setChecked(True)
+    r.categorie.setCurrentIndex(r.categorie.findData("enseignant"))
+    r.c["ppr"].setText("1234567")
+    r.c["cin"].setText("AB123456")
+    r.c["cadre"].setEditText("أستاذة التعليم الابتدائي")
+    r.c["matiere"].setEditText("العربية")
+    r.c["heures_hebdo"].setText("30")
+    r.classes.item(0).setCheckState(Qt.Checked)
+    r.enregistrer()
+    photo(f, "21_personnel_fiche")
+    f.resize(1280, 1500)
+    photo(f, "22_personnel_fiche_complete")
+    f.resize(1280, 800)
     f.close()
     app.quit()
     print("captures:", sorted(p.name for p in sortie.glob("*.png")))
