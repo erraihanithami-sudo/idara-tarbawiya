@@ -110,6 +110,7 @@ class PageImport(QWidget):
         entetes.setSectionResizeMode(1, QHeaderView.Stretch)
         entetes.setSectionResizeMode(4, QHeaderView.Stretch)
         self.table.setColumnWidth(3, 170)
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         nv.addWidget(self.table)
         hn = QHBoxLayout()
         self.b_confirmer = QPushButton("تأكيد مستويات هذا القسم")
@@ -258,7 +259,11 @@ class PageImport(QWidget):
         lignes = [r for r in self.lignes_niveau if r["classe"] == classe]
         candidats = ms.niveaux_du_code_classe(classe or "") or list(ms.ORDRE)
         self.table.setRowCount(len(lignes))
-        self.table.setFixedHeight(48 * max(1, len(lignes)) + self.table.horizontalHeader().height() + 6)
+        hauteur = 48 * max(1, len(lignes)) + max(36, self.table.horizontalHeader().sizeHint().height()) + 8
+        self.table.setMinimumHeight(hauteur)
+        self.table.setMaximumHeight(hauteur)
+        self.table.updateGeometry()
+        self.c_niveaux.updateGeometry()
         self.combos = {}
         for i, r in enumerate(lignes):
             for j, t in enumerate([r["code_massar"], f"{r['prenom_ar']} {r['nom_ar']}",

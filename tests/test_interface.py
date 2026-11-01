@@ -158,6 +158,7 @@ def test_page_import_et_confirmation(app, config_tmp):
     assert not page.c_niveaux.isHidden() and page.choix_classe.count() == 2
     page.choix_classe.setCurrentIndex(page.choix_classe.findData("PS1-PS2"))
     assert page.table.rowCount() == 2
+    assert page.table.minimumHeight() >= 2 * 48 + 36
     assert page.confirmer() == 2
     assert page.choix_classe.count() == 1
     f.aller(0)
