@@ -143,27 +143,45 @@ class PagePersonnel(QWidget):
         self.unite = QComboBox()
         self.date_aff = ChampDate()
 
-        def section(titre: str, champs: list[tuple[str, QWidget]]) -> None:
+        self.etiquettes = {}
+
+        def section(titre: str, champs: list[tuple[str, QWidget]], cible=None) -> None:
+            cible = cible or fv
             t = QLabel(titre)
             t.setObjectName("titreCarte")
-            fv.addWidget(t)
+            cible.addWidget(t)
             g = QGridLayout()
             g.setHorizontalSpacing(16)
             g.setVerticalSpacing(4)
             for i, (lib, w) in enumerate(champs):
-                g.addWidget(etiquette(lib, w), (i // 2) * 2, i % 2)
+                e = etiquette(lib, w)
+                self.etiquettes[lib] = e
+                g.addWidget(e, (i // 2) * 2, i % 2)
                 g.addWidget(w, (i // 2) * 2 + 1, i % 2)
-            fv.addLayout(g)
+            cible.addLayout(g)
+
+        def liste_fixe(valeurs) -> QComboBox:
+            c = QComboBox()
+            c.addItem("— اختر —", "")
+            for v in valeurs:
+                c.addItem(v, v)
+            return c
+        self.cadre, self.grade = liste_fixe(rh.CADRES), liste_fixe(rh.GRADES)
 
         section("الهوية", [("النسب *", self.c["nom_ar"]), ("الاسم *", self.c["prenom_ar"]),
                            ("Nom", self.c["nom_fr"]), ("Prénom", self.c["prenom_fr"]),
                            ("النوع *", sexe), ("الفئة *", self.categorie)])
         section("الوضعية الإدارية", [("رقم التأجير", self.c["ppr"]), ("رقم البطاقة الوطنية", self.c["cin"]),
-                                     ("الإطار", self.c["cadre"]), ("الدرجة", self.c["grade"]),
+                                     ("الإطار", self.cadre), ("الدرجة", self.grade),
                                      ("المهمة", self.c["fonction"]), ("السلك", self.c["cycle"]),
                                      ("الوحدة المدرسية", self.unite)])
         self.dates = {k: (self.date_aff if k == "date_affectation" else ChampDate()) for k, _ in rh.DATES_CARRIERE}
-        section("المسار المهني (لتحديد الفائض)", [(lib, self.dates[k]) for k, lib in rh.DATES_CARRIERE])
+        # قرار المدير: المسار المهني (الفائض) لا يظهر لفئة المدير
+        self.bloc_carriere = QWidget()
+        bc = QVBoxLayout(self.bloc_carriere)
+        bc.setContentsMargins(0, 0, 0, 0)
+        fv.addWidget(self.bloc_carriere)
+        section("المسار المهني (لتحديد الفائض)", [(lib, self.dates[k]) for k, lib in rh.DATES_CARRIERE], bc)
         self.exemption = QComboBox()
         for lib, k in (("لا استثناء", ""), ("أستاذ(ة) مبرز(ة)", "agrege"), ("حامل(ة) الدكتوراه", "doctorat")):
             self.exemption.addItem(lib, k)
@@ -176,16 +194,16 @@ class PagePersonnel(QWidget):
         g_ex.addWidget(self.exemption, 1, 0)
         g_ex.addWidget(etiquette("تاريخ الحصول على الدكتوراه", self.date_doctorat), 0, 1)
         g_ex.addWidget(self.date_doctorat, 1, 1)
-        fv.addLayout(g_ex)
+        bc.addLayout(g_ex)
         regle = QLabel("من عُيّن بالمديرية قبل إحداث الأكاديميات: يُعتمد 01/09/2002 تاريخاً للتعيين بالأكاديمية "
                        "(يُملأ آلياً عند الحفظ).")
         regle.setObjectName("etiquette")
         regle.setWordWrap(True)
-        fv.addWidget(regle)
+        bc.addWidget(regle)
         self.anciennete = QLabel()
         self.anciennete.setObjectName("etiquette")
         self.anciennete.setWordWrap(True)
-        fv.addWidget(self.anciennete)
+        bc.addWidget(self.anciennete)
         self.bloc_ens = QWidget()
         be = QVBoxLayout(self.bloc_ens)
         be.setContentsMargins(0, 0, 0, 0)
@@ -313,7 +331,12 @@ class PagePersonnel(QWidget):
                 and self.classes.item(i).checkState() == Qt.Checked]
 
     def _maj_categorie(self) -> None:
-        self.bloc_ens.setVisible(self.categorie.currentData() in ("enseignant", "educatrice"))
+        cat = self.categorie.currentData()
+        self.bloc_ens.setVisible(cat in ("enseignant", "educatrice"))
+        directeur = cat == "directeur"
+        self.bloc_carriere.setVisible(not directeur)
+        self.c["cycle"].setVisible(not directeur)
+        self.etiquettes["السلك"].setVisible(not directeur)
 
     def _maj_enseignement(self) -> None:
         ids = self.classes_cochees()
@@ -355,6 +378,17 @@ class PagePersonnel(QWidget):
         self.exemption.setCurrentIndex(max(0, self.exemption.findData(p.exemption_fa or "")))
         self.date_doctorat.definir(p.date_exemption_fa or None)
         self.date_doctorat.setEnabled(p.exemption_fa == "doctorat")
+        for w, val, n in ((self.cadre, p.cadre, len(rh.CADRES)), (self.grade, p.grade, len(rh.GRADES)),
+                          (self.matiere, None, len(rh.MATIERES))):
+            while w.count() > n + 1:  # حذف القيم القديمة المضافة لعرض سابق
+                w.removeItem(w.count() - 1)
+            if val is None:
+                continue
+            j = w.findData(val or "")
+            if j < 0:  # قيمة مكتوبة يدوياً قبل اعتماد القائمة
+                w.addItem(f"{val} (اختر من القائمة)", val)
+                j = w.count() - 1
+            w.setCurrentIndex(j)
         i = self.matiere.findData(p.matiere)
         if i < 0:  # قيمة قديمة مكتوبة يدوياً قبل اعتماد القائمة: تظهر وتُطلب إعادة الاختيار
             self.matiere.addItem(f"{p.matiere} (اختر من القائمة)", p.matiere)
@@ -397,6 +431,8 @@ class PagePersonnel(QWidget):
     def lire_formulaire(self) -> rh.Personnel:
         v = {k: (w.currentText() if isinstance(w, QComboBox) else w.text()) for k, w in self.c.items()}
         v["matiere"] = self.matiere.currentData() or ""
+        v["cadre"] = self.cadre.currentData() or ""
+        v["grade"] = self.grade.currentData() or ""
         v["exemption_fa"] = self.exemption.currentData() or ""
         try:
             v["date_exemption_fa"] = self.date_doctorat.iso() if v["exemption_fa"] == "doctorat" else ""

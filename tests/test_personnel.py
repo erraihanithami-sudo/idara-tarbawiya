@@ -22,7 +22,7 @@ def base(tmp_path, dossier, conn):
 
 def _prof(**k):
     d = dict(nom_ar="الأستاذة", prenom_ar="فاطمة", sexe="F", categorie="enseignant", ppr="1234567",
-             cin="ab 123456", telephone="06 12 34 56 78", cadre="أستاذة التعليم الابتدائي",
+             cin="ab 123456", telephone="06 12 34 56 78", cadre="أستاذ(ة) التعليم الابتدائي",
              grade="الدرجة الأولى", fonction="التدريس", cycle="الابتدائي", matiere="عربية",
              heures_hebdo="30", adresse="حي تجريبي", date_affectation="2015-09-01")
     d.update(k)
@@ -48,7 +48,7 @@ def test_ajout_normalisation_et_lecture(base):
     for t in ("فاطمة", "الأستاذة فاطمة", "1234567", "ab123456"):
         assert [x.id for x in rh.lister(base, t)] == [pid], t
     assert [x.id for x in rh.lister(base, categorie="gardien")] == []
-    assert rh.suggestions(base, "cadre") == ["أستاذة التعليم الابتدائي"]
+    assert set(rh.suggestions(base, "fonction")) == {"التدريس", "الإدارة التربوية"}
 
 
 @pytest.mark.parametrize("modif, message", [
@@ -56,7 +56,8 @@ def test_ajout_normalisation_et_lecture(base):
     (dict(cin="123"), "البطاقة"), (dict(telephone="12345"), "الهاتف"), (dict(heures_hebdo="x"), "عدد صحيح"),
     (dict(heures_hebdo="99"), "معقولة"), (dict(date_affectation="2099-01-01"), "المستقبل"),
     (dict(statut="retraite"), "تاريخ المغادرة"), (dict(categorie="directeur"), "إعداد المؤسسة"),
-    (dict(unite="غير موجودة"), "الوحدة"), (dict(matiere="الرياضيات"), "اختر من القائمة"),
+    (dict(unite="غير موجودة"), "الوحدة"), (dict(cadre="أستاذة"), "الإطار: اختر"),
+    (dict(grade="الأولى"), "الدرجة: اختر"), (dict(matiere="الرياضيات"), "اختر من القائمة"),
 ])
 def test_refus(base, modif, message):
     with pytest.raises(rh.ErreurPersonnel, match=message):
@@ -75,9 +76,10 @@ def test_unicite(base):
 
 def test_directeur_modifiable_mais_pas_depart(base):
     d = rh.lister(base, categorie="directeur")[0]
-    d.cin, d.cadre = "Z99", "مدير"
+    d.cin, d.cadre, d.cycle = "Z99", "متصرف(ة) تربوي(ة)", "ابتدائي"
     rh.enregistrer(base, d)
     assert et.directeur_actuel(base)["cin"] == "Z99"
+    assert rh.lire(base, d.id).cycle == ""  # السلك لا يخص المدير
     d.categorie = "enseignant"
     with pytest.raises(rh.ErreurPersonnel, match="إعداد المؤسسة"):
         rh.enregistrer(base, d)
@@ -205,3 +207,13 @@ def test_reference_academies_pour_affectation_ancienne(base):
 def test_academie_coherente(base, modif, message):
     with pytest.raises(rh.ErreurPersonnel, match=message):
         rh.enregistrer(base, _carriere(**modif))
+
+
+
+@pytest.mark.parametrize("cadre, sexe, attendu", [
+    ("أستاذ(ة) التعليم الابتدائي", "F", "أستاذة التعليم الابتدائي"),
+    ("أستاذ(ة) التعليم الابتدائي", "M", "أستاذ التعليم الابتدائي"),
+    ("متصرف(ة) تربوي(ة)", "F", "متصرفة تربوية"), ("متصرف(ة) تربوي(ة)", "M", "متصرف تربوي")])
+def test_cadre_accorde(cadre, sexe, attendu):
+    assert rh.cadre_accorde(cadre, sexe) == attendu
+    assert rh.grade_court("الدرجة الممتازة") == "الممتازة"

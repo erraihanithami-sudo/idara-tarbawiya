@@ -308,7 +308,9 @@ def test_page_personnel(app, config_tmp):
     assert not p.bloc_ens.isHidden()
     p.c["ppr"].setText("7654321")
     p.c["cin"].setText("ab123456")
-    p.c["cadre"].setEditText("أستاذة التعليم الابتدائي")
+    assert [p.cadre.itemData(i) for i in range(p.cadre.count())] == ["", "أستاذ(ة) التعليم الابتدائي", "متصرف(ة) تربوي(ة)"]
+    assert p.grade.count() == 4
+    p.cadre.setCurrentIndex(1)
     p.c["telephone"].setText("0612345678")
     p.c["heures_hebdo"].setText("30")
     assert [p.matiere.itemData(i) for i in range(p.matiere.count())] == ["", "عربية", "فرنسية", "مزدوجة", "أمازيغية"]
@@ -337,7 +339,7 @@ def test_page_personnel(app, config_tmp):
     assert rh.lire(f.conn, pid).date_affectation_direction == "2008-09-01"
     # اقتراح الإطار في الملف الجديد
     p.nouveau()
-    assert p.c["cadre"].findText("أستاذة التعليم الابتدائي") >= 0
+    assert p.cadre.currentIndex() == 0 and p.cadre.count() == 3
     # المغادرة
     p.afficher(pid)
     assert p.depart("mute", "2026-12-01", "انتقال")
@@ -349,6 +351,7 @@ def test_page_personnel(app, config_tmp):
                  if p.liste.item(i, 0).data(Qt.UserRole) != pid)
     selectionner(p.liste, ligne)
     assert not p.categorie.isEnabled() and p.b_depart.isHidden()
+    assert p.bloc_carriere.isHidden() and p.c["cycle"].isHidden()  # قرار المدير
     f.close()
 
 
@@ -383,7 +386,7 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     f = _fenetre_avec_eleves(config_tmp)
     pid = rh.enregistrer(f.conn, rh.Personnel(
         nom_ar="التجريبية", prenom_ar="سلمى", sexe="F", categorie="enseignant", ppr="7654321", cin="AB1",
-        cadre="أستاذة التعليم الابتدائي", grade="الأولى", fonction="التدريس", cycle="ابتدائي", matiere="عربية",
+        cadre="أستاذ(ة) التعليم الابتدائي", grade="الدرجة الأولى", fonction="التدريس", cycle="ابتدائي", matiere="عربية",
         niveau_enseigne="الرابع", nb_eleves=28, heures_hebdo=30, adresse="حي", telephone="0600000000"))
     f.aller_a("الرخص")
     p = f.page_conges
@@ -470,3 +473,19 @@ def test_page_mouvements(app, config_tmp, monkeypatch):
     assert p.envoi() is not None and "أُرسل الملف" in p.liste.item(0, 1).text()
     assert mv.alertes(f.conn)["envoi"] == []
     f.close()
+
+
+
+def test_champ_date_calendrier(app):
+    from PySide6.QtCore import QDate
+    from idara.ui.saisie import ChampDate
+    c = ChampDate()
+    c.definir("2026-11-10")
+    cal = c.ouvrir_calendrier()
+    assert cal.selectedDate() == QDate(2026, 11, 10)
+    cal.clicked.emit(QDate(2015, 9, 1))
+    assert c.iso() == "2015-09-01" and c.popup is None
+    c.clear()
+    cal = c.ouvrir_calendrier()  # فارغ: اليومية على تاريخ اليوم
+    assert cal.selectedDate() == QDate.currentDate()
+    c.popup.close()

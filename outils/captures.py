@@ -125,7 +125,8 @@ def main(sortie: Path) -> None:
     r.categorie.setCurrentIndex(r.categorie.findData("enseignant"))
     r.c["ppr"].setText("1234567")
     r.c["cin"].setText("AB123456")
-    r.c["cadre"].setEditText("أستاذة التعليم الابتدائي")
+    r.cadre.setCurrentIndex(1)
+    r.grade.setCurrentIndex(1)
     r.matiere.setCurrentIndex(r.matiere.findData("عربية"))
     r.c["heures_hebdo"].setText("30")
     r.classes.item(0).setCheckState(Qt.Checked)
@@ -135,6 +136,11 @@ def main(sortie: Path) -> None:
         r.dates[k].setText(v)
     r.enregistrer()
     photo(f, "21_personnel_fiche")
+    r.dates["date_naissance"].ouvrir_calendrier()
+    QApplication.processEvents()
+    __import__("PySide6.QtGui", fromlist=["x"]).QGuiApplication.primaryScreen()
+    r.dates["date_naissance"].popup.grab().save(str(sortie / "21b_calendrier.png"))
+    r.dates["date_naissance"].popup.close()
     f.resize(1280, 1750)
     photo(f, "22_personnel_fiche_complete")
     f.resize(1280, 800)
@@ -154,7 +160,7 @@ def main(sortie: Path) -> None:
     from idara.services import conges as cg
     fatima = next(x for x in rh.lister(f.conn) if x.prenom_ar == "فاطمة")
     fatima.grade, fatima.fonction, fatima.cycle, fatima.adresse, fatima.telephone = (
-        "الأولى", "التدريس", "ابتدائي", "حي تجريبي", "0600000000")
+        "الدرجة الأولى", "التدريس", "ابتدائي", "حي تجريبي", "0600000000")
     rh.enregistrer(f.conn, fatima)
     f.aller_a("الرخص")
     pc = f.page_conges

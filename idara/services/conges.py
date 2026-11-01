@@ -340,7 +340,8 @@ def _personnel_valeurs(conn, p: rh.Personnel, champs: dict[str, str]) -> dict[st
     enseignant = p.categorie in ("enseignant", "educatrice")
     e = rh.enseignement(conn, p) if enseignant else {"niveau": "—", "nb_eleves": "—"}
     v = {"nom_complet": f"{p.prenom_ar} {p.nom_ar}", "prenom": p.prenom_ar, "nom": p.nom_ar, "ppr": p.ppr,
-         "cin": p.cin, "cadre": p.cadre, "grade": p.grade, "fonction": p.fonction, "adresse": p.adresse,
+         "cin": p.cin, "cadre": rh.cadre_accorde(p.cadre, p.sexe), "grade": rh.grade_court(p.grade),
+         "fonction": p.fonction, "adresse": p.adresse,
          "telephone": p.telephone,
          "cycle": p.cycle if enseignant else "—", "matiere": p.matiere if enseignant else "—",
          "niveau": e["niveau"], "nb_eleves": "" if e["nb_eleves"] in (None, "") else str(e["nb_eleves"]),
@@ -598,8 +599,7 @@ def documents(conn, conge_id: int) -> list[sqlite3.Row]:
 
 def exemple(conn, code: str, sexe: str = "M") -> dict[str, str]:
     p = rh.Personnel(nom_ar="التجريبي", prenom_ar="سعيد" if sexe == "M" else "سلمى", sexe=sexe,
-                     categorie="enseignant", ppr="1234567", cin="AB123456", cadre=tx.accord(
-                         sexe, "أستاذ التعليم الابتدائي", "أستاذة التعليم الابتدائي"), grade="الأولى",
+                     categorie="enseignant", ppr="1234567", cin="AB123456", cadre=rh.CADRES[0], grade=rh.GRADES[0],
                      fonction="التدريس", cycle="ابتدائي", matiere="عربية", niveau_enseigne="الرابع",
                      nb_eleves=30, heures_hebdo=30, adresse="[العنوان الشخصي]", telephone="0600000000")
     an = date.today().year

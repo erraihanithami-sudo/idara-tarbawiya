@@ -21,7 +21,7 @@ def base(dossier, conn):
 
 def _prof(conn, **k):
     d = dict(nom_ar="التجريبية", prenom_ar="سلمى", sexe="F", categorie="enseignant", ppr="1234567",
-             cin="AB123456", cadre="أستاذة التعليم الابتدائي", grade="الأولى", fonction="التدريس",
+             cin="AB123456", cadre="أستاذ(ة) التعليم الابتدائي", grade="الدرجة الأولى", fonction="التدريس",
              cycle="ابتدائي", matiere="فرنسية", niveau_enseigne="الرابع", nb_eleves=28, heures_hebdo=30,
              adresse="حي تجريبي", telephone="0600000000")
     d.update(k)

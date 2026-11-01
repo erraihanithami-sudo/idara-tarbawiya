@@ -4,20 +4,84 @@ from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QHeaderView, QLabel, QLineEdit, QTableWidget,
-                               QTableWidgetItem)
+from PySide6.QtCore import QDate, QLocale, QPoint, QRectF, Qt
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (QAbstractItemView, QCalendarWidget, QFrame, QHeaderView, QLabel, QLineEdit,
+                               QTableWidget, QTableWidgetItem, QVBoxLayout)
+
+
+def _icone_calendrier() -> QIcon:
+    pm = QPixmap(32, 32)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    vert = QColor("#006233")
+    p.setPen(QPen(vert, 2.4))
+    p.drawRoundedRect(QRectF(5, 7, 22, 20), 3, 3)
+    p.fillRect(QRectF(5, 7, 22, 6), vert)
+    p.drawLine(11, 4, 11, 9)
+    p.drawLine(21, 4, 21, 9)
+    p.setPen(Qt.NoPen)
+    p.setBrush(vert)
+    for x in (10, 16, 22):
+        for y in (17, 22):
+            p.drawEllipse(QRectF(x - 1.6, y - 1.6, 3.2, 3.2))
+    p.end()
+    return QIcon(pm)
 
 
 class ChampDate(QLineEdit):
-    """تاريخ يُكتب مباشرة 01/01/1985 (أسرع من التقويم للتواريخ القديمة)."""
+    """تاريخ يُكتب مباشرة 01/01/1985، أو يُختار من يومية (طلب المدير: كما في صفحة الإعدادات).
+    اليومية تُفتح بأيقونتها، أو بالنقر على الحقل وهو فارغ."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setInputMask("00/00/0000;_")
         self.setLayoutDirection(Qt.LeftToRight)
         self.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.setMaximumWidth(180)
+        self.setMaximumWidth(190)
+        self.action_calendrier = self.addAction(_icone_calendrier(), QLineEdit.ActionPosition.TrailingPosition)
+        self.action_calendrier.setToolTip("اختيار التاريخ من اليومية")
+        self.action_calendrier.triggered.connect(self.ouvrir_calendrier)
+        self.popup: QFrame | None = None
+
+    def ouvrir_calendrier(self) -> QCalendarWidget:
+        self.popup = QFrame(self, Qt.Popup)
+        self.popup.setObjectName("carte")
+        v = QVBoxLayout(self.popup)
+        v.setContentsMargins(6, 6, 6, 6)
+        cal = QCalendarWidget()
+        cal.setLocale(QLocale("ar_MA"))
+        cal.setLayoutDirection(Qt.RightToLeft)
+        cal.setGridVisible(False)
+        cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        try:
+            actuelle = self.iso()
+        except ValueError:
+            actuelle = ""
+        if actuelle:
+            d = date.fromisoformat(actuelle)
+            cal.setSelectedDate(QDate(d.year, d.month, d.day))
+        cal.clicked.connect(self._choisir)
+        cal.activated.connect(self._choisir)
+        v.addWidget(cal)
+        self.popup.adjustSize()
+        pos = self.mapToGlobal(QPoint(0, self.height()))
+        self.popup.move(pos.x() + self.width() - self.popup.width(), pos.y() + 2)
+        self.popup.show()
+        self.calendrier = cal
+        return cal
+
+    def _choisir(self, q: QDate) -> None:
+        self.setText(f"{q.day():02d}/{q.month():02d}/{q.year()}")
+        if self.popup:
+            self.popup.close()
+            self.popup = None
+
+    def mousePressEvent(self, e) -> None:
+        super().mousePressEvent(e)
+        if self.isEnabled() and not self.text().replace("_", "").strip("/ "):
+            self.ouvrir_calendrier()
 
     def iso(self) -> str:
         """YYYY-MM-DD، أو نص فارغ إن لم يُكتب شيء. يرفع ValueError إن كان غير صحيح."""

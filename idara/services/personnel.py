@@ -22,7 +22,22 @@ CATEGORIES = {"enseignant": ("أستاذ", "أستاذة", "الأساتذة"),
               "directeur": ("المدير", "المديرة", "الإدارة")}
 STATUTS = {"actif": "في العمل", "retraite": "متقاعد(ة)", "mute": "منتقل(ة)", "autre": "مغادر(ة) لسبب آخر"}
 # الحقول ذات القيم المتكررة: تُقترح من القيم المدخلة سابقاً (لا قوائم رسمية مفترضة)
-CHAMPS_SUGGERES = ("cadre", "grade", "fonction", "cycle")
+CHAMPS_SUGGERES = ("fonction", "cycle")
+# قرار المدير (2026-11-01): الإطار والدرجة من قوائم ثابتة
+CADRES = ("أستاذ(ة) التعليم الابتدائي", "متصرف(ة) تربوي(ة)")
+GRADES = ("الدرجة الأولى", "الدرجة الثانية", "الدرجة الممتازة")
+
+
+def cadre_accorde(cadre: str, sexe: str) -> str:
+    """«أستاذ(ة) التعليم الابتدائي» ← «أستاذة التعليم الابتدائي» حسب النوع (للوثائق)."""
+    if sexe == "F":
+        return cadre.replace("(ة)", "ة")
+    return cadre.replace("(ة)", "")
+
+
+def grade_court(grade: str) -> str:
+    """«الدرجة الأولى» ← «الأولى» (النماذج تكتب «الدرجة: ...»)."""
+    return grade.removeprefix("الدرجة ").strip()
 # قرار المدير (2026-11-01): مادة التدريس من قائمة ثابتة
 MATIERES = ("عربية", "فرنسية", "مزدوجة", "أمازيغية")
 
@@ -160,6 +175,12 @@ class Personnel:
         if "date_affectation_direction" in d and "date_affectation" in d \
                 and d["date_affectation"] < d["date_affectation_direction"]:
             raise ErreurPersonnel("تاريخ التعيين بالمؤسسة قبل تاريخ التعيين بالمديرية الإقليمية.")
+        if self.cadre and self.cadre not in CADRES:
+            raise ErreurPersonnel("الإطار: اختر من القائمة (" + "، ".join(CADRES) + ").")
+        if self.grade and self.grade not in GRADES:
+            raise ErreurPersonnel("الدرجة: اختر من القائمة (" + "، ".join(GRADES) + ").")
+        if self.categorie == "directeur":
+            self.cycle = ""  # قرار المدير: السلك والمسار المهني لا يخصان المدير
         if self.matiere and self.matiere not in MATIERES:
             raise ErreurPersonnel("مادة التدريس: اختر من القائمة (" + "، ".join(MATIERES) + ").")
         if self.exemption_fa not in ("", "agrege", "doctorat"):
