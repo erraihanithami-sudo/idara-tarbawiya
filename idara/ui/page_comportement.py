@@ -79,11 +79,15 @@ class PageComportement(QWidget):
         g = QGridLayout()
         g.setHorizontalSpacing(16)
         g.setVerticalSpacing(4)
-        for i, (lib, w) in enumerate((("التاريخ *", self.date), ("طبيعة الملاحظة *", self.nature),
-                                      ("الإجراء المتخذ", self.mesure), ("صاحب الملاحظة", self.signale),
-                                      ("التفاصيل", self.description))):
-            g.addWidget(etiquette(lib, w), (i // 2) * 2, i % 2)
-            g.addWidget(w, (i // 2) * 2 + 1, i % 2)
+        g.addWidget(etiquette("التاريخ *", self.date), 0, 0)
+        g.addWidget(self.date, 1, 0)
+        g.addWidget(etiquette("صاحب الملاحظة", self.signale), 0, 1)
+        g.addWidget(self.signale, 1, 1)
+        for i, (lib, w) in enumerate((("طبيعة الملاحظة *", self.nature), ("الإجراء المتخذ", self.mesure),
+                                      ("التفاصيل", self.description)), start=1):
+            g.addWidget(etiquette(lib, w), i * 2, 0, 1, 2)
+            g.addWidget(w, i * 2 + 1, 0, 1, 2)
+        g.setColumnStretch(1, 1)
         fv.addLayout(g)
         h = QHBoxLayout()
         self.b_save = QPushButton("تسجيل الملاحظة")
