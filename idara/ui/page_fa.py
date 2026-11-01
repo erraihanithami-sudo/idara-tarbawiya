@@ -71,7 +71,7 @@ class CarteMatiere(QWidget):
                 if l.resultat == "fa":
                     it.setForeground(QColor("#A61E24"))
                 self.table.setItem(i, j, it)
-        self.table.setMinimumHeight(self.table.horizontalHeader().sizeHint().height() + 6
+        self.table.setMinimumHeight(self.table.horizontalHeader().sizeHint().height() + 30
                                     + 40 * max(1, len(lignes)))
         if g is None or not g.lignes:
             texte, nom = "لا أساتذة عاملون في هذه المادة.", "etiquette"
