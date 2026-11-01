@@ -136,7 +136,7 @@ class PageEleves(QWidget):
         self.b_convocations.setToolTip("حدد عدة تلاميذ بالضغط على Ctrl، ثم ولّد استدعاءاتهم في ملف واحد")
         self.b_convocations.clicked.connect(self.convocations)
         cv.addWidget(self.b_convocations)
-        corps.addWidget(c, 5)
+        corps.addWidget(c, 6)
 
         # البطاقة
         self.c_fiche, fv = carte()
@@ -212,12 +212,12 @@ class PageEleves(QWidget):
         self.docs.cellDoubleClicked.connect(self._ouvrir_doc)
         fv.addWidget(self.docs)
         fv.addStretch()
-        corps.addWidget(self.c_fiche, 6)
+        corps.addWidget(self.c_fiche, 5)
         self.c_fiche.hide()
         self.vide = QLabel("اختر تلميذاً من اللائحة لعرض بطاقته.")
         self.vide.setObjectName("etiquette")
         self.vide.setAlignment(Qt.AlignCenter)
-        corps.addWidget(self.vide, 6)
+        corps.addWidget(self.vide, 5)
         self.chercher("")
 
     # ---------- البحث ----------
