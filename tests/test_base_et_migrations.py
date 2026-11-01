@@ -49,12 +49,13 @@ def test_migration_suivante_sans_perte(tmp_path, dossier, conn):
     dossier_m.mkdir()
     for _, nom, f in dbmod.lister_migrations():
         (dossier_m / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
-    (dossier_m / "0003_test_ajout.sql").write_text(
+    n = len(dbmod.lister_migrations())
+    (dossier_m / f"{n + 1:04d}_test_ajout.sql").write_text(
         "ALTER TABLE etablissement ADD COLUMN email TEXT;", encoding="utf-8")
     c = connecter(dossier.base)
-    assert migrer(c, dossier_m) == ["0003_test_ajout"]
+    assert migrer(c, dossier_m) == [f"{n + 1:04d}_test_ajout"]
     assert c.execute("SELECT nom_ar FROM etablissement").fetchone()[0] == "مؤسسة تجريبية"
-    assert version_actuelle(c) == 3
+    assert version_actuelle(c) == n + 1
     c.close()
 
 
@@ -64,7 +65,8 @@ def test_migration_defaillante_annulee_entierement(tmp_path, dossier, conn):
     dossier_m.mkdir()
     for _, nom, f in dbmod.lister_migrations():
         (dossier_m / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
-    (dossier_m / "0003_casse.sql").write_text(
+    n = len(dbmod.lister_migrations())
+    (dossier_m / f"{n + 1:04d}_casse.sql").write_text(
         "CREATE TABLE nouvelle(x INTEGER);\nINSERT INTO table_inexistante VALUES (1);",
         encoding="utf-8")
     c = connecter(dossier.base)
@@ -72,7 +74,7 @@ def test_migration_defaillante_annulee_entierement(tmp_path, dossier, conn):
         migrer(c, dossier_m)
     tables = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert "nouvelle" not in tables
-    assert version_actuelle(c) == 2
+    assert version_actuelle(c) == n
     c.close()
 
 

@@ -74,6 +74,10 @@ def verification_installation() -> int:
             n = conn.execute("SELECT COUNT(*) FROM niveau").fetchone()[0]
             conn.close()
             assert n == 8, "البيانات المرجعية غير مكتملة"
+        from idara.services import documents as dc
+        from idara.services.moteur_docx import champs_du_modele
+        for code in dc.MODELES:
+            assert champs_du_modele(dc.chemin_defaut(code)), f"القالب {code} غير مرفق"
         AssistantPremierLancement()
         BandeZellige()
         police = QApplication.instance().font().family()

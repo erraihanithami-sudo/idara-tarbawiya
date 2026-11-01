@@ -63,7 +63,8 @@ def test_regles_de_la_base(conn):
     def count(t): return db.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
     results.append(("T35 المستويات المرجعية = 8", "مقبول", count("niveau")==8, ""))
     results.append(("T36 حالات الاستئناف = 10 (كما في المحضر الحقيقي)", "مقبول", count("cas_reprise")==10, ""))
-    results.append(("T37 إصدار القاعدة = آخر ترحيل (2)", "مقبول", db.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]==2, ""))
+    from idara.data.db import lister_migrations
+    results.append(("T37 إصدار القاعدة = آخر ترحيل", "مقبول", db.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]==len(lister_migrations()), ""))
     R = "INSERT INTO reprise_travail(personnel_id,conge_id,cas_reprise_id,date_debut_absence,date_fin_absence,date_reprise) VALUES (?,?,?,?,?,?)"
     expect("T38 محضر استئناف بعد رخصة", R, (1, 2, 6, "2026-02-10", "2026-03-01", "2026-03-02"))
     expect("T39 محضر ثان لنفس الرخصة", R, (1, 2, 6, "2026-02-10", "2026-03-01", "2026-03-02"), ok=False)

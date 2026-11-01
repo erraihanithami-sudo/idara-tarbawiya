@@ -109,3 +109,25 @@ def test_fenetre_principale_et_edition(app, config_tmp):
     assert f.nom_etab.text() == "اسم معدل"
     f.close()
     assert len(list((dossier.sauvegardes).glob("*.db"))) == 1
+
+
+def test_page_documents(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
+    from idara.ui.assistant import AssistantPremierLancement
+    from idara.ui.fenetre import FenetrePrincipale
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    monkeypatch.setattr(bureautique, "convertir_pdf", lambda p: p.with_suffix(".pdf"))
+    a = AssistantPremierLancement()
+    remplir_assistant(a, config_tmp / "الإدارة التربوية")
+    f = FenetrePrincipale(a.terminer())
+    f.aller(2)
+    page = f.page_docs
+    assert len(page.lignes) == 4
+    for code, ligne in page.lignes.items():
+        assert ligne.etat.objectName() == "ok", ligne.etat.text()
+        chemin = page.apercu(code)
+        assert chemin is not None and chemin.exists(), page.message.text()
+    assert len(ouverts) == 4
+    assert page.apercu("visite_medicale", pdf=True).suffix == ".pdf"
+    f.close()

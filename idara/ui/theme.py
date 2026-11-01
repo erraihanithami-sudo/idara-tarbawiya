@@ -41,6 +41,16 @@ def charger_police() -> QFont:
 FEUILLE_STYLE = f"""
 QWidget {{ color: {ENCRE}; font-size: 10.5pt; }}
 QMainWindow, #fond {{ background: {PLATRE}; }}
+QScrollArea {{ background: {PLATRE}; border: 0; }}
+QScrollArea > QWidget#qt_scrollarea_viewport {{ background: {PLATRE}; }}
+QToolButton {{ background: {BLANC}; border: 1px solid {BORDURE_CHAMP}; border-radius: 10px;
+    padding: 0 12px; min-height: 40px; }}
+QToolButton::menu-indicator {{ image: none; }}
+QMenu {{ background: {BLANC}; border: 1px solid {LIGNE}; padding: 4px; }}
+QMenu::item {{ padding: 8px 18px; border-radius: 6px; }}
+QMenu::item:selected {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; }}
+#ok {{ color: {VERT_FONCE}; }}
+#alerte {{ color: {ROUGE_TEXTE}; }}
 #barreLaterale {{ background: {BLANC}; border-left: 1px solid {LIGNE}; }}
 #carte {{ background: {BLANC}; border: 1px solid {LIGNE}; border-radius: 12px; }}
 #titrePage {{ font-size: 20pt; font-weight: 600; }}

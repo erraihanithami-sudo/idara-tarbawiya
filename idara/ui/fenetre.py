@@ -18,45 +18,10 @@ from idara.services import sauvegarde
 from idara.services.etablissement import ErreurValidation
 from idara.services.textes import date_longue_ar
 from idara.ui import theme
+from idara.ui.composants import carte, entete, page_defilante
 from idara.ui.formulaires import FormDirecteur, FormEtablissement, FormIdentite
+from idara.ui.page_documents import PageDocuments
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
-
-
-def carte(titre: str | None = None) -> tuple[QFrame, QVBoxLayout]:
-    c = QFrame()
-    c.setObjectName("carte")
-    v = QVBoxLayout(c)
-    v.setContentsMargins(24, 20, 24, 20)
-    v.setSpacing(10)
-    if titre:
-        t = QLabel(titre)
-        t.setObjectName("titreCarte")
-        v.addWidget(t)
-    return c, v
-
-
-def page_defilante(contenu: QWidget) -> QScrollArea:
-    z = QScrollArea()
-    z.setWidgetResizable(True)
-    z.setFrameShape(QFrame.NoFrame)
-    contenu.setObjectName("fond")
-    z.setWidget(contenu)
-    return z
-
-
-def entete(titre: str, sous_titre: str = "") -> QWidget:
-    w = QWidget()
-    v = QVBoxLayout(w)
-    v.setContentsMargins(0, 0, 0, 0)
-    v.setSpacing(4)
-    t = QLabel(titre)
-    t.setObjectName("titrePage")
-    v.addWidget(t)
-    if sous_titre:
-        s = QLabel(sous_titre)
-        s.setObjectName("sousTitre")
-        v.addWidget(s)
-    return w
 
 
 class PageTableauBord(QWidget):
@@ -212,7 +177,7 @@ class FenetrePrincipale(QMainWindow):
     PAGES = [
         ("لوحة القيادة", None),
         ("التلاميذ", "المرحلتين 3 و4"),
-        ("الوثائق", "المرحلتين 2 و5"),
+        ("الوثائق", None),
         ("الموارد البشرية", "المرحلتين 6 و7"),
         ("إعداد المؤسسة", None),
     ]
@@ -236,6 +201,9 @@ class FenetrePrincipale(QMainWindow):
         for nom, etape in self.PAGES:
             if nom == "لوحة القيادة":
                 self.pile.addWidget(page_defilante(self.tableau))
+            elif nom == "الوثائق":
+                self.page_docs = PageDocuments(self)
+                self.pile.addWidget(page_defilante(self.page_docs))
             elif nom == "إعداد المؤسسة":
                 self.pile.addWidget(page_defilante(self.page_etab))
             else:
@@ -309,6 +277,8 @@ class FenetrePrincipale(QMainWindow):
         self.boutons[i].setChecked(True)
         if i == 0:
             self.tableau.rafraichir()
+        elif self.PAGES[i][0] == "الوثائق":
+            self.page_docs.rafraichir()
         self.pile.setCurrentIndex(i)
 
     def exporter(self) -> None:

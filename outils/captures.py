@@ -57,7 +57,8 @@ def main(sortie: Path) -> None:
     f = FenetrePrincipale(dossier)
     f.resize(1280, 800)
     f.show()
-    for i, nom in [(0, "07_tableau_de_bord"), (4, "08_etablissement"), (1, "09_page_a_venir")]:
+    for i, nom in [(0, "07_tableau_de_bord"), (4, "08_etablissement"), (1, "09_page_a_venir"),
+                   (2, "10_documents")]:
         f.aller(i)
         photo(f, nom)
     f.close()
