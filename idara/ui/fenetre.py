@@ -14,6 +14,7 @@ from idara.data.db import ouvrir_base
 from idara.data.dossier import DossierDonnees
 from idara.services import annee as annee_srv
 from idara.services import etablissement as etab_srv
+from idara.services import import_eleves as imp
 from idara.services import sauvegarde
 from idara.services.etablissement import ErreurValidation
 from idara.services.textes import date_longue_ar
@@ -21,6 +22,7 @@ from idara.ui import theme
 from idara.ui.composants import carte, entete, page_defilante
 from idara.ui.formulaires import FormDirecteur, FormEtablissement, FormIdentite
 from idara.ui.page_documents import PageDocuments
+from idara.ui.page_import import PageImport
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
 
 
@@ -62,7 +64,7 @@ class PageTableauBord(QWidget):
         grille = QGridLayout()
         grille.setSpacing(16)
         for i, (lib, val, note) in enumerate([
-                ("عدد التلاميذ", str(n_eleves), "بعد الاستيراد من مسار"),
+                ("عدد التلاميذ", str(n_eleves), "المسجلون هذه السنة"),
                 ("الأقسام", str(n_classes), ""),
                 ("الموظفون", str(n_pers), "دون المدير"),
                 ("آخر نسخة احتياطية", derniere, f"{len(sv)} نسخة محفوظة")]):
@@ -80,15 +82,56 @@ class PageTableauBord(QWidget):
             grille.addWidget(c, 0, i)
         self.v.addLayout(grille)
 
-        c, cv = carte("ما يأتي في المراحل القادمة")
-        for ligne in ["محرك الوثائق بقوالبك الحقيقية (المرحلة 2)",
-                      "الاستيراد من مسار (المرحلة 3)",
-                      "التلاميذ ووثائقهم (المرحلة 4)",
-                      "الشهادة المدرسية لما قبل مسار (المرحلة 5)",
-                      "الموارد البشرية والرخص (المرحلتان 6 و7)"]:
-            l = QLabel("•  " + ligne)
-            cv.addWidget(l)
-        self.v.addWidget(c)
+        # التوزيع حسب القسم
+        repartition = conn.execute(
+            "SELECT c.code, COUNT(i.id) AS n FROM classe c LEFT JOIN inscription i ON i.classe_id=c.id "
+            "AND i.statut IN ('inscrit','arrive') WHERE c.annee_id=? GROUP BY c.id ORDER BY c.code",
+            (a["id"] if a else -1,)).fetchall()
+        if repartition:
+            c, cv = carte("التوزيع حسب القسم")
+            maxi = max(r["n"] for r in repartition) or 1
+            for r in repartition:
+                ligne = QHBoxLayout()
+                nom = QLabel(r["code"])
+                nom.setMinimumWidth(160)
+                barre = QFrame()
+                barre.setFixedHeight(10)
+                barre.setFixedWidth(max(4, int(420 * r["n"] / maxi)))
+                barre.setStyleSheet(f"background:{theme.VERT}; border-radius:5px;")
+                ligne.addWidget(nom)
+                ligne.addWidget(barre)
+                ligne.addWidget(QLabel(str(r["n"])))
+                ligne.addStretch()
+                cv.addLayout(ligne)
+            self.v.addWidget(c)
+
+        # التنبيهات المفيدة فقط
+        alertes = []
+        n_niv = len(imp.niveaux_a_confirmer(conn))
+        if n_niv:
+            alertes.append((f"مستوى {n_niv} تلميذاً بانتظار تأكيدك (أقسام مشتركة)",
+                            "الاستيراد من مسار"))
+        n_lieu = conn.execute(
+            "SELECT COUNT(*) FROM inscription i JOIN eleve e ON e.id=i.eleve_id WHERE i.annee_id=? "
+            "AND i.statut IN ('inscrit','arrive') AND e.lieu_naissance_id IS NULL",
+            (a["id"] if a else -1,)).fetchone()[0]
+        if n_lieu:
+            alertes.append((f"مكان الازدياد غير مسجل لـ {n_lieu} تلميذ (يلزم قبل توليد وثائقهم)", None))
+        if n_eleves == 0:
+            alertes.append(("لا يوجد تلاميذ بعد: ابدأ باستيراد لوائح مسار", "الاستيراد من مسار"))
+        if alertes:
+            c, cv = carte("تنبيهات")
+            for texte, cible in alertes:
+                ligne = QHBoxLayout()
+                l = QLabel(texte)
+                l.setWordWrap(True)
+                ligne.addWidget(l, 1)
+                if cible:
+                    b = QPushButton("فتح")
+                    b.clicked.connect(lambda _=False, c=cible: self.f.aller_a(c))
+                    ligne.addWidget(b)
+                cv.addLayout(ligne)
+            self.v.addWidget(c)
         self.v.addStretch()
 
 
@@ -176,7 +219,8 @@ class PageAVenir(QWidget):
 class FenetrePrincipale(QMainWindow):
     PAGES = [
         ("لوحة القيادة", None),
-        ("التلاميذ", "المرحلتين 3 و4"),
+        ("التلاميذ", "المرحلة 4"),
+        ("الاستيراد من مسار", None),
         ("الوثائق", None),
         ("الموارد البشرية", "المرحلتين 6 و7"),
         ("إعداد المؤسسة", None),
@@ -201,6 +245,9 @@ class FenetrePrincipale(QMainWindow):
         for nom, etape in self.PAGES:
             if nom == "لوحة القيادة":
                 self.pile.addWidget(page_defilante(self.tableau))
+            elif nom == "الاستيراد من مسار":
+                self.page_import = PageImport(self)
+                self.pile.addWidget(page_defilante(self.page_import))
             elif nom == "الوثائق":
                 self.page_docs = PageDocuments(self)
                 self.pile.addWidget(page_defilante(self.page_docs))
@@ -273,12 +320,17 @@ class FenetrePrincipale(QMainWindow):
         n = len(sauvegarde.lister_sauvegardes(self.dossier))
         self.etat_sauvegarde.setText(f"النسخ الاحتياطية المحفوظة: {n}")
 
+    def aller_a(self, nom: str) -> None:
+        self.aller([n for n, _ in self.PAGES].index(nom))
+
     def aller(self, i: int) -> None:
         self.boutons[i].setChecked(True)
         if i == 0:
             self.tableau.rafraichir()
         elif self.PAGES[i][0] == "الوثائق":
             self.page_docs.rafraichir()
+        elif self.PAGES[i][0] == "الاستيراد من مسار":
+            self.page_import.rafraichir()
         self.pile.setCurrentIndex(i)
 
     def exporter(self) -> None:

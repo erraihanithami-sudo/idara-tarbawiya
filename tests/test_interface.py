@@ -121,7 +121,7 @@ def test_page_documents(app, config_tmp, monkeypatch):
     a = AssistantPremierLancement()
     remplir_assistant(a, config_tmp / "الإدارة التربوية")
     f = FenetrePrincipale(a.terminer())
-    f.aller(2)
+    f.aller_a("الوثائق")
     page = f.page_docs
     assert len(page.lignes) == 4
     page.rafraichir()
@@ -133,4 +133,31 @@ def test_page_documents(app, config_tmp, monkeypatch):
         assert chemin is not None and chemin.exists(), page.message.text()
     assert len(ouverts) == 4
     assert page.apercu("visite_medicale", pdf=True).suffix == ".pdf"
+    f.close()
+
+
+def test_page_import_et_confirmation(app, config_tmp):
+    from tests.fabrique_massar import classeur
+    from tests.test_import_massar import AR, FR
+    from idara.ui.assistant import AssistantPremierLancement
+    from idara.ui.fenetre import FenetrePrincipale
+    a = AssistantPremierLancement()
+    remplir_assistant(a, config_tmp / "الإدارة التربوية")
+    a.f_donnees.annee.setCurrentText("2026/2027")
+    f = FenetrePrincipale(a.terminer())
+    f.aller_a("الاستيراد من مسار")
+    page = f.page_import
+    assert page.c_niveaux.isHidden()
+    page.definir_fichiers([classeur(config_tmp / "ar.xlsx", AR, etab="مدرسة تجريبية"),
+                           classeur(config_tmp / "fr.xlsx", FR, "fr")])
+    r = page.analyser()
+    assert r is not None, page.message.text()
+    assert not page.c_rapport.isHidden() and "X000000004" in page.details.text()
+    res = page.appliquer()
+    assert res is not None and res.ajoutes == 5, page.message.text()
+    assert not page.c_niveaux.isHidden() and page.choix_classe.count() == 2
+    assert page.table.rowCount() == 2  # القسم الأول: PS1-PS2
+    assert page.confirmer() == 2
+    assert page.choix_classe.count() == 1
+    f.aller(0)
     f.close()

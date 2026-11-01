@@ -57,10 +57,25 @@ def main(sortie: Path) -> None:
     f = FenetrePrincipale(dossier)
     f.resize(1280, 800)
     f.show()
-    for i, nom in [(0, "07_tableau_de_bord"), (4, "08_etablissement"), (1, "09_page_a_venir"),
-                   (2, "10_documents")]:
-        f.aller(i)
+    for page, nom in [("لوحة القيادة", "07_tableau_de_bord"), ("إعداد المؤسسة", "08_etablissement"),
+                      ("التلاميذ", "09_page_a_venir"), ("الوثائق", "10_documents")]:
+        f.aller_a(page)
         photo(f, nom)
+    # الاستيراد بلوائح وهمية بنفس بنية مسار
+    from tests.fabrique_massar import classeur
+    from tests.test_import_massar import AR, FR
+    f.aller_a("الاستيراد من مسار")
+    p = f.page_import
+    p.definir_fichiers([classeur(tmp / "ar.xlsx", AR, etab="مجموعة مدارس تجريبية",
+                                 annee=__import__("idara.services.annee", fromlist=["x"]).libelle_pour_date()),
+                        classeur(tmp / "fr.xlsx", FR, "fr",
+                                 annee=__import__("idara.services.annee", fromlist=["x"]).libelle_pour_date())])
+    p.analyser()
+    photo(f, "11_import_rapport")
+    p.appliquer()
+    photo(f, "12_import_niveaux")
+    f.aller_a("لوحة القيادة")
+    photo(f, "13_tableau_apres_import")
     f.close()
     app.quit()
     print("captures:", sorted(p.name for p in sortie.glob("*.png")))
