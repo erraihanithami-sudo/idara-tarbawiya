@@ -183,6 +183,18 @@ def main(sortie: Path) -> None:
     d.close()
     f.aller_a("سجل الصادر")
     photo(f, "28_sortants")
+    # حركية التلاميذ
+    from idara.services import mouvements as mvs
+    mvs.enregistrer(f.conn, mvs.Mouvement("arrive", "Y000000009", "الوافد", "هبة", "F", "2026-09-08",
+                                          "المؤسسة الأصلية", niveau="الخامس"))
+    mvs.enregistrer(f.conn, mvs.Mouvement("parti", "X000000003", date_mouvement="2026-10-15",
+                                          etablissement="المؤسسة المستقبلة", direction="عمالة: فاس",
+                                          academie="فاس مكناس", hors_province=True))
+    f.aller_a("حركية التلاميذ")
+    photo(f, "31_mouvements")
+    f.page_mouvements.r_parti.setChecked(True)
+    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(f.page_mouvements.liste, 0)
+    photo(f, "32_mouvements_depart")
     f.aller_a("التقييم")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")

@@ -174,6 +174,8 @@ def _dupliquer_pages(racine, n: int) -> list[list[etree._Element]]:
 
 # قيمة خاصة: الفقرة التي تحمل هذا الحقل تُحذف كلها (أسطر اختيارية: مرفقات ورقة الإرسال...)
 SUPPRIMER = "\ue000supprimer\ue000"
+# قيمة خاصة: سطر الجدول الذي يحمل هذا الحقل يُحذف (أسطر التلاميذ غير المستعملة في المراسلة)
+SUPPRIMER_LIGNE = "\ue000supprimer-ligne\ue000"
 
 
 def _sauts_de_ligne(p: etree._Element) -> None:
@@ -206,9 +208,12 @@ def _remplir_elements(elements, valeurs: dict[str, str], manquants: set[str]) ->
     for el in elements:
         for p in paragraphes(el):
             remplacer_dans_paragraphe(p, MOTIF_CHAMP, remplacement)
-            if SUPPRIMER in texte_paragraphe(p):
-                if p.getparent() is not None:
-                    p.getparent().remove(p)
+            texte = texte_paragraphe(p)
+            if SUPPRIMER in texte or SUPPRIMER_LIGNE in texte:
+                tr = next(p.iterancestors(_q(W, "tr")), None) if SUPPRIMER_LIGNE in texte else None
+                cible = tr if tr is not None else p
+                if cible.getparent() is not None:
+                    cible.getparent().remove(cible)
                 continue
             _sauts_de_ligne(p)
 

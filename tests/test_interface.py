@@ -111,7 +111,7 @@ def test_fenetre_principale_et_edition(app, config_tmp):
         assert f.pile.currentIndex() == i and f.boutons[i].isChecked()
         assert ("قريباً" in f.boutons[i].text()) == (not noms)
     f.aller_a("الرخص")
-    f.aller(SECTIONS.index(("التلاميذ", ["التلاميذ", "التلاميذ القدامى", "الاستيراد من مسار"])))
+    f.aller([t for t, _ in SECTIONS].index("التلاميذ"))
     assert f.page_courante() == "التلاميذ"
     f.page_etab.f_etab.nom_ar.setText("اسم معدل")
     f.page_etab.enregistrer()
@@ -420,4 +420,53 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     assert s.table.rowCount() == 2 and "3" in s.prochain.text()
     s.objet.setText("مراسلة يدوية")
     assert s.ajouter() == "3/26-27" and s.table.rowCount() == 3
+    f.close()
+
+
+
+def test_page_mouvements(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
+    from idara.services import mouvements as mv
+    from idara.ui.saisie import selectionner
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("حركية التلاميذ")
+    p = f.page_mouvements
+    assert f.page_courante() == "حركية التلاميذ" and p.liste.rowCount() == 0
+    # وافد جديد
+    p.code.setText("Y000000009")
+    p._chercher_code()
+    assert "غير موجود" in p.info_eleve.text()
+    p.nom.setText("الوافد")
+    p.prenom.setText("هبة")
+    p.s_f.setChecked(True)
+    p.date_mv.setText("08/09/2026")
+    p.etab.setEditText("المؤسسة الأصلية")
+    p.niveau.setEditText("الخامس")
+    assert p.enregistrer() is not None, p.message.text()
+    assert p.liste.rowCount() == 1 and "لم يُطلب الملف" in p.liste.item(0, 1).text()
+    assert "وافدون لم يُطلب ملفهم (1): هبة الوافد" in p.alertes.text()
+    selectionner(p.liste, 0)
+    p.date_action.setText("10/09/2026")
+    assert p.demande(False) is not None, p.message.text()
+    assert len(ouverts) == 1 and "أُرسل الطلب" in p.liste.item(0, 1).text()
+    assert "وافدون" not in p.alertes.text()
+    selectionner(p.liste, 0)
+    p.date_action.setText("20/09/2026")
+    assert p.marquer("dossier_recu_le") and "توصلنا" in p.liste.item(0, 1).text()
+    # مغادر من اللوائح
+    p.f_parti.setChecked(True)
+    p.code.setText("X000000003")
+    p._chercher_code()
+    assert p.prenom.text() == "يوسف"
+    p.date_mv.setText("15/10/2026")
+    p.etab.setEditText("قاسم أمين")
+    assert p.enregistrer() is not None, p.message.text()
+    assert p.r_parti.isChecked() and p.liste.rowCount() == 1 and p.b_envoi.isVisibleTo(p)
+    assert "مغادرون لم يُرسل ملفهم (1)" in p.alertes.text()
+    selectionner(p.liste, 0)
+    p.date_action.setText("20/10/2026")
+    assert p.envoi() is not None and "أُرسل الملف" in p.liste.item(0, 1).text()
+    assert mv.alertes(f.conn)["envoi"] == []
     f.close()

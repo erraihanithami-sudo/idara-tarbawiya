@@ -48,6 +48,10 @@ _COMMUNS = ("etablissement", "etablissement_fr", "ville", "ville_fr", "directeur
 _RH = ("date_redaction", "sayyid_mudir", "rai_mudir", "ana_mouwaqqi", "bisifati", "destinataire", "dest_titre",
        "dest_ministere", "dest_service", "dest_bureau")
 
+_MV = ("date_redaction", "date_enregistrement", "numero", "etab_cible", "sous_couvert", "al_tilmidh",
+       "nom_N", "niveau_N", "code_N", "obs_N")
+_HORS = ("notre_direction", "notre_academie", "direction_cible", "academie_cible")
+
 MODELES: dict[str, DefModele] = {d.code: d for d in [
     DefModele("certificat_scolarite_ancien", "شهادة مدرسية (ما قبل مسار)", "ar", _COMMUNS + (
         "date_redaction", "sayyid", "nom_complet", "almozdad", "date_naissance", "lieu_naissance",
@@ -76,6 +80,14 @@ MODELES: dict[str, DefModele] = {d.code: d for d in [
     DefModele("pv_reprise", "محضر استئناف العمل", "ar", _COMMUNS + _RH + (
         "sayyid", "prenom", "nom", "ppr", "cin", "cadre", "grade", "istaanafa", "date_reprise", "duree", "du",
         "au", "fonction", "adresse", "telephone", "autres_contacts", "cas_N")),
+    # حركية التلاميذ
+    DefModele("demande_dossier", "طلب وثائق مدرسية (داخل الإقليم)", "ar", _COMMUNS + _MV + (
+        "reference", "rappel", "tadhkir", "rt_N")),
+    DefModele("demande_dossier_hors", "طلب وثائق مدرسية (خارج الإقليم)", "ar", _COMMUNS + _MV + _HORS + (
+        "rappel", "tadhkir")),
+    DefModele("envoi_dossier", "إرسال وثائق مدرسية (داخل الإقليم)", "ar", _COMMUNS + _MV + ("bina",)),
+    DefModele("envoi_dossier_hors", "إرسال وثائق مدرسية (خارج الإقليم)", "ar", _COMMUNS + _MV + _HORS + (
+        "bina", "reference")),
 ]}
 
 
@@ -446,6 +458,9 @@ def exemple(conn: sqlite3.Connection, code: str, sexe: str = "M"):
     if code == "convocation_parent":
         eleves = [_eleve_exemple("M"), _eleve_exemple("F"), _eleve_exemple("M", prenom_ar="يوسف")]
         return champs_convocation(conn, eleves)
+    if code in ("demande_dossier", "demande_dossier_hors", "envoi_dossier", "envoi_dossier_hors"):
+        from idara.services import mouvements  # تفادي الاستيراد الدائري
+        return mouvements.exemple(conn, code), None
     if code in ("demande_conge", "recu_certificat", "demande_remplacement", "bordereau_envoi", "pv_reprise"):
         from idara.services import conges  # تفادي الاستيراد الدائري
         try:
