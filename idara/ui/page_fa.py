@@ -25,6 +25,7 @@ class CarteMatiere(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(c)
         haut = QHBoxLayout()
+        haut.setSpacing(8)
         t = QLabel(f"مادة التدريس: {matiere}")
         t.setObjectName("titreCarte")
         haut.addWidget(t)
@@ -40,8 +41,9 @@ class CarteMatiere(QWidget):
         self.etat = QLabel()
         self.etat.setWordWrap(True)
         v.addWidget(self.etat)
-        self.table = tableau(["الرتبة", "الاسم", "الأقدمية العامة", "بالمديرية", "بالمؤسسة ×2",
-                              "المجموع", "تاريخ الازدياد", "النتيجة"], etirer=1)
+        self.table = tableau(["الرتبة", "الاسم", "العامة", "المديرية", "المؤسسة ×2",
+                              "المجموع", "الازدياد", "النتيجة"], etirer=1)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         v.addWidget(self.table)
 
     def _postes(self, n: int) -> None:

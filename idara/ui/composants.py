@@ -40,5 +40,6 @@ def entete(titre: str, sous_titre: str = "") -> QWidget:
     if sous_titre:
         s = QLabel(sous_titre)
         s.setObjectName("sousTitre")
+        s.setWordWrap(True)
         v.addWidget(s)
     return w
