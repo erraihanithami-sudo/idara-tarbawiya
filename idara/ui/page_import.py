@@ -104,8 +104,12 @@ class PageImport(QWidget):
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["الرمز", "الاسم", "تاريخ الازدياد", "المستوى", "ملاحظة"])
         self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.setMinimumHeight(320)
+        self.table.verticalHeader().setDefaultSectionSize(48)
+        entetes = self.table.horizontalHeader()
+        entetes.setSectionResizeMode(QHeaderView.ResizeToContents)
+        entetes.setSectionResizeMode(1, QHeaderView.Stretch)
+        entetes.setSectionResizeMode(4, QHeaderView.Stretch)
+        self.table.setColumnWidth(3, 170)
         nv.addWidget(self.table)
         hn = QHBoxLayout()
         self.b_confirmer = QPushButton("تأكيد مستويات هذا القسم")
@@ -254,6 +258,7 @@ class PageImport(QWidget):
         lignes = [r for r in self.lignes_niveau if r["classe"] == classe]
         candidats = ms.niveaux_du_code_classe(classe or "") or list(ms.ORDRE)
         self.table.setRowCount(len(lignes))
+        self.table.setFixedHeight(48 * max(1, len(lignes)) + self.table.horizontalHeader().height() + 6)
         self.combos = {}
         for i, r in enumerate(lignes):
             for j, t in enumerate([r["code_massar"], f"{r['prenom_ar']} {r['nom_ar']}",
@@ -268,6 +273,7 @@ class PageImport(QWidget):
             if r["niveau"]:
                 cb.setCurrentIndex(max(0, cb.findData(r["niveau"])))
             cb.currentIndexChanged.connect(lambda _=0, i=i: self._note(i))
+            cb.setMinimumWidth(150)
             self.table.setCellWidget(i, 3, cb)
             self.combos[r["inscription_id"]] = (cb, r)
             self._note(i)
