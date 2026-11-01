@@ -28,6 +28,17 @@ _CIN = re.compile(r"^[A-Z]{1,2}[0-9]{1,8}$")
 _TEL = re.compile(r"^(\+212|0)[5-7][0-9]{8}$")
 
 
+DATES_CARRIERE = (("date_naissance", "تاريخ الازدياد"), ("date_recrutement", "تاريخ التوظيف"),
+                  ("date_affectation_academie", "تاريخ التعيين بالأكاديمية"),
+                  ("date_affectation_direction", "تاريخ التعيين بالمديرية الإقليمية"),
+                  ("date_affectation", "تاريخ التعيين بالمؤسسة"))
+
+
+def annees_entre(debut: date, fin: date) -> int:
+    """عدد السنوات الكاملة."""
+    return fin.year - debut.year - ((fin.month, fin.day) < (debut.month, debut.day))
+
+
 class ErreurPersonnel(ValueError):
     """رسالة موجهة للمدير بالعربية."""
 
@@ -58,7 +69,11 @@ class Personnel:
     adresse: str = ""
     telephone: str = ""
     unite: str = ""
-    date_affectation: str = ""
+    date_affectation: str = ""            # التعيين بالمؤسسة
+    date_naissance: str = ""
+    date_recrutement: str = ""            # التوظيف
+    date_affectation_academie: str = ""
+    date_affectation_direction: str = ""  # المديرية الإقليمية
     statut: str = "actif"
     date_depart: str = ""
     dossier_disponible: bool = False
@@ -103,15 +118,27 @@ class Personnel:
             if v < 0 or (k == "heures_hebdo" and v > 60):
                 raise ErreurPersonnel(f"{lib}: قيمة غير معقولة.")
             setattr(self, k, v)
-        for k, lib in (("date_affectation", "تاريخ التعيين بالمؤسسة"), ("date_depart", "تاريخ المغادرة")):
+        d = {}
+        for k, lib in DATES_CARRIERE + (("date_depart", "تاريخ المغادرة"),):
             v = getattr(self, k)
             if v:
                 try:
-                    d = date.fromisoformat(v)
+                    d[k] = date.fromisoformat(v)
                 except ValueError:
                     raise ErreurPersonnel(f"{lib} غير صحيح.") from None
-                if d > date.today() and k == "date_affectation":
+                if d[k] > date.today() and k != "date_depart":
                     raise ErreurPersonnel(f"{lib} في المستقبل.")
+        n, r = d.get("date_naissance"), d.get("date_recrutement")
+        if n and annees_entre(n, date.today()) < 18:
+            raise ErreurPersonnel("تاريخ الازدياد غير منطقي (أقل من 18 سنة).")
+        if n and r and annees_entre(n, r) < 18:
+            raise ErreurPersonnel("تاريخ التوظيف غير منطقي: سن الموظف عند التوظيف أقل من 18 سنة.")
+        for k, lib in DATES_CARRIERE[2:]:
+            if r and k in d and d[k] < r:
+                raise ErreurPersonnel(f"{lib} قبل تاريخ التوظيف.")
+        if "date_affectation_direction" in d and "date_affectation" in d \
+                and d["date_affectation"] < d["date_affectation_direction"]:
+            raise ErreurPersonnel("تاريخ التعيين بالمؤسسة قبل تاريخ التعيين بالمديرية الإقليمية.")
         if self.statut not in STATUTS:
             raise ErreurPersonnel("الوضعية غير صحيحة.")
         if self.statut != "actif" and not self.date_depart:
@@ -238,6 +265,24 @@ def manquants_documents(conn: sqlite3.Connection, p: Personnel) -> list[str]:
     return res
 
 
+def manquants_carriere(p: Personnel) -> list[str]:
+    """تواريخ المسار المهني اللازمة لتحديد الفائض (للأساتذة والمربين)."""
+    if p.categorie not in ("enseignant", "educatrice"):
+        return []
+    return [lib for k, lib in DATES_CARRIERE if not getattr(p, k)]
+
+
+def anciennetes(p: Personnel, le: date | None = None) -> dict[str, int | None]:
+    """السن والأقدمية بالسنوات الكاملة في تاريخ معين (اليوم افتراضياً)."""
+    le = le or date.today()
+
+    def a(v):
+        return annees_entre(date.fromisoformat(v), le) if v else None
+    return {"age": a(p.date_naissance), "fonction": a(p.date_recrutement),
+            "academie": a(p.date_affectation_academie), "direction": a(p.date_affectation_direction),
+            "etablissement": a(p.date_affectation)}
+
+
 def effectifs(conn: sqlite3.Connection) -> dict[str, int]:
     """البنية البشرية (محضر التسليم): عدد العاملين حسب الفئة."""
     d = {c: 0 for c in CATEGORIES}
@@ -259,7 +304,8 @@ def _unite_id(conn, nom: str) -> int | None:
 
 _COLONNES = ("nom_ar", "prenom_ar", "nom_fr", "prenom_fr", "sexe", "categorie", "ppr", "cin", "cadre",
              "grade", "fonction", "cycle", "matiere", "niveau_enseigne", "nb_eleves", "heures_hebdo",
-             "adresse", "telephone", "date_affectation", "statut", "date_depart", "remarques")
+             "adresse", "telephone", "date_affectation", "statut", "date_depart", "remarques",
+             "date_naissance", "date_recrutement", "date_affectation_academie", "date_affectation_direction")
 
 
 def enregistrer(conn: sqlite3.Connection, p: Personnel) -> int:

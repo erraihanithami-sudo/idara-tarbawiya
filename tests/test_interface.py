@@ -312,7 +312,19 @@ def test_page_personnel(app, config_tmp):
     assert pid is not None, p.message.text()
     assert p.liste.rowCount() == 2 and "الأساتذة: 1" in p.effectifs.text()
     assert "ينقص" in p.manquants.text() and "الدرجة" in p.manquants.text()
+    assert "ينقص لتحديد الفائض" in p.manquants.text()
     assert rh.lire(f.conn, pid).cin == "AB123456"
+    # المسار المهني
+    p.dates["date_naissance"].setText("15/03/1980")
+    p.dates["date_recrutement"].setText("16/09/1995")
+    assert p.enregistrer() is None and "عند التوظيف" in p.message.text()
+    p.dates["date_recrutement"].setText("16/09/2003")
+    p.dates["date_affectation_academie"].setText("16/09/2003")
+    p.dates["date_affectation_direction"].setText("01/09/2008")
+    p.dates["date_affectation"].setText("01/09/2015")
+    assert p.enregistrer() == pid, p.message.text()
+    assert "الفائض" not in p.manquants.text() and "الأقدمية في الوظيفة" in p.anciennete.text()
+    assert rh.lire(f.conn, pid).date_affectation_direction == "2008-09-01"
     # اقتراح الإطار في الملف الجديد
     p.nouveau()
     assert p.c["cadre"].findText("أستاذة التعليم الابتدائي") >= 0

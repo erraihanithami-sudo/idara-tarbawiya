@@ -129,9 +129,13 @@ def main(sortie: Path) -> None:
     r.c["matiere"].setEditText("العربية")
     r.c["heures_hebdo"].setText("30")
     r.classes.item(0).setCheckState(Qt.Checked)
+    for k, v in (("date_naissance", "15/03/1980"), ("date_recrutement", "16/09/2003"),
+                 ("date_affectation_academie", "16/09/2003"), ("date_affectation_direction", "01/09/2008"),
+                 ("date_affectation", "01/09/2015")):
+        r.dates[k].setText(v)
     r.enregistrer()
     photo(f, "21_personnel_fiche")
-    f.resize(1280, 1500)
+    f.resize(1280, 1750)
     photo(f, "22_personnel_fiche_complete")
     f.resize(1280, 800)
     f.close()

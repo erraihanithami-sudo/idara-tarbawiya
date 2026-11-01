@@ -135,3 +135,46 @@ def test_depart_et_reintegration(base):
 def test_unite(base):
     pid = rh.enregistrer(base, _prof(unite="وحدة فرعية"))
     assert rh.lire(base, pid).unite == "وحدة فرعية"
+
+
+# ---------- المسار المهني (طلب المدير: لازم لتحديد الفائض) ----------
+
+def _carriere(**k):
+    d = dict(date_naissance="1980-03-15", date_recrutement="2003-09-16", date_affectation_academie="2003-09-16",
+             date_affectation_direction="2008-09-01", date_affectation="2015-09-01")
+    d.update(k)
+    return _prof(**d)
+
+
+def test_carriere_enregistree_et_anciennetes(base):
+    from datetime import date
+    pid = rh.enregistrer(base, _carriere())
+    p = rh.lire(base, pid)
+    assert p.date_recrutement == "2003-09-16" and p.date_affectation_direction == "2008-09-01"
+    assert rh.manquants_carriere(p) == []
+    a = rh.anciennetes(p, date(2026, 11, 1))
+    assert a == {"age": 46, "fonction": 23, "academie": 23, "direction": 18, "etablissement": 11}
+    assert rh.anciennetes(p, date(2026, 3, 14))["age"] == 45  # قبل يوم الميلاد
+
+
+def test_carriere_manquante_signalee_pour_enseignants(base):
+    p = rh.lire(base, rh.enregistrer(base, _prof(date_affectation="")))
+    assert rh.manquants_carriere(p) == ["تاريخ الازدياد", "تاريخ التوظيف", "تاريخ التعيين بالأكاديمية",
+                                        "تاريخ التعيين بالمديرية الإقليمية", "تاريخ التعيين بالمؤسسة"]
+    g = rh.lire(base, rh.enregistrer(base, rh.Personnel(nom_ar="الحارس", prenom_ar="علي", sexe="M",
+                                                        categorie="gardien")))
+    assert rh.manquants_carriere(g) == []
+
+
+@pytest.mark.parametrize("modif, message", [
+    (dict(date_naissance="2015-01-01"), "أقل من 18"),
+    (dict(date_recrutement="1995-01-01"), "عند التوظيف"),
+    (dict(date_affectation_academie="2000-01-01"), "الأكاديمية قبل تاريخ التوظيف"),
+    (dict(date_affectation_direction="2000-01-01"), "المديرية الإقليمية قبل تاريخ التوظيف"),
+    (dict(date_affectation="2005-01-01"), "المؤسسة قبل تاريخ التعيين بالمديرية"),
+    (dict(date_recrutement="2099-01-01"), "المستقبل"),
+    (dict(date_naissance="1980-02-30"), "غير صحيح"),
+])
+def test_carriere_incoherente(base, modif, message):
+    with pytest.raises(rh.ErreurPersonnel, match=message):
+        rh.enregistrer(base, _carriere(**modif))

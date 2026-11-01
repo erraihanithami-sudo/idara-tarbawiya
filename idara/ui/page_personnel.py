@@ -157,8 +157,13 @@ class PagePersonnel(QWidget):
         section("الوضعية الإدارية", [("رقم التأجير", self.c["ppr"]), ("رقم البطاقة الوطنية", self.c["cin"]),
                                      ("الإطار", self.c["cadre"]), ("الدرجة", self.c["grade"]),
                                      ("المهمة", self.c["fonction"]), ("السلك", self.c["cycle"]),
-                                     ("الوحدة المدرسية", self.unite),
-                                     ("تاريخ التعيين بالمؤسسة", self.date_aff)])
+                                     ("الوحدة المدرسية", self.unite)])
+        self.dates = {k: (self.date_aff if k == "date_affectation" else ChampDate()) for k, _ in rh.DATES_CARRIERE}
+        section("المسار المهني (لتحديد الفائض)", [(lib, self.dates[k]) for k, lib in rh.DATES_CARRIERE])
+        self.anciennete = QLabel()
+        self.anciennete.setObjectName("etiquette")
+        self.anciennete.setWordWrap(True)
+        fv.addWidget(self.anciennete)
         self.bloc_ens = QWidget()
         be = QVBoxLayout(self.bloc_ens)
         be.setContentsMargins(0, 0, 0, 0)
@@ -240,7 +245,7 @@ class PagePersonnel(QWidget):
             nom = f"{p.prenom_ar} {p.nom_ar}"
             if p.statut != "actif":
                 nom += f" ({rh.STATUTS[p.statut]})"
-            m = rh.manquants_documents(self.f.conn, p)
+            m = rh.manquants_documents(self.f.conn, p) + rh.manquants_carriere(p)
             self.liste.setItem(i, 0, cellule(nom, p.id))
             self.liste.setItem(i, 1, cellule(rh.libelle_categorie(p.categorie, p.sexe)))
             self.liste.item(i, 0).setToolTip(f"رقم التأجير: {p.ppr or '—'}")
@@ -325,7 +330,14 @@ class PagePersonnel(QWidget):
         if p.sexe:
             (self.r_f if p.sexe == "F" else self.r_m).setChecked(True)
         self.unite.setCurrentIndex(max(0, self.unite.findData(p.unite)))
-        self.date_aff.definir(p.date_affectation or None)
+        for k, w in self.dates.items():
+            w.definir(getattr(p, k) or None)
+        a = rh.anciennetes(p)
+        morceaux = [f"{lib}: {a[k]} سنة" for k, lib in (("age", "السن"), ("fonction", "الأقدمية في الوظيفة"),
+                    ("academie", "بالأكاديمية"), ("direction", "بالمديرية"), ("etablissement", "بالمؤسسة"))
+                    if a[k] is not None]
+        self.anciennete.setText(" · ".join(morceaux))
+        self.anciennete.setVisible(bool(morceaux))
         self.dossier.setChecked(p.dossier_disponible)
         self.remarques.setPlainText(p.remarques)
         self._remplir_classes(p.classes)
@@ -336,9 +348,13 @@ class PagePersonnel(QWidget):
             etat = "" if p.statut == "actif" else f" · {rh.STATUTS[p.statut]} منذ {p.date_depart}"
             self.titre.setText(f"{p.prenom_ar} {p.nom_ar} · {rh.libelle_categorie(p.categorie, p.sexe)}{etat}")
             m = rh.manquants_documents(self.f.conn, p)
-            self.manquants.setObjectName("alerte" if m else "ok")
-            self.manquants.setText("ينقص لوثائق الرخص ومحضر الاستئناف: " + "، ".join(m) if m
-                                   else "الملف مكتمل لوثائق الرخص ومحضر الاستئناف.")
+            mc = rh.manquants_carriere(p)
+            lignes = ["ينقص لوثائق الرخص ومحضر الاستئناف: " + "، ".join(m) if m
+                      else "الملف مكتمل لوثائق الرخص ومحضر الاستئناف."]
+            if mc:
+                lignes.append("ينقص لتحديد الفائض: " + "، ".join(mc))
+            self.manquants.setObjectName("alerte" if (m or mc) else "ok")
+            self.manquants.setText("\n".join(lignes))
             self.manquants.style().unpolish(self.manquants)
             self.manquants.style().polish(self.manquants)
             self.manquants.show()
@@ -350,16 +366,18 @@ class PagePersonnel(QWidget):
 
     def lire_formulaire(self) -> rh.Personnel:
         v = {k: (w.currentText() if isinstance(w, QComboBox) else w.text()) for k, w in self.c.items()}
-        try:
-            date_aff = self.date_aff.iso()
-        except ValueError:
-            raise rh.ErreurPersonnel("تاريخ التعيين غير صحيح.") from None
+        dates = {}
+        for k, lib in rh.DATES_CARRIERE:
+            try:
+                dates[k] = self.dates[k].iso()
+            except ValueError:
+                raise rh.ErreurPersonnel(f"{lib} غير صحيح.") from None
         ids = self.classes_cochees()
         if ids:
             v["niveau_enseigne"], v["nb_eleves"] = "", ""
         sexe = "F" if self.r_f.isChecked() else "M" if self.r_m.isChecked() else ""
         return rh.Personnel(**v, sexe=sexe, categorie=self.categorie.currentData(),
-                            unite=self.unite.currentData() or "", date_affectation=date_aff,
+                            unite=self.unite.currentData() or "", **dates,
                             dossier_disponible=self.dossier.isChecked(),
                             remarques=self.remarques.toPlainText().strip(), id=self.pid,
                             classes=ids if self.categorie.currentData() in ("enseignant", "educatrice") else [],
