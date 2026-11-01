@@ -84,7 +84,7 @@ def main(sortie: Path) -> None:
     photo(f, "14_eleves_liste")
     e = f.page_eleves
     e.recherche.setText("يوسف")
-    e.resultats.selectRow(0)
+    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(e.resultats, 0)
     photo(f, "15_eleve_fiche")
     from idara.ui.page_eleves import DialogueVacances
     d = DialogueVacances(e.titre.text(), f)

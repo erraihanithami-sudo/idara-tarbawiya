@@ -61,3 +61,10 @@ def cellule(texte, donnee=None) -> QTableWidgetItem:
     if donnee is not None:
         it.setData(Qt.UserRole, donnee)
     return it
+
+
+def selectionner(t, ligne: int) -> None:
+    """تحديد سطر برمجياً (لا يعتمد على حالة لوحة المفاتيح)."""
+    from PySide6.QtCore import QItemSelectionModel
+    t.selectionModel().select(t.model().index(ligne, 0),
+                              QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)

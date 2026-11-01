@@ -192,7 +192,7 @@ def test_page_eleves_recherche_et_documents(app, config_tmp, monkeypatch):
     assert p.resultats.rowCount() == 5 and p.c_fiche.isHidden()
     p.recherche.setText("يوسف")
     assert p.resultats.rowCount() == 1
-    p.resultats.selectRow(0)
+    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(p.resultats, 0)
     assert not p.c_fiche.isHidden() and "يوسف" in p.titre.text()
     # المستوى غير مؤكد: رسالة واضحة بدل وثيقة خاطئة
     assert p.vacances(date(2026, 12, 20), date(2027, 1, 4)) is None
@@ -249,7 +249,7 @@ def test_page_anciens_tous_champs(app, config_tmp, monkeypatch):
     assert p.c_num.text() == "" and p.eleve_id is None
     p.recherche.setText("8173")
     assert p.resultats.rowCount() == 1
-    p.resultats.selectRow(0)
+    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(p.resultats, 0)
     assert p.c_lieu.text() == "الخميسات" and p.c_niveau.currentText() == "الخامس"
     assert p._reimprimer(0, 0) is not None and len(ouverts) == 2
     # لا يختلط بتلاميذ مسار
