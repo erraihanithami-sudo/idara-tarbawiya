@@ -156,7 +156,8 @@ def test_page_import_et_confirmation(app, config_tmp):
     res = page.appliquer()
     assert res is not None and res.ajoutes == 5, page.message.text()
     assert not page.c_niveaux.isHidden() and page.choix_classe.count() == 2
-    assert page.table.rowCount() == 2  # القسم الأول: PS1-PS2
+    page.choix_classe.setCurrentIndex(page.choix_classe.findData("PS1-PS2"))
+    assert page.table.rowCount() == 2
     assert page.confirmer() == 2
     assert page.choix_classe.count() == 1
     f.aller(0)
