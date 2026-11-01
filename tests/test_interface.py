@@ -102,9 +102,17 @@ def test_fenetre_principale_et_edition(app, config_tmp):
     assert len([w for w in f.tableau.findChildren(QWidget, "", Qt.FindDirectChildrenOnly)
                 if w.isVisibleTo(f.tableau)]) == 1
     assert f.nom_etab.text() == "مدرسة تجريبية"
-    for i in range(len(f.PAGES)):
-        f.aller(i)
-        assert f.pile.currentIndex() == i
+    from idara.ui.fenetre import SECTIONS
+    for nom in f.noms_pages():
+        f.aller_a(nom)
+        assert f.page_courante() == nom
+    for i, (titre, noms) in enumerate(SECTIONS):
+        f.aller_a(titre)
+        assert f.pile.currentIndex() == i and f.boutons[i].isChecked()
+        assert ("قريباً" in f.boutons[i].text()) == (not noms)
+    f.aller_a("الرخص")
+    f.aller(SECTIONS.index(("التلاميذ", ["التلاميذ", "التلاميذ القدامى", "الاستيراد من مسار"])))
+    assert f.page_courante() == "التلاميذ"
     f.page_etab.f_etab.nom_ar.setText("اسم معدل")
     f.page_etab.enregistrer()
     assert f.page_etab.message.objectName() == "info", f.page_etab.message.text()

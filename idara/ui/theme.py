@@ -76,6 +76,12 @@ QPushButton#principal:hover {{ background: {VERT_FONCE}; }}
 QPushButton#principal:disabled {{ background: #9DB8A8; }}
 QPushButton#nav {{
     text-align: right; border: 0; border-radius: 8px; padding: 0 14px; min-height: 44px; }}
+QTabWidget#sections::pane {{ border: 0; }}
+QTabWidget#sections > QTabBar {{ background: {PLATRE}; }}
+QTabBar::tab {{ background: transparent; color: {GRIS}; padding: 10px 22px; margin: 0 2px;
+    border: 0; border-bottom: 3px solid transparent; font-size: 11pt; }}
+QTabBar::tab:selected {{ color: {VERT_FONCE}; border-bottom: 3px solid {VERT}; font-weight: 600; }}
+QTabBar::tab:hover:!selected {{ color: {ENCRE}; }}
 QPushButton#nav:checked {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; font-weight: 600; }}
 QPushButton#nav:hover:!checked {{ background: {PLATRE}; }}
 QRadioButton {{ min-height: 36px; }}

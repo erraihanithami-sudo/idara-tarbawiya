@@ -7,7 +7,7 @@ from datetime import date
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QMainWindow, QMessageBox, QPushButton, QScrollArea,
-                               QStackedWidget, QVBoxLayout, QWidget)
+                               QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
 
 from idara import NOM_APPLICATION, __version__
 from idara.data.db import ouvrir_base
@@ -208,33 +208,64 @@ class PageEtablissement(QWidget):
 
 
 class PageAVenir(QWidget):
-    def __init__(self, titre: str, etape: str):
+    """قسم مخطط له: ما سيضمه، وما يلزم من المدير لإنجازه."""
+
+    def __init__(self, titre: str, contenu: list[str], besoins: list[str]):
         super().__init__()
         v = QVBoxLayout(self)
         v.setContentsMargins(40, 32, 40, 32)
-        v.addWidget(entete(titre))
-        c, cv = carte()
-        l = QLabel(f"هذه الوحدة مخطط لها في {etape}، ولم تُبرمج بعد.")
-        l.setWordWrap(True)
-        cv.addWidget(l)
-        v.addWidget(c)
+        v.setSpacing(16)
+        v.addWidget(entete(titre, "قسم مخطط له، لم يُبرمج بعد."))
+        for t, lignes in (("ما سيضمه", contenu), ("ما أحتاجه منك لإنجازه", besoins)):
+            if not lignes:
+                continue
+            c, cv = carte(t)
+            for x in lignes:
+                l = QLabel("•  " + x)
+                l.setWordWrap(True)
+                cv.addWidget(l)
+            v.addWidget(c)
         v.addStretch()
 
 
-class FenetrePrincipale(QMainWindow):
-    PAGES = [
-        ("لوحة القيادة", None),
-        ("التلاميذ", None),
-        ("التلاميذ القدامى", None),
-        ("الاستيراد من مسار", None),
-        ("الوثائق", None),
-        ("الموارد البشرية", None),
-        ("الرخص", None),
-        ("سجل الصادر", None),
-        ("تدبير الفائض", None),
-        ("إعداد المؤسسة", None),
-    ]
+# الأقسام (اقتراح المدير 2026-11-01): كل قسم في القائمة الجانبية، وصفحاته في ألسنة داخله.
+SECTIONS = [
+    ("لوحة القيادة", ["لوحة القيادة"]),
+    ("التلاميذ", ["التلاميذ", "التلاميذ القدامى", "الاستيراد من مسار"]),
+    ("الموارد البشرية", ["الموارد البشرية", "الرخص", "تدبير الفائض"]),
+    ("التدبير التربوي", []),
+    ("التقييم", []),
+    ("التدبير المالي والمادي", []),
+    ("المراسلات", ["سجل الصادر"]),
+    ("مشروع المؤسسة", []),
+    ("الإعدادات", ["إعداد المؤسسة", "الوثائق"]),
+]
+ETIQUETTES = {"التلاميذ": "البحث والوثائق", "الموارد البشرية": "الموظفون", "الوثائق": "نماذج الوثائق",
+              "إعداد المؤسسة": "المؤسسة"}
+A_VENIR = {
+    "التدبير التربوي": (
+        ["تتبع أداء المؤسسة ونتائج التلاميذ حسب الأقسام والمستويات والمواد.",
+         "مؤشرات تربوية تُستخرج آلياً من النتائج المسجلة في قسم التقييم.",
+         "الحياة المدرسية والأنشطة: الأندية، الأنشطة الثقافية والرياضية، تقاريرها."],
+        ["المؤشرات التي تعتمدونها في تتبع أداء المؤسسة.", "نماذج تقارير الأنشطة إن وُجدت."]),
+    "التقييم": (
+        ["تدبير الامتحان المحلي والإقليمي: الاستدعاءات، ترقيم الطاولات، الوثائق المرتبطة.",
+         "محاضر مجالس الأقسام بنتائج التلاميذ، مذيلة بتوقيع أساتذة كل قسم على حدة."],
+        ["نموذج محضر مجلس القسم.", "نماذج وثائق الامتحان المحلي والإقليمي.",
+         "صيغة ملف النتائج الذي يُستخرج من مسار (إن أمكن)."]),
+    "التدبير المالي والمادي": (
+        ["الجمعيات الثلاث: المداخيل والمصاريف بحسابات منفصلة، التقارير المالية والأدبية، الحصيلة السنوية.",
+         "جرد الممتلكات بالمجموعات وحالاتها، النقل والإعارة والمفقودات.",
+         "محضر تسليم المهام: يُحيَّن آلياً من معطيات المؤسسة (المحاور اختيارية)."],
+        ["وثائق الجمعيات الثلاث ونماذج التقارير المالية والأدبية.", "سجل الجرد الحالي."]),
+    "مشروع المؤسسة": (
+        ["إدراج المشروع: الأهداف، العمليات، المسؤوليات، المؤشرات.",
+         "تتبع الإنجاز وتقييم النتائج، واقتراح أولويات المشروع اللاحق."],
+        ["أنموذج من مشروع المؤسسة والمذكرات المؤطرة له (اتفقنا أن يكون هذا القسم آخر العمل)."]),
+}
 
+
+class FenetrePrincipale(QMainWindow):
     def __init__(self, dossier: DossierDonnees):
         super().__init__()
         self.dossier = dossier
@@ -247,41 +278,40 @@ class FenetrePrincipale(QMainWindow):
         h = QHBoxLayout(centre)
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(0)
-        h.addWidget(self._barre_laterale())
-        self.pile = QStackedWidget()
         self.tableau = PageTableauBord(self)
         self.page_etab = PageEtablissement(self)
-        for nom, etape in self.PAGES:
-            if nom == "لوحة القيادة":
-                self.pile.addWidget(page_defilante(self.tableau))
-            elif nom == "التلاميذ":
-                self.page_eleves = PageEleves(self)
-                self.pile.addWidget(page_defilante(self.page_eleves))
-            elif nom == "التلاميذ القدامى":
-                self.page_anciens = PageAnciens(self)
-                self.pile.addWidget(page_defilante(self.page_anciens))
-            elif nom == "الموارد البشرية":
-                self.page_rh = PagePersonnel(self)
-                self.pile.addWidget(page_defilante(self.page_rh))
-            elif nom == "الرخص":
-                self.page_conges = PageConges(self)
-                self.pile.addWidget(page_defilante(self.page_conges))
-            elif nom == "سجل الصادر":
-                self.page_sortants = PageSortants(self)
-                self.pile.addWidget(page_defilante(self.page_sortants))
-            elif nom == "تدبير الفائض":
-                self.page_fa = PageFa(self)
-                self.pile.addWidget(page_defilante(self.page_fa))
-            elif nom == "الاستيراد من مسار":
-                self.page_import = PageImport(self)
-                self.pile.addWidget(page_defilante(self.page_import))
-            elif nom == "الوثائق":
-                self.page_docs = PageDocuments(self)
-                self.pile.addWidget(page_defilante(self.page_docs))
-            elif nom == "إعداد المؤسسة":
-                self.pile.addWidget(page_defilante(self.page_etab))
+        self.page_eleves = PageEleves(self)
+        self.page_anciens = PageAnciens(self)
+        self.page_import = PageImport(self)
+        self.page_rh = PagePersonnel(self)
+        self.page_conges = PageConges(self)
+        self.page_fa = PageFa(self)
+        self.page_sortants = PageSortants(self)
+        self.page_docs = PageDocuments(self)
+        self.pages = {"لوحة القيادة": self.tableau, "التلاميذ": self.page_eleves,
+                      "التلاميذ القدامى": self.page_anciens, "الاستيراد من مسار": self.page_import,
+                      "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
+                      "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs}
+        self.emplacement = {}   # اسم الصفحة ← (رقم القسم، رقم اللسان)
+        self.pile = QStackedWidget()
+        self.onglets = {}
+        for i, (titre, noms) in enumerate(SECTIONS):
+            if not noms:
+                self.pile.addWidget(page_defilante(PageAVenir(titre, *A_VENIR[titre])))
+            elif len(noms) == 1:
+                self.pile.addWidget(page_defilante(self.pages[noms[0]]))
+                self.emplacement[noms[0]] = (i, None)
             else:
-                self.pile.addWidget(page_defilante(PageAVenir(nom, etape)))
+                t = QTabWidget()
+                t.setObjectName("sections")
+                t.setDocumentMode(True)
+                for j, nom in enumerate(noms):
+                    t.addTab(page_defilante(self.pages[nom]), ETIQUETTES.get(nom, nom))
+                    self.emplacement[nom] = (i, j)
+                t.currentChanged.connect(lambda j, noms=noms: self._rafraichir(noms[j]))
+                self.onglets[i] = t
+                self.pile.addWidget(t)
+        h.addWidget(self._barre_laterale())
         h.addWidget(self.pile, 1)
         self.setCentralWidget(centre)
         self.aller(0)
@@ -315,8 +345,8 @@ class FenetrePrincipale(QMainWindow):
         self.groupe = QButtonGroup(self)
         self.groupe.setExclusive(True)
         self.boutons = []
-        for i, (nom, _) in enumerate(self.PAGES):
-            b = QPushButton(nom)
+        for i, (nom, noms) in enumerate(SECTIONS):
+            b = QPushButton(nom if noms else f"{nom}  ·  قريباً")
             b.setObjectName("nav")
             b.setCheckable(True)
             b.setCursor(Qt.PointingHandCursor)
@@ -347,30 +377,42 @@ class FenetrePrincipale(QMainWindow):
         n = len(sauvegarde.lister_sauvegardes(self.dossier))
         self.etat_sauvegarde.setText(f"النسخ الاحتياطية المحفوظة: {n}")
 
+    def noms_pages(self) -> list[str]:
+        return list(self.emplacement)
+
+    def page_courante(self) -> str | None:
+        i = self.pile.currentIndex()
+        t = self.onglets.get(i)
+        for nom, (si, j) in self.emplacement.items():
+            if si == i and (t is None or j == t.currentIndex()):
+                return nom
+        return None
+
+    def _rafraichir(self, nom: str) -> None:
+        page = self.pages.get(nom)
+        if page is not None and hasattr(page, "rafraichir"):
+            page.rafraichir()
+
     def aller_a(self, nom: str) -> None:
-        self.aller([n for n, _ in self.PAGES].index(nom))
+        """يفتح صفحة باسمها (القسم واللسان)، أو قسماً باسمه."""
+        if nom in self.emplacement:
+            i, j = self.emplacement[nom]
+            self.boutons[i].setChecked(True)
+            self.pile.setCurrentIndex(i)
+            if j is not None and self.onglets[i].currentIndex() != j:
+                self.onglets[i].setCurrentIndex(j)  # يحدّث الصفحة عبر currentChanged
+            else:
+                self._rafraichir(nom)
+            return
+        self.aller([t for t, _ in SECTIONS].index(nom))
 
     def aller(self, i: int) -> None:
+        """يفتح القسم رقم i على لسانه الحالي."""
         self.boutons[i].setChecked(True)
-        if i == 0:
-            self.tableau.rafraichir()
-        elif self.PAGES[i][0] == "الوثائق":
-            self.page_docs.rafraichir()
-        elif self.PAGES[i][0] == "التلاميذ":
-            self.page_eleves.rafraichir()
-        elif self.PAGES[i][0] == "التلاميذ القدامى":
-            self.page_anciens.rafraichir()
-        elif self.PAGES[i][0] == "الموارد البشرية":
-            self.page_rh.rafraichir()
-        elif self.PAGES[i][0] == "الرخص":
-            self.page_conges.rafraichir()
-        elif self.PAGES[i][0] == "سجل الصادر":
-            self.page_sortants.rafraichir()
-        elif self.PAGES[i][0] == "تدبير الفائض":
-            self.page_fa.rafraichir()
-        elif self.PAGES[i][0] == "الاستيراد من مسار":
-            self.page_import.rafraichir()
         self.pile.setCurrentIndex(i)
+        nom = self.page_courante()
+        if nom:
+            self._rafraichir(nom)
 
     def exporter(self) -> None:
         d = QFileDialog.getExistingDirectory(self, "اختيار القرص الخارجي أو المجلد")
