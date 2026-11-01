@@ -34,6 +34,10 @@ DATES_CARRIERE = (("date_naissance", "تاريخ الازدياد"), ("date_recr
                   ("date_affectation", "تاريخ التعيين بالمؤسسة"))
 
 
+# قرار المدير (2026-11-01): من عُيّن بمديرية قبل إحداث الأكاديميات، تاريخ تعيينه بالأكاديمية هو 01/09/2002.
+DATE_REFERENCE_ACADEMIES = "2002-09-01"
+
+
 def annees_entre(debut: date, fin: date) -> int:
     """عدد السنوات الكاملة."""
     return fin.year - debut.year - ((fin.month, fin.day) < (debut.month, debut.day))
@@ -128,6 +132,19 @@ class Personnel:
                     raise ErreurPersonnel(f"{lib} غير صحيح.") from None
                 if d[k] > date.today() and k != "date_depart":
                     raise ErreurPersonnel(f"{lib} في المستقبل.")
+        ref = date.fromisoformat(DATE_REFERENCE_ACADEMIES)
+        dr, ac = d.get("date_affectation_direction"), d.get("date_affectation_academie")
+        if dr and dr < ref:
+            if ac and ac != ref:
+                raise ErreurPersonnel("عُيّن بالمديرية قبل إحداث الأكاديميات: تاريخ التعيين بالأكاديمية "
+                                      "هو التاريخ المرجعي 01/09/2002.")
+            d["date_affectation_academie"] = ref
+            self.date_affectation_academie = DATE_REFERENCE_ACADEMIES
+        elif ac:
+            if ac < ref:
+                raise ErreurPersonnel("تاريخ التعيين بالأكاديمية قبل إحداث الأكاديميات (01/09/2002).")
+            if dr and ac > dr:
+                raise ErreurPersonnel("تاريخ التعيين بالأكاديمية بعد تاريخ التعيين بالمديرية الإقليمية.")
         n, r = d.get("date_naissance"), d.get("date_recrutement")
         if n and annees_entre(n, date.today()) < 18:
             raise ErreurPersonnel("تاريخ الازدياد غير منطقي (أقل من 18 سنة).")

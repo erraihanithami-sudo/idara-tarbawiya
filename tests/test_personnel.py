@@ -169,12 +169,39 @@ def test_carriere_manquante_signalee_pour_enseignants(base):
 @pytest.mark.parametrize("modif, message", [
     (dict(date_naissance="2015-01-01"), "أقل من 18"),
     (dict(date_recrutement="1995-01-01"), "عند التوظيف"),
-    (dict(date_affectation_academie="2000-01-01"), "الأكاديمية قبل تاريخ التوظيف"),
-    (dict(date_affectation_direction="2000-01-01"), "المديرية الإقليمية قبل تاريخ التوظيف"),
+    (dict(date_recrutement="2005-09-16", date_affectation_academie="2005-01-01"), "الأكاديمية قبل تاريخ التوظيف"),
+    (dict(date_recrutement="2005-09-16", date_affectation_academie="", date_affectation_direction="2005-01-01"),
+     "المديرية الإقليمية قبل تاريخ التوظيف"),
     (dict(date_affectation="2005-01-01"), "المؤسسة قبل تاريخ التعيين بالمديرية"),
     (dict(date_recrutement="2099-01-01"), "المستقبل"),
     (dict(date_naissance="1980-02-30"), "غير صحيح"),
 ])
 def test_carriere_incoherente(base, modif, message):
+    with pytest.raises(rh.ErreurPersonnel, match=message):
+        rh.enregistrer(base, _carriere(**modif))
+
+
+def test_reference_academies_pour_affectation_ancienne(base):
+    """قرار المدير: المعيّن بالمديرية قبل إحداث الأكاديميات ← 01/09/2002 تاريخاً للتعيين بالأكاديمية."""
+    from datetime import date
+    pid = rh.enregistrer(base, _carriere(date_naissance="1965-05-10", date_recrutement="1987-09-16",
+                                         date_affectation_academie="", date_affectation_direction="1990-09-01",
+                                         date_affectation="1998-09-01"))
+    p = rh.lire(base, pid)
+    assert p.date_affectation_academie == "2002-09-01"
+    assert rh.anciennetes(p, date(2026, 11, 1))["academie"] == 24
+    rh.enregistrer(base, p)  # إعادة الحفظ بنفس التاريخ مقبولة
+    with pytest.raises(rh.ErreurPersonnel, match="01/09/2002"):
+        rh.enregistrer(base, _carriere(ppr="", cin="", date_recrutement="1987-09-16",
+                                       date_affectation_academie="1995-01-01",
+                                       date_affectation_direction="1990-09-01", date_affectation="1998-09-01"))
+
+
+@pytest.mark.parametrize("modif, message", [
+    (dict(date_recrutement="1990-09-16", date_affectation_academie="2001-09-01",
+          date_affectation_direction="2008-09-01"), "قبل إحداث الأكاديميات"),
+    (dict(date_affectation_academie="2009-09-01"), "بعد تاريخ التعيين بالمديرية"),
+])
+def test_academie_coherente(base, modif, message):
     with pytest.raises(rh.ErreurPersonnel, match=message):
         rh.enregistrer(base, _carriere(**modif))

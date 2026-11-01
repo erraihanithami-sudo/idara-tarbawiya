@@ -160,6 +160,11 @@ class PagePersonnel(QWidget):
                                      ("الوحدة المدرسية", self.unite)])
         self.dates = {k: (self.date_aff if k == "date_affectation" else ChampDate()) for k, _ in rh.DATES_CARRIERE}
         section("المسار المهني (لتحديد الفائض)", [(lib, self.dates[k]) for k, lib in rh.DATES_CARRIERE])
+        regle = QLabel("من عُيّن بالمديرية قبل إحداث الأكاديميات: يُعتمد 01/09/2002 تاريخاً للتعيين بالأكاديمية "
+                       "(يُملأ آلياً عند الحفظ).")
+        regle.setObjectName("etiquette")
+        regle.setWordWrap(True)
+        fv.addWidget(regle)
         self.anciennete = QLabel()
         self.anciennete.setObjectName("etiquette")
         self.anciennete.setWordWrap(True)
