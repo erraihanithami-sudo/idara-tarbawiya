@@ -303,7 +303,7 @@ def test_page_personnel(app, config_tmp):
     p.c["cadre"].setEditText("أستاذة التعليم الابتدائي")
     p.c["telephone"].setText("0612345678")
     p.c["heures_hebdo"].setText("30")
-    assert [p.matiere.itemData(i) for i in range(p.matiere.count())] == ["", "عربية", "فرنسية", "مزدوجة"]
+    assert [p.matiere.itemData(i) for i in range(p.matiere.count())] == ["", "عربية", "فرنسية", "مزدوجة", "أمازيغية"]
     p.matiere.setCurrentIndex(p.matiere.findData("مزدوجة"))
     # إسناد قسم: المستوى والعدد محسوبان
     for i in range(p.classes.count()):

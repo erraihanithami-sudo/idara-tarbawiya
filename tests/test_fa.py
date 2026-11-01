@@ -117,7 +117,7 @@ def test_matieres_separees_et_postes(base):
     fa.definir_postes(base, "فرنسية", 0)
     groupes = {g.matiere: g for g in fa.calculer(base)[0]}
     assert groupes["عربية"].fa == [] and [l.p.id for l in groupes["فرنسية"].fa] == [f]
-    assert "مزدوجة" not in groupes
+    assert "مزدوجة" not in groupes and "أمازيغية" not in groupes
     fa.definir_postes(base, "فرنسية", None)
     assert fa.postes_requis(base) == {"عربية": 1}
     with pytest.raises(fa.ErreurFa):
