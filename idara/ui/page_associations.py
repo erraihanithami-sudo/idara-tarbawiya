@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, 
 
 from idara.services import associations as asso
 from idara.services import bureautique
+from idara.services import achats as ac
 from idara.services import docs_association as da
 from idara.services import textes as tx
 from idara.ui.composants import carte, entete
@@ -119,6 +120,49 @@ class DialoguePassation(QDialog):
                     remarques=self.remarques.toPlainText().splitlines(), maj=self.maj.isChecked())
 
 
+class DialogueDon(QDialog):
+    """وصل تسلم تجهيز (الملحق 14) أو التصريح بتلقي مساعدة أجنبية (الملحق 15)."""
+
+    def __init__(self, parent, etranger: bool):
+        super().__init__(parent)
+        self.etranger = etranger
+        self.setWindowTitle("التصريح بتلقي مساعدة أجنبية" if etranger else "وصل تسلم تجهيز")
+        self.setLayoutDirection(Qt.RightToLeft)
+        v = QVBoxLayout(self)
+        f = QFormLayout()
+        self.date = ChampDate()
+        self.date.definir(date.today().isoformat())
+        self.source = champ()
+        self.texte = QPlainTextEdit()
+        self.texte.setFixedHeight(100)
+        if etranger:
+            self.texte.setPlaceholderText("مساعدة في كل سطر")
+            f.addRow("تاريخ التوصل بالمساعدة", self.date)
+            f.addRow("المساعدات (سطر لكل مساعدة)", self.texte)
+            f.addRow("تخصيص المساعدات ل", self.source)
+        else:
+            self.texte.setPlaceholderText("مواصفات التجهيز")
+            f.addRow("تاريخ التسلم", self.date)
+            f.addRow("الجهة المانحة", self.source)
+            f.addRow("التجهيز (المواصفات)", self.texte)
+            n = QLabel("يُسجل التجهيز بعد ذلك بدفتر الجرد (الدليل المسطري).")
+            n.setWordWrap(True)
+            f.addRow(n)
+        v.addLayout(f)
+        b = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        b.button(QDialogButtonBox.Ok).setText("توليد الوثيقة")
+        b.button(QDialogButtonBox.Cancel).setText("إلغاء")
+        b.accepted.connect(self.accept)
+        b.rejected.connect(self.reject)
+        v.addWidget(b)
+
+    def valeurs(self) -> dict:
+        d = _date(self.date, "التاريخ")
+        if self.etranger:
+            return dict(date_reception=d, aides=self.texte.toPlainText().splitlines(), affectation=self.source.text())
+        return dict(date_don=d, donateur=self.source.text(), description=self.texte.toPlainText())
+
+
 class PageAssociations(QWidget):
     def __init__(self, fenetre):
         super().__init__()
@@ -164,7 +208,12 @@ class PageAssociations(QWidget):
         t = QLabel("الوثائق:")
         t.setObjectName("etiquette")
         h.addWidget(t)
-        for b in (self.b_registres, self.b_budget, self.b_passation, self.b_export):
+        self.b_autres = QPushButton("وثائق أخرى")
+        m = QMenu(self.b_autres)
+        m.addAction("وصل تسلم تجهيز — مدخول عيني (الملحق 14)", lambda: self.recu_equipement())
+        m.addAction("التصريح بتلقي مساعدة أجنبية (الملحق 15)", lambda: self.aide_etrangere())
+        self.b_autres.setMenu(m)
+        for b in (self.b_registres, self.b_budget, self.b_passation, self.b_autres, self.b_export):
             h.addWidget(b)
         h.addStretch()
         cv.addLayout(h)
@@ -352,7 +401,7 @@ class PageAssociations(QWidget):
     def _changer_exercice(self) -> None:
         self.eid = self.exercice.currentData()
         actif = self.eid is not None
-        for w in (self.b_export, self.b_registres, self.b_budget, self.b_passation, self.tiers, self.tiers_qualite,
+        for w in (self.b_export, self.b_autres, self.b_registres, self.b_budget, self.b_passation, self.tiers, self.tiers_qualite,
                   self.b_save, self.date, self.nature, self.registre, self.chapitre, self.ligne,
                   self.montant, self.reference, self.detail, self.b_prev, self.prevu):
             w.setEnabled(actif)
@@ -614,6 +663,43 @@ class PageAssociations(QWidget):
                                       a["date_renouvellement"] or "")
             self._charger_association()
         return p
+
+    def _dialogue_don(self, etranger: bool, valeurs: dict | None) -> dict | None:
+        if valeurs is not None:
+            return valeurs
+        dlg = DialogueDon(self, etranger)
+        if dlg.exec() != QDialog.Accepted:
+            return None
+        try:
+            return dlg.valeurs()
+        except asso.ErreurAssociation as e:
+            message(self.message, str(e), True)
+            return None
+
+    def recu_equipement(self, valeurs: dict | None = None) -> Path | None:
+        v = self._dialogue_don(False, valeurs)
+        if v is None:
+            return None
+        try:
+            p = ac.recu_equipement(self.f.conn, self.f.dossier, self.eid, **v)
+        except ac.ErreurAchat as e:
+            message(self.message, str(e), True)
+            return None
+        return self._produire(lambda: p, "وُلّد وصل تسلم التجهيز (سجله بعد ذلك بدفتر الجرد)")
+
+    def aide_etrangere(self, valeurs: dict | None = None) -> Path | None:
+        v = self._dialogue_don(True, valeurs)
+        if v is None:
+            return None
+        try:
+            p, alerte = ac.declaration_aide_etrangere(self.f.conn, self.f.dossier, self.eid, **v)
+        except ac.ErreurAchat as e:
+            message(self.message, str(e), True)
+            return None
+        r = self._produire(lambda: p, "وُلّد التصريح بتلقي مساعدة أجنبية")
+        if alerte:
+            message(self.message, alerte, True)
+        return r
 
     # ---------- السنة المالية والتصدير ----------
 

@@ -231,6 +231,20 @@ def main(sortie: Path) -> None:
     photo(f, "35_association")
     __import__("idara.ui.saisie", fromlist=["x"]).selectionner(f.page_asso.ops, 4)
     photo(f, "36_association_pieces")
+    from idara.services import achats as acx
+    e_ = __import__("idara.services.etablissement", fromlist=["x"])
+    et_ = e_.lire_etablissement(f.conn); et_.adresse = "حي تجريبي"; e_.enregistrer_etablissement(f.conn, et_)
+    aid = acx.creer(f.conn, ex, "bon_commande", "اقتناء طابعات", _r("معدات معلوماتية"), "", "2025-10-01")
+    acx.definir_besoin(f.conn, aid, "اقتناء طابعات", _r("معدات معلوماتية"), [("طابعة ليزر", 2, "وحدة", 2000)], 20)
+    acx.definir_demande(f.conn, aid, "2025-10-02", 10, 3)
+    acx.definir_commission(f.conn, aid, "2025-10-15", "10:00", [("الرئيس التجريبي", "رئيسا"),
+                           ("أمين المال التجريبي", "أمين المال"), ("العضو التجريبي", "عضو بمكتب الجمعية")])
+    for nom, m in (("الممون أ", 5000), ("الممون ب", 4800), ("الممون ج", 5200)):
+        acx.ajouter_offre(f.conn, aid, nom, m)
+    acx.choisir(f.conn, aid, acx.fournisseur_par_nom(f.conn, "الممون ب"))
+    f.aller_a("الصرف")
+    f.page_achats.afficher_liste(aid)
+    photo(f, "37_achats")
     f.aller_a("مشروع المؤسسة")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")

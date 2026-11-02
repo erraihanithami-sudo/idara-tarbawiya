@@ -633,3 +633,66 @@ def test_association_documents_du_guide(app, config_tmp, monkeypatch):
     assert p.tresorier.text() == "الأمينة الجديدة" and len(ouverts) == 4
     assert asso.association(f.conn)["tresorier"] == "الأمينة الجديدة"
     f.close()
+
+
+def test_page_achats_bon_de_commande(app, config_tmp, monkeypatch):
+    from idara.services import achats as ac
+    from idara.services import bureautique
+    from idara.services import etablissement as et
+    from idara.ui.saisie import selectionner
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    e = et.lire_etablissement(f.conn)
+    e.adresse = "حي تجريبي"
+    et.enregistrer_etablissement(f.conn, e)
+    pa = f.page_asso
+    f.aller_a("جمعية دعم مدرسة النجاح")
+    pa.ouvrir(dict(libelle="2025/2026", debut="2025-09-01", fin="2026-08-31", report_banque=20000, report_caisse=0))
+    pa.president.setText("الرئيس الوهمي")
+    pa.tresorier.setText("أمين المال الوهمي")
+    assert pa.enregistrer_association()
+    assert pa.recu_equipement(dict(date_don="2025-11-03", donateur="شركة وهمية", description="حاسوب"))
+    f.aller_a("الصرف")
+    p = f.page_achats
+    assert f.page_courante() == "الصرف" and p.zone.isHidden()
+    rub = p.rubrique.itemData(p.rubrique.findText("معدات معلوماتية", Qt.MatchContains))
+    aid = p.nouveau(dict(mode="bon_commande", objet="اقتناء طابعات", rubrique_id=rub, service_type=""))
+    assert aid and not p.zone.isHidden() and p.boutons_docs["pv_service"].isHidden()
+    p.articles.setItem(0, 0, __import__("idara.ui.saisie", fromlist=["x"]).cellule("طابعة"))
+    p.articles.setItem(0, 1, __import__("idara.ui.saisie", fromlist=["x"]).cellule("2"))
+    assert p.enregistrer_besoin(), p.message.text()
+    p.date_demande.setText("02/10/2025")
+    p.nb.setText("2")
+    assert not p.enregistrer_demande() and "3 طلبات" in p.message.text()
+    p.nb.setText("3")
+    assert p.enregistrer_demande() and p.document("demande_devis")
+    p.date_comm.setText("15/10/2025")
+    p.membres.setItem(2, 0, __import__("idara.ui.saisie", fromlist=["x"]).cellule("العضو الوهمي"))
+    assert p.enregistrer_commission(), p.message.text()
+    assert p.membres.item(0, 0).text() == "الرئيس الوهمي"
+    for nom, m in (("الممون أ", "2500"), ("الممون ب", "2400"), ("الممون ج", "2600")):
+        p.nom_offre.setEditText(nom)
+        p.montant_offre.setText(m)
+        assert p.ajouter_offre(), p.message.text()
+    assert p.offres.rowCount() == 3 and p.offres.item(0, 0).text() == "الممون ب"
+    selectionner(p.offres, 0)
+    assert p.choisir() and p.document("pv_commission")
+    p.articles.setItem(0, 3, __import__("idara.ui.saisie", fromlist=["x"]).cellule("1000"))
+    assert p.enregistrer_besoin()
+    p.date_bc.setText("20/10/2025")
+    assert p.engager()
+    assert p.editer_fournisseur(ac.Fournisseur("الممون ب", adresse="شارع وهمي",
+                                               id=ac.fournisseur_par_nom(f.conn, "الممون ب")))
+    assert p.document("bon_commande")
+    p.date_liv.setText("24/10/2025")
+    assert p.enregistrer_reception() and p.document("bon_livraison")
+    p.num_facture.setText("F-1")
+    p.date_facture.setText("25/10/2025")
+    assert p.enregistrer_facture()
+    p.date_paie.setText("28/10/2025")
+    p.ref_paie.setText("0001")
+    assert p.payer(), p.message.text()
+    assert "○" not in p.etapes.text() and len(ouverts) == 5
+    assert ac.achat(f.conn, aid)["operation_id"]
+    f.close()
