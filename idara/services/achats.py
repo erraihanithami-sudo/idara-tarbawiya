@@ -223,7 +223,7 @@ def definir_demande(conn, aid: int, date_demande: str, delai: int | str, nb: int
     a = achat(conn, aid)
     _non_engage(a)
     e = asso.exercice(conn, a["exercice_id"])
-    d = _d(date_demande, "تاريخ طلب عروض الأثمان")
+    _d(date_demande, "تاريخ طلب عروض الأثمان")
     if not e["date_debut"] <= date_demande <= e["date_fin"]:
         raise ErreurAchat("تاريخ الطلب خارج السنة المالية.")
     delai, nb = int(_nombre(delai, "أجل الرد")), int(_nombre(nb, "عدد الطلبات"))
@@ -231,8 +231,6 @@ def definir_demande(conn, aid: int, date_demande: str, delai: int | str, nb: int
         raise ErreurAchat(f"أجل إرجاع الرد لا يتعدى {DELAI_MAX} يوماً (الدليل المسطري).")
     if nb < DEMANDES_MIN:
         raise ErreurAchat(f"توجه على الأقل {DEMANDES_MIN} طلبات عروض الأثمان إلى ثلاثة ممونين (الدليل المسطري).")
-    if a["date_besoin"] and d < _d(a["date_besoin"], "تاريخ الحاجة"):
-        raise ErreurAchat("تاريخ الطلب قبل تاريخ التعبير عن الحاجة.")
     with conn:
         conn.execute("UPDATE achat SET date_demande=?, delai_jours=?, nb_demandes=? WHERE id=?",
                      (date_demande, delai, nb, aid))
