@@ -30,7 +30,7 @@ def _n(x, suffixe="") -> str:
 def _ecart(x, suffixe="") -> str:
     if x is None:
         return "—"
-    return ("▲ +" if x > 0 else "▼ " if x < 0 else "= ") + f"{x:.2f}{suffixe}"
+    return ("+" if x > 0 else "") + f"{x:.2f}{suffixe}"
 
 
 def _grille(paires, etirer=None) -> QGridLayout:
@@ -85,11 +85,11 @@ class PagePerformance(QWidget):
         self.titre = QLabel()
         self.titre.setObjectName("titreCarte")
         v.addWidget(self.titre)
-        self.table = tableau(["الفئة", "العدد", "المعدل", "نسبة الحاصلين على المعدل", "المعدل (السابق)",
-                              "النسبة (السابق)", "تطور المعدل", "تطور النسبة"], etirer=0)
+        self.table = tableau(["الفئة", "العدد", "المعدل", "نسبة النجاح", "المعدل قبله", "النسبة قبله",
+                              "تطور المعدل", "تطور النسبة"], etirer=0)
         self.table.setMinimumHeight(360)
         v.addWidget(self.table)
-        self.note = QLabel()
+        self.note = QLabel("نسبة النجاح: نسبة الحاصلين على معدل 5/10 فأكثر في الأسدوس.")
         self.note.setObjectName("sousTitre")
         self.note.setWordWrap(True)
         v.addWidget(self.note)
@@ -132,8 +132,8 @@ class PagePerformance(QWidget):
             l0 = lignes[0]
             self.titre.setText(f"{l0['periode']}" + (f" مقارنة ب{l0['avant']}" if l0["avant"] else
                                                      " (لا أسدوس قبله في البيانات)"))
-            self.note.setText("المقارنة بين أسدوسين من سنتين مختلفتين تخص نفس المستوى الدراسي، لا نفس التلاميذ "
-                              "(انتقلوا إلى المستوى الموالي).")
+            self.note.setText("نسبة النجاح: نسبة الحاصلين على معدل 5/10 فأكثر في الأسدوس. المقارنة بين أسدوسين من "
+                              "سنتين مختلفتين تخص نفس المستوى الدراسي، لا نفس التلاميذ.")
         else:
             self.titre.setText("")
             self.note.setText("")
