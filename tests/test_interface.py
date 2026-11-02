@@ -552,3 +552,52 @@ def test_page_conseils(app, config_tmp, monkeypatch):
     assert p.generer_pv() is not None, p.message.text()
     assert p.generer_synthese() is not None and len(ouverts) == 2
     f.close()
+
+
+def test_page_association_najah(app, config_tmp, monkeypatch, tmp_path):
+    from idara.services import associations as asso
+    from idara.services import bureautique
+    from idara.ui.saisie import selectionner
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("التدبير المالي والمادي")
+    p = f.page_asso
+    assert f.page_courante() == "جمعية دعم مدرسة النجاح" and not p.b_save.isEnabled()
+    eid = p.ouvrir(dict(libelle="2025/2026", debut="2025-09-01", fin="2026-08-31",
+                        report_banque=50000, report_caisse=300, reference="محضر تسليم المهام"))
+    assert eid and p.b_save.isEnabled() and p.ops.rowCount() == 2
+    assert p.chiffres["banque"].text() == "50 000.00 درهم"
+    # تحويل: يختفي البند
+    p.nature.setCurrentIndex(p.nature.findData("transfert"))
+    assert p.ligne.isHidden() and p.l_registre.text() == "من *"
+    p.date.setText("24/10/2025")
+    p.montant.setText("3000")
+    p.reference.setText("شيك 04")
+    assert p.enregistrer(), p.message.text()
+    # مصروف من الصندوق ببند من نموذج المدير
+    p.nature.setCurrentIndex(p.nature.findData("depense"))
+    p.registre.setCurrentIndex(p.registre.findData("caisse"))
+    p.chapitre.setCurrentIndex(p.chapitre.findText("ر- التجهيزات"))
+    assert p.ligne.count() == 10 and "20000" in p.indice.text()
+    p.date.setText("05/11/2025")
+    p.montant.setText("99999")
+    p.reference.setText("فاتورة 1")
+    assert p.enregistrer() is None and "لا يكفي" in p.message.text()
+    p.montant.setText("1200")
+    p.reference.setText("فاتورة 1")
+    assert p.enregistrer(), p.message.text()
+    assert p.chiffres["caisse"].text() == "2 100.00 درهم"
+    p.vue.setCurrentIndex(p.vue.findData("caisse"))
+    assert p.ops.rowCount() == 3 and p.ops.item(2, 5).text() == "2 100.00"
+    # الميزانية والتنبيه
+    rid = asso.execution(f.conn, eid)
+    i = next(k for k in range(p.budget.rowCount()) if p.budget.item(k, 0).data(Qt.UserRole) == p.ligne.itemData(0))
+    selectionner(p.budget, i)
+    p.prevu.setText("1000")
+    assert p.enregistrer_prevision() and not p.alertes.isHidden() and rid
+    selectionner(p.ops, 2)
+    assert p.supprimer() and p.alertes.isHidden()
+    assert p.exporter(tmp_path / "n.xlsx").exists()
+    p.rib.setText("12A")
+    assert not p.enregistrer_association()
+    f.close()
