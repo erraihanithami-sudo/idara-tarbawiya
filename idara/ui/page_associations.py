@@ -307,7 +307,7 @@ class PageAssociations(QWidget):
             return
         t = asso.totaux(self.f.conn, self.eid)
         for k, n in self.chiffres.items():
-            n.setText(f"{dh(t[k])} درهم")
+            n.setText(f"\u2066{dh(t[k])}\u2069 درهم")
         al = asso.depassements(self.f.conn, self.eid)
         self.alertes.setText("تنبيه — تجاوز المتوقع:\n" + "\n".join(al))
         self.alertes.setVisible(bool(al))
