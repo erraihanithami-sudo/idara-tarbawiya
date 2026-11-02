@@ -41,15 +41,23 @@ def _boutons(dlg: QDialog, ok: str) -> QDialogButtonBox:
     return b
 
 
+def _combo_large(c: QComboBox) -> QComboBox:
+    """قائمة بنصوص طويلة لا تفرض عرضها على الصفحة."""
+    c.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+    c.setMinimumContentsLength(24)
+    c.view().setMinimumWidth(600)
+    return c
+
+
 def _combo_rubriques(conn) -> QComboBox:
-    c = QComboBox()
+    c = _combo_large(QComboBox())
     for r in asso.rubriques(conn, TYPE, "depense", actifs=True):
         c.addItem(f"{r['chapitre']} ← {r['ligne']}", r["id"])
     return c
 
 
 def _combo_services() -> QComboBox:
-    c = QComboBox()
+    c = _combo_large(QComboBox())
     for s in ac.SERVICES_CONVENTION:
         c.addItem(s, s)
     return c
