@@ -718,7 +718,7 @@ def test_section_pedagogie(app, config_tmp, monkeypatch):
     assert p.importer([fic]) and p.periode.count() == 2
     assert "الأسدوس الثاني 2026/2027" in p.titre.text()
     inst = p.table.item(p.table.rowCount() - 1, 0)
-    assert inst.text() == "المؤسسة" and p.table.item(p.table.rowCount() - 1, 6).text() == "+1.50"
+    assert inst.text() == "المؤسسة" and p.table.item(p.table.rowCount() - 1, 6).text() == "\u200e+1.50"
     f.aller_a("التعلمات الأساس")
     t = f.page_tarl
     ft = classeur_niveaux(config_tmp / "t.xlsx", {"2APG-1": [("X000000001", "أ", "حرف", "كلمة", "débutant", "lettre",

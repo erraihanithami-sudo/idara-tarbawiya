@@ -30,7 +30,7 @@ def _n(x, suffixe="") -> str:
 def _ecart(x, suffixe="") -> str:
     if x is None:
         return "—"
-    return ("+" if x > 0 else "") + f"{x:.2f}{suffixe}"
+    return "\u200e" + ("+" if x > 0 else "") + f"{x:.2f}{suffixe}"  # الإشارة على يسار الرقم
 
 
 def _grille(paires, etirer=None) -> QGridLayout:
