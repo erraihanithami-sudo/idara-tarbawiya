@@ -554,3 +554,111 @@ def generer_pv_passation(conn, dossier: DossierDonnees, eid: int, date_pv: str, 
         _cellule(t.cell(0, j), lib, gras=True)
     return _enregistrer(d, dossier, e["libelle"], "محاضر", "محضر تسليم المهام المالية")
 
+
+
+# ---------- التقرير المالي (الملحق 16) ----------
+
+# توزيع أبواب الملحق 1 على فقرات التقرير المالي (المصادقة: المدير، 2026-11-02).
+# المداخيل القارة: منحة المديرية الإقليمية. المنقول ليس مدخولاً للسنة: يظهر في وضعية الخزينة.
+RAPPORT_RECETTES = (("مداخيل قارة", lambda r: r["ligne"] == "منحة المديرية الإقليمية"),
+                    ("مداخيل الأنشطة", lambda r: r["chapitre"] == "مداخيل الأنشطة"),
+                    ("المنح والهبات", lambda r: r["chapitre"] in ("المنح", "الهبات")
+                     and r["ligne"] != "منحة المديرية الإقليمية"),
+                    ("مداخيل استثنائية", lambda r: r["chapitre"] == "مداخيل استثنائية" and r["ligne"] != asso.REPORT))
+RAPPORT_DEPENSES = (("أ- مصاريف التجهيزات", ("التجهيزات",)),
+                    ("ب- مصاريف الأنشطة", ("الأندية التربوية", "التظاهرات المدرسية", "الدعم التربوي",
+                                           "دعم الصحة المدرسية", "الدعم النفسي", "التوجيه المدرسي والمهني",
+                                           "نفقات تشجيع التميز والإبداع والابتكار")),
+                    ("د- مصاريف التسيير", ("التدبير والشراكة", "صيانة وإصلاح تجهيزات وبنيات المؤسسة وتأهيلها")),
+                    ("ج- مصاريف استثنائية", ("نفقات استثنائية",)))
+QUESTIONS_RAPPORT = (("relation", "حلل العلاقة بين المصاريف والمنجزات"),
+                     ("resultat", "قم بتبرير النتيجة المحصل عليها في الرصيد إن كانت إيجابية فلماذا وإن كانت سلبية فلماذا"),
+                     ("difficultes", "ماهي إكراهات التدبير المالي للجمعية، والتدابير الإجرائية المتخذة لتجاوزها"),
+                     ("durabilite", "الاستدامة المالية: وضح ماهي السياسة التي تم إتباعها من أجل ضمان الاستدامة المالية"))
+
+
+def chiffres_rapport(conn, eid: int) -> dict:
+    ex = asso.execution(conn, eid)
+    rec = [(lib, round(sum(r["realise"] for r in ex if r["sens"] == "recette" and f(r)), 2))
+           for lib, f in RAPPORT_RECETTES]
+    dep = [(lib, round(sum(r["realise"] for r in ex if r["sens"] == "depense" and r["chapitre"] in chs), 2))
+           for lib, chs in RAPPORT_DEPENSES]
+    report = round(sum(r["realise"] for r in ex if r["ligne"] == asso.REPORT), 2)
+    tr, td = round(sum(m for _, m in rec), 2), round(sum(m for _, m in dep), 2)
+    return {"recettes": rec, "depenses": dep, "total_recettes": tr, "total_depenses": td, "report": report,
+            "resultat": round(tr - td, 2), "soldes": asso.soldes(conn, eid)}
+
+
+def generer_rapport_financier(conn, dossier: DossierDonnees, eid: int, numero_ag: str,
+                              analyses: dict[str, str] | None = None) -> Path:
+    ctx = _contexte(conn, eid)
+    a = ctx["a"]
+    _exiger({"رقم الجمع العام العادي": numero_ag, "رئيس الجمعية (معطيات الجمعية)": a["president"],
+             "أمين المال (معطيات الجمعية)": a["tresorier"]})
+    c = chiffres_rapport(conn, eid)
+    analyses = {k: (v or "").strip() for k, v in (analyses or {}).items()}
+    d = _nouveau()
+    para(d, f"{a['nom']} — المؤسسة: {ctx['etab']}", gras=True, taille=13)
+    para(d, "التقرير المالي", gras=True, taille=22, centre=True, apres=8)
+    p = para(d, apres=0)
+    ajouter(p, "الجمع العام العادي رقم: ", gras=True)
+    ajouter(p, ltr(" ".join(numero_ag.split())))
+    p = para(d, apres=8)
+    ajouter(p, "السنة: ", gras=True)
+    ajouter(p, f"{ctx['e']['libelle']} ({tx.date_chiffres(ctx['e']['date_debut'])} — {tx.date_chiffres(ctx['e']['date_fin'])})")
+    n = max(len(c["recettes"]), len(c["depenses"]))
+    t = tableau(d, 3 + n, 4, largeurs=[5.0, 3.7, 5.0, 3.7])
+    t.cell(0, 0).merge(t.cell(0, 1))
+    _cellule(t.cell(0, 0), "المداخيل", gras=True)
+    t.cell(0, 2).merge(t.cell(0, 3))
+    _cellule(t.cell(0, 2), "المصاريف", gras=True)
+    for j, lib in enumerate(("الفقرات", "المبلغ", "الفقرات", "المبلغ")):
+        _cellule(t.cell(1, j), lib, gras=True, taille=13)
+    for i in range(n):
+        for col, lst in ((0, c["recettes"]), (2, c["depenses"])):
+            if i < len(lst):
+                _cellule(t.cell(2 + i, col), lst[i][0], taille=13, centre=False)
+                _cellule(t.cell(2 + i, col + 1), dh(lst[i][1]), taille=13)
+    for col, tot in ((0, c["total_recettes"]), (2, c["total_depenses"])):
+        _cellule(t.cell(2 + n, col), "المجموع العام", gras=True, taille=13)
+        _cellule(t.cell(2 + n, col + 1), dh(tot), gras=True, taille=13)
+        _ombre(t.cell(2 + n, col), "D9D9D9")
+        _ombre(t.cell(2 + n, col + 1), "D9D9D9")
+    para(d, apres=6)
+    para(d, "الوضعية الإجمالية للخزينة", gras=True, apres=2)
+    s = c["soldes"]
+    t = tableau(d, 6, 2, largeurs=[9.4, 4.4])
+    for i, (lib, v) in enumerate((("المنقول من السنة المالية السابقة", c["report"]),
+                                  ("مداخيل السنة", c["total_recettes"]), ("مصاريف السنة", c["total_depenses"]),
+                                  ("الرصيد بالبنك في نهاية الفترة", s["banque"]),
+                                  ("الرصيد بالصندوق في نهاية الفترة", s["caisse"]),
+                                  ("المجموع", s["banque"] + s["caisse"]))):
+        _cellule(t.cell(i, 0), lib, gras=i == 5, taille=13, centre=False)
+        _cellule(t.cell(i, 1), dh(v), gras=i == 5, taille=13)
+    para(d, apres=6)
+    para(d, "التحليل:", gras=True, souligne=True, apres=4)
+    tdep = c["total_depenses"]
+    for cle, q in QUESTIONS_RAPPORT:
+        para(d, f"▪ {q}", gras=True, apres=2)
+        if cle == "relation" and tdep:
+            nsb = "، ".join(f"{lib[3:]}: {m / tdep * 100:.1f}%" for lib, m in c["depenses"])
+            para(d, f"نسب مصاريف كل مجال من المجموع العام ({dh(tdep)} درهم): {nsb}.", taille=14, apres=2)
+        if cle == "resultat":
+            r = c["resultat"]
+            etat = "إيجابية" if r > 0 else ("سلبية" if r < 0 else "متوازنة")
+            para(d, f"النتيجة (المداخيل ناقص المصاريف): {dh(r)} درهم — {etat}.", taille=14, apres=2)
+        if analyses.get(cle):
+            for ligne in analyses[cle].splitlines():
+                para(d, ligne, taille=14, apres=2)
+        else:
+            para(d, "." * 150, taille=11, apres=2)
+            para(d, "." * 150, taille=11, apres=4)
+    para(d, apres=6)
+    para(d, "الإمضاء", gras=True, apres=2)
+    t = tableau(d, 1, 2, bordures=False, largeurs=[8.7, 8.7])
+    _cellule(t.cell(0, 0), f"الرئيس: {a['president']}", gras=True)
+    _cellule(t.cell(0, 1), f"أمين المال: {a['tresorier']}", gras=True)
+    para(d, apres=30)
+    para(d, "يُرسل هذا التقرير إلى مجلس تدبير المؤسسة وإلى المديرية الإقليمية قبل 15 يناير من السنة التي تلي تلقي "
+            "المنحة أو الإعانة (الدليل المسطري).", taille=11)
+    return _enregistrer(d, dossier, ctx["e"]["libelle"], "التقارير", "التقرير المالي")

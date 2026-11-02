@@ -116,3 +116,23 @@ def test_budget_et_pv_passation(conn, dossier, ex):
     t = texte(da.generer_pv_passation(conn, dossier, ex, "2026-01-10", "القديم", "الجديد", ["ملاحظة أولى"]))
     assert "محضر تسليم المهام المالية" in t and "42 000.00" in t and "ثلاثمائة وخمسون درهما" in t
     assert "1- ملاحظة أولى" in t and "سجل تسليم الشيكات" in t
+
+
+def test_rapport_financier_annexe_16(conn, dossier, ex):
+    asso.enregistrer(conn, asso.Operation(ex, "2025-10-01", "recette", "banque", 50000, _r(conn, "منحة المديرية"),
+                                          tiers="المديرية"))
+    asso.enregistrer(conn, asso.Operation(ex, "2025-10-02", "recette", "caisse", 1000, _r(conn, "هبات"), tiers="محسن"))
+    asso.enregistrer(conn, asso.Operation(ex, "2025-10-03", "depense", "banque", 15000, _r(conn, "معدات معلوماتية"),
+                                          "فاتورة 1"))
+    asso.enregistrer(conn, asso.Operation(ex, "2025-10-04", "depense", "banque", 5000, _r(conn, "وثائق"), "فاتورة 2"))
+    c = da.chiffres_rapport(conn, ex)
+    assert dict(c["recettes"]) == {"مداخيل قارة": 50000, "مداخيل الأنشطة": 0, "المنح والهبات": 1000,
+                                   "مداخيل استثنائية": 0}  # المنقول (42350) ليس مدخولاً للسنة
+    assert dict(c["depenses"])["أ- مصاريف التجهيزات"] == 15000 and dict(c["depenses"])["ب- مصاريف الأنشطة"] == 5000
+    assert (c["report"], c["resultat"]) == (42350, 31000)
+    with pytest.raises(da.ErreurDocAssociation, match="الجمع العام"):
+        da.generer_rapport_financier(conn, dossier, ex, "")
+    asso.modifier_association(conn, "najah", "", "الرئيس الوهمي", "أمين المال الوهمي")
+    t = texte(da.generer_rapport_financier(conn, dossier, ex, "3", {"difficultes": "تأخر صرف المنحة"}))
+    assert "التقرير المالي" in t and "مداخيل قارة" in t and "75.0%" in t and "إيجابية" in t
+    assert "تأخر صرف المنحة" in t and "15 يناير" in t and "73 350.00" in t

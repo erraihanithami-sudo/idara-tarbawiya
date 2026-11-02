@@ -37,18 +37,19 @@ def _date(w: ChampDate, lib: str) -> str:
 class DialogueExercice(QDialog):
     """فتح سنة مالية. المنقول يُحتسب آلياً من السنة السابقة؛ يُدخل يدوياً لأول سنة في التطبيق فقط."""
 
-    def __init__(self, parent, premiere: bool):
+    def __init__(self, parent, premiere: bool, derniere_fin: str | None = None):
         super().__init__(parent)
         self.setWindowTitle("فتح سنة مالية")
         self.setLayoutDirection(Qt.RightToLeft)
         v = QVBoxLayout(self)
         f = QFormLayout()
-        a = date.today().year if date.today().month >= 9 else date.today().year - 1
+        # السنة المالية للجمعية سنة ميلادية: من 1 يناير إلى 31 دجنبر (اصطلاح المدير، 2026-11-02)
+        a = int(derniere_fin[:4]) + 1 if derniere_fin else date.today().year
         self.libelle = champ()
-        self.libelle.setText(f"{a}/{a + 1}")
+        self.libelle.setText(str(a))
         self.debut, self.fin = ChampDate(), ChampDate()
-        self.debut.definir(f"{a}-09-01")
-        self.fin.definir(f"{a + 1}-08-31")
+        self.debut.definir(f"{a}-01-01")
+        self.fin.definir(f"{a}-12-31")
         f.addRow("السنة المالية", self.libelle)
         f.addRow("تاريخ البداية", self.debut)
         f.addRow("تاريخ النهاية", self.fin)
@@ -163,6 +164,40 @@ class DialogueDon(QDialog):
         return dict(date_don=d, donateur=self.source.text(), description=self.texte.toPlainText())
 
 
+class DialogueRapport(QDialog):
+    """التقرير المالي (الملحق 16): الأرقام آلية؛ التحليل يُكتب هنا أو يُترك فارغاً للكتابة باليد."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("التقرير المالي")
+        self.setLayoutDirection(Qt.RightToLeft)
+        self.resize(640, 560)
+        v = QVBoxLayout(self)
+        f = QFormLayout()
+        self.ag = champ("مثلا: 3", ltr=True)
+        f.addRow("رقم الجمع العام العادي", self.ag)
+        self.textes = {}
+        for cle, q in da.QUESTIONS_RAPPORT:
+            w = QPlainTextEdit()
+            w.setPlaceholderText("اختياري: يُترك فارغاً للكتابة باليد")
+            w.setFixedHeight(70)
+            lab = QLabel(q)
+            lab.setWordWrap(True)
+            f.addRow(lab)
+            f.addRow(w)
+            self.textes[cle] = w
+        v.addLayout(f)
+        b = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        b.button(QDialogButtonBox.Ok).setText("توليد التقرير")
+        b.button(QDialogButtonBox.Cancel).setText("إلغاء")
+        b.accepted.connect(self.accept)
+        b.rejected.connect(self.reject)
+        v.addWidget(b)
+
+    def valeurs(self) -> dict:
+        return dict(numero_ag=self.ag.text(), analyses={k: w.toPlainText() for k, w in self.textes.items()})
+
+
 class PageAssociations(QWidget):
     def __init__(self, fenetre):
         super().__init__()
@@ -199,6 +234,8 @@ class PageAssociations(QWidget):
         self.b_registres.setMenu(m)
         self.b_budget = QPushButton("وثيقة الميزانية")
         self.b_budget.clicked.connect(lambda: self.generer_budget())
+        self.b_rapport = QPushButton("التقرير المالي")
+        self.b_rapport.clicked.connect(lambda: self.rapport())
         self.b_passation = QPushButton("محضر تسليم المهام المالية")
         self.b_passation.clicked.connect(lambda: self.passation())
         h.addWidget(self.b_ouvrir)
@@ -213,7 +250,9 @@ class PageAssociations(QWidget):
         m.addAction("وصل تسلم تجهيز — مدخول عيني (الملحق 14)", lambda: self.recu_equipement())
         m.addAction("التصريح بتلقي مساعدة أجنبية (الملحق 15)", lambda: self.aide_etrangere())
         self.b_autres.setMenu(m)
-        for b in (self.b_registres, self.b_budget, self.b_passation, self.b_autres, self.b_export):
+        self.b_export.setText("Excel")
+        self.b_export.setToolTip("تصدير السجلات والحصيلة إلى Excel")
+        for b in (self.b_registres, self.b_budget, self.b_rapport, self.b_passation, self.b_autres, self.b_export):
             h.addWidget(b)
         h.addStretch()
         cv.addLayout(h)
@@ -401,7 +440,7 @@ class PageAssociations(QWidget):
     def _changer_exercice(self) -> None:
         self.eid = self.exercice.currentData()
         actif = self.eid is not None
-        for w in (self.b_export, self.b_autres, self.b_registres, self.b_budget, self.b_passation, self.tiers, self.tiers_qualite,
+        for w in (self.b_export, self.b_rapport, self.b_autres, self.b_registres, self.b_budget, self.b_passation, self.tiers, self.tiers_qualite,
                   self.b_save, self.date, self.nature, self.registre, self.chapitre, self.ligne,
                   self.montant, self.reference, self.detail, self.b_prev, self.prevu):
             w.setEnabled(actif)
@@ -664,6 +703,15 @@ class PageAssociations(QWidget):
             self._charger_association()
         return p
 
+    def rapport(self, valeurs: dict | None = None) -> Path | None:
+        if valeurs is None:
+            dlg = DialogueRapport(self)
+            if dlg.exec() != QDialog.Accepted:
+                return None
+            valeurs = dlg.valeurs()
+        return self._produire(lambda: da.generer_rapport_financier(self.f.conn, self.f.dossier, self.eid, **valeurs),
+                              "وُلّد التقرير المالي")
+
     def _dialogue_don(self, etranger: bool, valeurs: dict | None) -> dict | None:
         if valeurs is not None:
             return valeurs
@@ -706,7 +754,8 @@ class PageAssociations(QWidget):
     def ouvrir(self, valeurs: dict | None = None) -> int | None:
         """يفتح سنة مالية (valeurs للاختبار، وإلا عبر النافذة)."""
         if valeurs is None:
-            d = DialogueExercice(self, premiere=self.exercice.count() == 0)
+            ex = asso.exercices(self.f.conn, TYPE)
+            d = DialogueExercice(self, premiere=not ex, derniere_fin=ex[0]["date_fin"] if ex else None)
             if d.exec() != QDialog.Accepted:
                 return None
             try:

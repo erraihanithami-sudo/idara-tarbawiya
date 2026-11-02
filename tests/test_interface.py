@@ -631,6 +631,10 @@ def test_association_documents_du_guide(app, config_tmp, monkeypatch):
     assert p.passation(dict(date_pv="2026-01-10", ancien="أمين المال الوهمي", nouveau="الأمينة الجديدة",
                             remarques=[], maj=True))
     assert p.tresorier.text() == "الأمينة الجديدة" and len(ouverts) == 4
+    assert p.rapport(dict(numero_ag="2", analyses={})) and len(ouverts) == 5
+    from idara.ui.page_associations import DialogueExercice
+    d = DialogueExercice(p, False, "2025-12-31")  # السنة المالية للجمعية سنة ميلادية
+    assert (d.libelle.text(), d.debut.iso(), d.fin.iso()) == ("2026", "2026-01-01", "2026-12-31")
     assert asso.association(f.conn)["tresorier"] == "الأمينة الجديدة"
     f.close()
 
