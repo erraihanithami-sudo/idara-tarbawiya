@@ -116,8 +116,8 @@ class PageAssociations(QWidget):
         cv.addLayout(h)
         self.chiffres = {}
         g = QHBoxLayout()
-        for k, lib in (("banque", "رصيد البنك"), ("caisse", "رصيد الصندوق"), ("recettes", "مجموع المداخيل"),
-                       ("depenses", "مجموع المصاريف")):
+        for k, lib in (("banque", "رصيد البنك (درهم)"), ("caisse", "رصيد الصندوق (درهم)"),
+                       ("recettes", "مجموع المداخيل (درهم)"), ("depenses", "مجموع المصاريف (درهم)")):
             b = QVBoxLayout()
             t = QLabel(lib)
             t.setObjectName("etiquette")
@@ -307,7 +307,7 @@ class PageAssociations(QWidget):
             return
         t = asso.totaux(self.f.conn, self.eid)
         for k, n in self.chiffres.items():
-            n.setText(f"\u2066{dh(t[k])}\u2069 درهم")
+            n.setText(dh(t[k]))
         al = asso.depassements(self.f.conn, self.eid)
         self.alertes.setText("تنبيه — تجاوز المتوقع:\n" + "\n".join(al))
         self.alertes.setVisible(bool(al))
