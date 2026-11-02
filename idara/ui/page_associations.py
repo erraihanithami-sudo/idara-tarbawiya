@@ -157,7 +157,14 @@ class PageAssociations(QWidget):
         self.b_budget.clicked.connect(lambda: self.generer_budget())
         self.b_passation = QPushButton("محضر تسليم المهام المالية")
         self.b_passation.clicked.connect(lambda: self.passation())
-        for b in (self.b_ouvrir, self.b_registres, self.b_budget, self.b_passation, self.b_export):
+        h.addWidget(self.b_ouvrir)
+        h.addStretch()
+        cv.addLayout(h)
+        h = QHBoxLayout()   # وثائق الدليل المسطري في سطر مستقل حتى لا تتجاوز الصفحة عرضها
+        t = QLabel("الوثائق:")
+        t.setObjectName("etiquette")
+        h.addWidget(t)
+        for b in (self.b_registres, self.b_budget, self.b_passation, self.b_export):
             h.addWidget(b)
         h.addStretch()
         cv.addLayout(h)
