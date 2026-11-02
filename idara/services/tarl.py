@@ -68,6 +68,7 @@ class FichierNiveaux:
     attendus: dict[tuple[str, str], str] = field(default_factory=dict)   # (niveau, matiere) ← المستوى المتوقع
     classes: list[str] = field(default_factory=list)
     alertes: list[str] = field(default_factory=list)
+    parcours: list[tuple[str, str, str]] = field(default_factory=list)   # (القسم، المادة، المسار)
 
 
 def lire_fichier(chemin: Path) -> FichierNiveaux:
@@ -100,6 +101,16 @@ def lire_fichier(chemin: Path) -> FichierNiveaux:
                 m = _matiere(c)
                 if m and j < len(vals) and niveau_canonique(m, vals[j]):
                     res.attendus[(niveau, m)] = niveau_canonique(m, vals[j])
+        classe = ws.title.strip()
+        classe = classe[5:] if classe.upper().startswith("TARL-") else classe
+        # تصدير «مجموعات الدعم»: سطر المواد ثم سطر المسارات (المسار 2، parcours 2) فوق رأس الجدول
+        for i in range(max(0, entete - 6), entete - 1):
+            mats = rows[i]
+            for j, c in enumerate(mats):
+                m = _matiere(c)
+                v = rows[i + 1][j] if j < len(rows[i + 1]) else None
+                if m and v and any(k in normaliser(v) for k in ("المسار", "parcours")):
+                    res.parcours.append((classe, m, " ".join(str(v).split())))
         tete, dessus = rows[entete], rows[entete - 1] if entete else []
         i_code = next(j for j, c in enumerate(tete) if normaliser(c) == "رقمالتلميذ")
         i_nom = next((j for j, c in enumerate(tete) if "الإسم" in normaliser(c) or "الاسم" in normaliser(c)), i_code + 1)
@@ -109,9 +120,9 @@ def lire_fichier(chemin: Path) -> FichierNiveaux:
             if ep and m:
                 colonnes.append((j, m, ep))
         if not colonnes:
+            if any(x[0] == classe for x in res.parcours):
+                res.classes.append(classe)
             continue
-        classe = ws.title.strip()
-        classe = classe[5:] if classe.upper().startswith("TARL-") else classe
         n_avant = len(res.lignes)
         for r in rows[entete + 1:]:
             code = str(r[i_code] or "").strip().upper() if i_code < len(r) else ""
@@ -132,7 +143,7 @@ def lire_fichier(chemin: Path) -> FichierNiveaux:
                 res.lignes.append((code, nom, classe, niveau, m, ep, can))
         if len(res.lignes) > n_avant:
             res.classes.append(classe)
-    if not res.lignes:
+    if not res.lignes and not res.parcours:
         raise ErreurTarl("لم يُعثر على مستويات تعلم في الملف. صدِّر «مستويات التعلم» من مسار (فضاء مؤسسات الريادة).")
     try:
         annee_srv.code_court(res.annee)
@@ -147,6 +158,7 @@ class RapportTarl:
     eleves: int
     classes: list[str]
     alertes: list[str]
+    parcours: int = 0
 
 
 def importer(conn: sqlite3.Connection, chemins: list[Path]) -> RapportTarl:
@@ -162,6 +174,10 @@ def importer(conn: sqlite3.Connection, chemins: list[Path]) -> RapportTarl:
             for (niv, m), v in f.attendus.items():
                 conn.execute("INSERT INTO niveau_attendu(annee_id, niveau, matiere, valeur) VALUES (?,?,?,?) "
                              "ON CONFLICT(annee_id, niveau, matiere) DO UPDATE SET valeur=excluded.valeur", (aid, niv, m, v))
+            for classe, m, parc in f.parcours:
+                conn.execute("INSERT INTO tarl_parcours(annee_id, classe, matiere, parcours) VALUES (?,?,?,?) "
+                             "ON CONFLICT(annee_id, classe, matiere) DO UPDATE SET parcours=excluded.parcours",
+                             (aid, classe, m, parc))
             for code, nom, classe, niv, m, ep, v in f.lignes:
                 codes.add(code)
                 e = conn.execute("SELECT id FROM eleve WHERE code_massar=?", (code,)).fetchone()
@@ -174,14 +190,15 @@ def importer(conn: sqlite3.Connection, chemins: list[Path]) -> RapportTarl:
         conn.execute("INSERT INTO journal(action, cible, details) VALUES ('import','niveaux_apprentissage',?)",
                      (f"{annee}: {len(codes)} تلميذاً",))
     return RapportTarl(annee, len(codes), [c for f in fichiers for c in f.classes],
-                       [a for f in fichiers for a in f.alertes])
+                       [a for f in fichiers for a in f.alertes], sum(len(f.parcours) for f in fichiers))
 
 
 # ---------- الإحصاء ----------
 
 def annees(conn) -> list[str]:
-    return [r[0] for r in conn.execute("SELECT DISTINCT a.libelle FROM niveau_apprentissage n JOIN annee_scolaire a "
-                                       "ON a.id=n.annee_id ORDER BY a.libelle DESC")]
+    return [r[0] for r in conn.execute(
+        "SELECT a.libelle FROM annee_scolaire a WHERE a.id IN (SELECT annee_id FROM niveau_apprentissage UNION "
+        "SELECT annee_id FROM tarl_parcours) ORDER BY a.libelle DESC")]
 
 
 def groupes(conn, annee: str) -> list[tuple[str, str]]:
@@ -250,3 +267,12 @@ def eleves_en_difficulte(conn, annee: str, groupe: str, matiere: str, epreuve: s
         if att and rang(matiere, r["valeur"]) < rang(matiere, att):
             res.append(r)
     return sorted(res, key=lambda r: (r["classe"], rang(matiere, r["valeur"]), r["nom"]))
+
+
+def parcours(conn, annee: str) -> dict[str, dict[str, str]]:
+    """القسم ← المادة ← مسار الدعم (من تصدير «مجموعات الدعم»)."""
+    res: dict = {}
+    for r in conn.execute("SELECT p.* FROM tarl_parcours p JOIN annee_scolaire a ON a.id=p.annee_id WHERE a.libelle=? "
+                          "ORDER BY p.classe", (annee,)):
+        res.setdefault(r["classe"], {})[r["matiere"]] = r["parcours"]
+    return res

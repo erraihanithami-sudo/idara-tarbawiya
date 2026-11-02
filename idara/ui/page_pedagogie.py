@@ -188,6 +188,11 @@ class PageTarl(QWidget):
         self.table.setMinimumHeight(300)
         v.addWidget(self.table)
         racine.addWidget(c)
+        c, v = carte("مسارات الدعم حسب الأقسام (تصدير «مجموعات الدعم»)")
+        self.parcours = tableau(["القسم", "العربية", "الفرنسية", "الرياضيات"], etirer=0)
+        self.parcours.setMinimumHeight(160)
+        v.addWidget(self.parcours)
+        racine.addWidget(c)
         c, v = carte("التلاميذ دون المستوى المتوقع في الرائز البعدي (للدعم)")
         self.difficulte = tableau(["القسم", "رمز مسار", "الاسم", "المستوى البعدي", "المتوقع"], etirer=2)
         self.difficulte.setMinimumHeight(260)
@@ -222,6 +227,11 @@ class PageTarl(QWidget):
 
     def afficher(self) -> None:
         a, g, m = self.annee.currentText(), self.groupe.currentData(), self.matiere.currentData()
+        pc = tarl.parcours(self.f.conn, a) if a else {}
+        self.parcours.setRowCount(len(pc))
+        for i, (cl, d) in enumerate(pc.items()):
+            for j, v in enumerate((cl.replace("-", ""), d.get("ar", "—"), d.get("fr", "—"), d.get("ma", "—"))):
+                self.parcours.setItem(i, j, cellule(v))
         if not (a and g):
             self.table.setRowCount(0)
             self.difficulte.setRowCount(0)
@@ -262,6 +272,8 @@ class PageTarl(QWidget):
         self.rafraichir()
         self.annee.setCurrentText(r.annee)
         txt = f"استوردت مستويات {r.eleves} تلميذاً ({len(r.classes)} أقسام) للسنة {r.annee}."
+        if r.parcours:
+            txt += f" ومسارات الدعم ({r.parcours})."
         if r.alertes:
             txt += "\nتنبيهات: " + "؛ ".join(r.alertes[:5]) + (" ..." if len(r.alertes) > 5 else "")
         message(self.message, txt, bool(r.alertes))
@@ -563,3 +575,268 @@ class PageVieScolaire(QWidget):
         except vs.ErreurVie as e:
             message(self.message, str(e), True)
             return None
+
+
+# ======================================================================
+class PageRiyada(QWidget):
+    """مؤسسات الريادة: ISA2 حسب المراحل، مراسلة الأساتذة، ملف شارة الريادة، التقرير التركيبي."""
+
+    def __init__(self, fenetre):
+        super().__init__()
+        from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QHeaderView, QTableWidget
+        from idara.services import riyada as ry
+        self.ry = ry
+        self.f = fenetre
+        racine, self.message = _page("مؤسسات الريادة",
+                                     "مؤشر ISA2 (نسبة التحكم في التعلمات الأساس) حسب مراحل التعليم الصريح كما يظهر في "
+                                     "مسار، ومراسلة الأساتذة بنتائج المرحلة، وملف شارة الريادة، والتقرير التركيبي.")
+        self.setLayout(racine)
+        c, v = carte("مؤشر ISA2 حسب المراحل")
+        self.annee, self.phase = QComboBox(), QComboBox()
+        for p in range(0, 7):
+            self.phase.addItem(ry.libelle_phase(p), p)
+        self.annee.currentIndexChanged.connect(lambda _: self.charger())
+        self.phase.currentIndexChanged.connect(lambda _: self.charger_saisie())
+        v.addLayout(_grille([("السنة", self.annee), ("المرحلة", self.phase)]))
+        self.saisie = QTableWidget(0, 4)
+        self.saisie.setHorizontalHeaderLabels(["القسم", "العربية %", "الفرنسية %", "الرياضيات %"])
+        self.saisie.verticalHeader().setVisible(False)
+        self.saisie.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        self.saisie.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.saisie.setMinimumHeight(260)
+        v.addWidget(self.saisie)
+        h = QHBoxLayout()
+        b = QPushButton("حفظ نسب المرحلة")
+        b.setObjectName("principal")
+        b.clicked.connect(lambda: self.enregistrer_isa())
+        h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        t = QLabel("التطور حسب المراحل")
+        t.setObjectName("titreCarte")
+        v.addWidget(t)
+        self.evol = tableau(["القسم", "المادة"], etirer=0)
+        self.evol.setMinimumHeight(240)
+        v.addWidget(self.evol)
+        racine.addWidget(c)
+
+        c, v = carte("مراسلة الأساتذة «بخصوص نتائج المرحلة» (نموذجكم)")
+        self.phase_l, self.maths = QComboBox(), QComboBox()
+        for p in range(1, 7):
+            self.phase_l.addItem(ry.libelle_phase(p), p)
+        for k, lib in (("fr", "أساتذة الفرنسية"), ("ar", "أساتذة العربية"), ("tous", "الجميع"), ("aucun", "لا أحد")):
+            self.maths.addItem(lib, k)
+        self.date_l = ChampDate()
+        self.date_l.definir(date.today().isoformat())
+        v.addLayout(_grille([("المرحلة", self.phase_l), ("تُدرج الرياضيات لـ", self.maths), ("التاريخ", self.date_l)]))
+        self.felicit = QCheckBox("صيغة التهنئة («أتشرف بتهنئتكم بالنتائج الجيدة...»)")
+        self.felicit.setChecked(True)
+        v.addWidget(self.felicit)
+        h = QHBoxLayout()
+        b = QPushButton("توليد المراسلات (Word)")
+        b.setObjectName("principal")
+        b.clicked.connect(lambda: self.lettres())
+        h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        racine.addWidget(c)
+
+        c, v = carte("ملف شارة الريادة")
+        self.infos_w = {}
+        g = QGridLayout()
+        g.setHorizontalSpacing(16)
+        for i, (cle, lib) in enumerate(ry.INFOS_MANUELLES):
+            w = champ()
+            lab = etiquette(lib, w)
+            lab.setWordWrap(True)
+            g.addWidget(lab, (i // 2) * 2, i % 2)
+            g.addWidget(w, (i // 2) * 2 + 1, i % 2)
+            self.infos_w[cle] = w
+        v.addLayout(g)
+        self.infos_auto = QLabel()
+        self.infos_auto.setWordWrap(True)
+        self.infos_auto.setObjectName("sousTitre")
+        v.addWidget(self.infos_auto)
+        self.pieces = QTableWidget(0, 3)
+        self.pieces.setHorizontalHeaderLabels(["الوثيقة", "متوفرة", "ملاحظات"])
+        self.pieces.verticalHeader().setVisible(False)
+        self.pieces.setWordWrap(True)
+        hh = self.pieces.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(2, QHeaderView.Fixed)
+        hh.resizeSection(2, 220)
+        self.pieces.setMinimumHeight(520)
+        v.addWidget(self.pieces)
+        h = QHBoxLayout()
+        for lib, fn, prin in (("حفظ الملف", lambda: self.enregistrer_dossier(), False),
+                              ("ملف الشارة (Word)", lambda: self.document("dossier"), True),
+                              ("لائحة التلاميذ ذوي الصعوبات (Word)", lambda: self.document("difficultes"), True)):
+            b = QPushButton(lib)
+            if prin:
+                b.setObjectName("principal")
+            b.clicked.connect(fn)
+            h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        racine.addWidget(c)
+
+        c, v = carte("التقرير التركيبي لأداء المؤسسة والتعلمات الأساس")
+        self.obs = QPlainTextEdit()
+        self.obs.setPlaceholderText("ملاحظات وتوصيات (اختياري؛ تُترك أسطر فارغة للكتابة باليد)")
+        self.obs.setFixedHeight(80)
+        v.addWidget(self.obs)
+        h = QHBoxLayout()
+        b = QPushButton("توليد التقرير التركيبي (Word)")
+        b.setObjectName("principal")
+        b.clicked.connect(lambda: self.document("synthese"))
+        h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        racine.addWidget(c)
+        racine.addStretch()
+        self.rafraichir()
+
+    # ---------- التحميل ----------
+
+    def rafraichir(self) -> None:
+        from idara.services import annee as annee_srv
+        courant = self.annee.currentText()
+        annees = set(ev.annees_disponibles(self.f.conn)) | set(tarl.annees(self.f.conn))
+        a = annee_srv.annee_courante(self.f.conn)
+        if a:
+            annees.add(a["libelle"])
+        self.annee.blockSignals(True)
+        self.annee.clear()
+        self.annee.addItems(sorted(annees, reverse=True))
+        if courant:
+            self.annee.setCurrentText(courant)
+        self.annee.blockSignals(False)
+        self.charger()
+
+    def charger(self) -> None:
+        self.charger_saisie()
+        self._evolution()
+        self._dossier()
+
+    def charger_saisie(self) -> None:
+        a = self.annee.currentText()
+        if not a:
+            self.saisie.setRowCount(0)
+            return
+        cls = self.ry.classes(self.f.conn, a)
+        d, p = self.ry.isa(self.f.conn, a), self.phase.currentData()
+        self.saisie.setRowCount(len(cls))
+        for i, cl in enumerate(cls):
+            it = cellule(cl.replace("-", ""), cl)
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+            self.saisie.setItem(i, 0, it)
+            for j, m in enumerate(self.ry.MATIERES, start=1):
+                v = d.get(cl, {}).get(m, {}).get(p)
+                self.saisie.setItem(i, j, cellule("" if v is None else f"{v:.2f}"))
+
+    def _evolution(self) -> None:
+        a = self.annee.currentText()
+        d = self.ry.isa(self.f.conn, a) if a else {}
+        phases = sorted({p for cl in d.values() for m in cl.values() for p in m})
+        self.evol.setColumnCount(2 + len(phases))
+        self.evol.setHorizontalHeaderLabels(["القسم", "المادة"] + [self.ry.libelle_phase(p) for p in phases])
+        lignes = [(cl, m) for cl in sorted(d) for m in self.ry.MATIERES if m in d[cl]]
+        self.evol.setRowCount(len(lignes))
+        for i, (cl, m) in enumerate(lignes):
+            self.evol.setItem(i, 0, cellule(cl.replace("-", "")))
+            self.evol.setItem(i, 1, cellule(self.ry.MATIERES[m]))
+            ev_ = {p: (v, dl) for p, v, dl in self.ry.evolution(d[cl][m])}
+            for j, p in enumerate(phases, start=2):
+                if p in ev_:
+                    v, dl = ev_[p]
+                    it = cellule(f"{v:.2f}%" + ("" if dl is None else f" ({_ecart(dl)})"))
+                    if dl:
+                        it.setForeground(VERT if dl > 0 else ROUGE)
+                else:
+                    it = cellule("—")
+                self.evol.setItem(i, j, it)
+
+    def _dossier(self) -> None:
+        a = self.annee.currentText()
+        for cle, w in self.infos_w.items():
+            w.setText(self.ry._param(self.f.conn, cle))
+        self.infos_auto.setText("من معطيات التطبيق: " + "، ".join(f"{l}: {v or '—'}" for l, v, auto in
+                                                                 self.ry.infos(self.f.conn) if auto))
+        ps = self.ry.pieces(self.f.conn, a) if a else []
+        self.pieces.setRowCount(len(ps))
+        for i, p in enumerate(ps):
+            it = cellule(f"{p['numero']}- {p['libelle']}" + (f"\n← {p['indice']}" if p["indice"] else ""), p["numero"])
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+            self.pieces.setItem(i, 0, it)
+            ck = cellule("")
+            ck.setFlags((ck.flags() | Qt.ItemIsUserCheckable) & ~Qt.ItemIsEditable)
+            ck.setCheckState(Qt.Checked if p["disponible"] else Qt.Unchecked)
+            self.pieces.setItem(i, 1, ck)
+            self.pieces.setItem(i, 2, cellule(p["observation"]))
+        self.pieces.resizeRowsToContents()
+
+    # ---------- الأفعال ----------
+
+    def _faire(self, fn, succes: str):
+        try:
+            r = fn()
+        except (self.ry.ErreurRiyada, ValueError) as e:
+            message(self.message, str(e) or "قيمة غير صحيحة.", True)
+            return None
+        if succes:
+            message(self.message, succes)
+        return True if r is None else r
+
+    def enregistrer_isa(self):
+        a, p = self.annee.currentText(), self.phase.currentData()
+
+        def fn():
+            for i in range(self.saisie.rowCount()):
+                cl = self.saisie.item(i, 0).data(Qt.UserRole)
+                vals = {m: (self.saisie.item(i, j).text() if self.saisie.item(i, j) else "")
+                        for j, m in enumerate(self.ry.MATIERES, start=1)}
+                self.ry.enregistrer_isa(self.f.conn, a, cl, p, vals)
+        r = self._faire(fn, f"حُفظت نسب {self.ry.libelle_phase(p)}.")
+        self._evolution()
+        return r
+
+    def enregistrer_dossier(self):
+        a = self.annee.currentText()
+
+        def fn():
+            self.ry.enregistrer_infos(self.f.conn, {k: w.text() for k, w in self.infos_w.items()})
+            for i in range(self.pieces.rowCount()):
+                self.ry.enregistrer_piece(self.f.conn, a, self.pieces.item(i, 0).data(Qt.UserRole),
+                                          self.pieces.item(i, 1).checkState() == Qt.Checked,
+                                          self.pieces.item(i, 2).text() if self.pieces.item(i, 2) else "")
+        r = self._faire(fn, "حُفظ ملف شارة الريادة.")
+        self._dossier()
+        return r
+
+    def _ouvrir(self, p: Path) -> Path:
+        message(self.message, f"وُلّدت الوثيقة: {p.name}")
+        try:
+            bureautique.ouvrir(p)
+        except Exception:  # noqa: BLE001 — الفتح اختياري
+            pass
+        return p
+
+    def lettres(self):
+        try:
+            d = self.date_l.iso()
+        except ValueError:
+            message(self.message, "التاريخ غير صحيح.", True)
+            return None
+        r = self._faire(lambda: self.ry.generer_lettres(self.f.conn, self.f.dossier, self.annee.currentText(),
+                                                        self.phase_l.currentData(), self.maths.currentData(),
+                                                        self.felicit.isChecked(), d), "")
+        return self._ouvrir(r) if r else None
+
+    def document(self, code: str):
+        a = self.annee.currentText()
+        fn = {"dossier": lambda: self.ry.generer_dossier(self.f.conn, self.f.dossier, a),
+              "difficultes": lambda: self.ry.generer_liste_difficultes(self.f.conn, self.f.dossier, a),
+              "synthese": lambda: self.ry.generer_synthese(self.f.conn, self.f.dossier, a, self.obs.toPlainText())}[code]
+        r = self._faire(fn, "")
+        return self._ouvrir(r) if r else None

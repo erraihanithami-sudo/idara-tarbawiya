@@ -267,6 +267,14 @@ def main(sortie: Path) -> None:
                                                   "شهر أكتوبر"))
     f.aller_a("الأندية والأنشطة")
     photo(f, "40_vie_scolaire")
+    from idara.services import riyada as ryx
+    an_ = __import__("idara.services.annee", fromlist=["x"]).libelle_pour_date()
+    cl_ = ryx.classes(f.conn, an_)[0]
+    for ph, vals in ((0, {"ar": 55, "fr": 60.5, "ma": 58}), (1, {"ar": 62, "fr": 75.94, "ma": 64}),
+                     (3, {"ar": 66, "fr": 65.51, "ma": 70})):
+        ryx.enregistrer_isa(f.conn, an_, cl_, ph, vals)
+    f.aller_a("الريادة")
+    photo(f, "41_riyada")
     f.aller_a("مشروع المؤسسة")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")

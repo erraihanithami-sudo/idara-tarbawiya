@@ -748,3 +748,31 @@ def test_section_pedagogie(app, config_tmp, monkeypatch):
     assert v.acts.rowCount() == 1 and "45" in v.indic.text()
     assert v.document("programme") and v.document("bilan") and len(ouverts) == 3
     f.close()
+
+
+def test_page_riyada(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
+    from idara.services import riyada as ry
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("الريادة")
+    p = f.page_riyada
+    assert p.annee.currentText() == "2026/2027" and p.saisie.rowCount() >= 1 and p.pieces.rowCount() == 20
+    cl = p.saisie.item(0, 0).data(Qt.UserRole)
+    p.phase.setCurrentIndex(p.phase.findData(0))
+    p.saisie.item(0, 2).setText("60")
+    assert p.enregistrer_isa()
+    p.phase.setCurrentIndex(p.phase.findData(1))
+    p.saisie.item(0, 2).setText("150")
+    assert not p.enregistrer_isa() and "خارج المجال" in p.message.text()
+    p.saisie.item(0, 2).setText("72,5")
+    assert p.enregistrer_isa() and p.evol.rowCount() == 1 and "+12.50" in p.evol.item(0, 3).text()
+    assert ry.isa(f.conn, "2026/2027")[cl]["fr"] == {0: 60.0, 1: 72.5}
+    assert not p.lettres() and "لا نسب" in p.message.text()  # لا أستاذ مسند للقسم
+    p.pieces.item(1, 1).setCheckState(Qt.Checked)
+    p.infos_w["riyada_date_construction"].setText("1985")
+    assert p.enregistrer_dossier()
+    assert ry.pieces(f.conn, "2026/2027")[1]["disponible"]
+    assert p.document("dossier") and p.document("synthese") and len(ouverts) == 2
+    f.close()

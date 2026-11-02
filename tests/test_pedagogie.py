@@ -99,3 +99,64 @@ def test_clubs_et_activites(base, dossier):  # noqa: F811
     assert "حصيلة الأنشطة" in t and "نسبة الإنجاز 50.00%" in t and "أناشيد وعروض" in t
     t = texte(vs.generer_liste_club(base, dossier, c))
     assert "رئيس النادي" in t and "الأربعاء 15:00-16:00" in t
+
+
+# ---------- الريادة ----------
+
+def test_parcours_de_soutien(conn, tmp_path):
+    from tests.fabrique_tarl import classeur_groupes
+    r = tarl.importer(conn, [classeur_groupes(tmp_path / "g.xlsx", {"4APG-1": ("المسار 2", "parcours 2", "parcours 1")})])
+    assert r.parcours == 3 and r.classes == ["4APG-1"]
+    assert tarl.parcours(conn, "2026/2027") == {"4APG-1": {"ar": "المسار 2", "fr": "parcours 2", "ma": "parcours 1"}}
+    assert tarl.annees(conn) == ["2026/2027"]
+
+
+def _enseignant(conn, classe_code, matiere="فرنسية", sexe="M"):
+    pid = conn.execute("INSERT INTO personnel(nom_ar, prenom_ar, sexe, categorie, statut, matiere) "
+                       "VALUES ('الوهمي', 'الأستاذ', ?, 'enseignant', 'actif', ?)", (sexe, matiere)).lastrowid
+    cid = conn.execute("SELECT c.id FROM classe c JOIN annee_scolaire a ON a.id=c.annee_id WHERE c.code=?",
+                       (classe_code,)).fetchone()[0]
+    conn.execute("INSERT INTO affectation_classe(personnel_id, classe_id) VALUES (?,?)", (pid, cid))
+    conn.commit()
+    return pid
+
+
+def test_isa_phases_et_lettres(base, dossier):  # noqa: F811
+    from idara.services import riyada as ry
+    cl = base.execute("SELECT code FROM classe ORDER BY code").fetchone()[0]
+    with pytest.raises(ry.ErreurRiyada, match="خارج المجال"):
+        ry.enregistrer_isa(base, "2026/2027", cl, 1, {"fr": "120"})
+    ry.enregistrer_isa(base, "2026/2027", cl, 0, {"fr": "60,5", "ma": "70%"})
+    ry.enregistrer_isa(base, "2026/2027", cl, 1, {"fr": "75.94", "ma": "65"})
+    ry.enregistrer_isa(base, "2026/2027", cl, 3, {"fr": "65.51", "ar": "50"})
+    assert ry.isa(base, "2026/2027")[cl]["fr"] == {0: 60.5, 1: 75.94, 3: 65.51}
+    assert ry.evolution({0: 60.5, 1: 75.94, 3: 65.51}) == [(0, 60.5, None), (1, 75.94, 15.44), (3, 65.51, -10.43)]
+    with pytest.raises(ry.ErreurRiyada, match="لا نسب ISA2"):
+        ry.generer_lettres(base, dossier, "2026/2027", 3)
+    _enseignant(base, cl)
+    t = texte(ry.generer_lettres(base, dossier, "2026/2027", 3, maths="fr"))
+    assert "بخصوص نتائج المرحلة الثالثة" in t and "أتشرف بتهنئتكم" in t and "مؤشر ISA2" in t
+    assert "الفرنسية" in t and "65.51%" in t and "-10.43" in t and "الرياضيات" not in t  # لا نسبة رياضيات في المرحلة 3
+    t = texte(ry.generer_lettres(base, dossier, "2026/2027", 1, felicitations=False))
+    assert "أتشرف بتهنئتكم" not in t and "الرياضيات" in t and "+15.44" in t
+
+
+def test_dossier_riyada_et_synthese(base, dossier, tmp_path):  # noqa: F811
+    from idara.services import riyada as ry
+    assert len(ry.pieces(base, "2026/2027")) == 20
+    ry.enregistrer_piece(base, "2026/2027", 2, True, "مصادق عليه في 10/10")
+    ry.enregistrer_infos(base, {"riyada_date_construction": "1985", "riyada_formes_tarl": "6"})
+    inf = dict((l, v) for l, v, _ in ry.infos(base))
+    assert inf["تاريخ بناء المؤسسة"] == "1985" and int(inf["عدد تلاميذ المؤسسة ذكور"]) + int(
+        inf["عدد تلاميذ المؤسسة إناث"]) == 5
+    t = texte(ry.generer_dossier(base, dossier, "2026/2027"))
+    assert "ملف شارة الريادة" in t and "حقيبة المعلومات" in t and "المتوفر منها: 1" in t and "مصادق عليه في 10/10" in t
+    with pytest.raises(ry.ErreurRiyada, match="لا معطيات"):
+        ry.generer_synthese(base, dossier, "2026/2027")
+    tarl.importer(base, [_tarl(tmp_path)])
+    p = ry.pieces(base, "2026/2027")
+    assert p[12]["indice"] and p[13]["indice"] and p[9]["indice"]
+    t = texte(ry.generer_liste_difficultes(base, dossier, "2026/2027"))
+    assert "يعانون من صعوبات" in t and "X000000002" in t
+    t = texte(ry.generer_synthese(base, dossier, "2026/2027", "تعزيز الدعم"))
+    assert "التعلمات الأساس" in t and "50.00%" in t and "تعزيز الدعم" in t
