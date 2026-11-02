@@ -450,7 +450,7 @@ class PageAssociations(QWidget):
         self.chapitre.clear()
         if not transfert:
             vus = []
-            for r in asso.rubriques(self.f.conn, TYPE, nat):
+            for r in asso.rubriques(self.f.conn, TYPE, nat, actifs=True):
                 if r["ligne"] != asso.REPORT and r["chapitre"] not in vus:
                     vus.append(r["chapitre"])
             self.chapitre.addItems(vus)
@@ -462,7 +462,7 @@ class PageAssociations(QWidget):
         self.ligne.clear()
         nat, ch = self.nature.currentData(), self.chapitre.currentText()
         if nat != "transfert":
-            for r in asso.rubriques(self.f.conn, TYPE, nat):
+            for r in asso.rubriques(self.f.conn, TYPE, nat, actifs=True):
                 if r["chapitre"] == ch and r["ligne"] != asso.REPORT:
                     self.ligne.addItem(r["ligne"], r["id"])
         self.ligne.blockSignals(False)

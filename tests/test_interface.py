@@ -577,8 +577,8 @@ def test_page_association_najah(app, config_tmp, monkeypatch, tmp_path):
     # مصروف من الصندوق ببند من نموذج المدير
     p.nature.setCurrentIndex(p.nature.findData("depense"))
     p.registre.setCurrentIndex(p.registre.findData("caisse"))
-    p.chapitre.setCurrentIndex(p.chapitre.findText("ر- التجهيزات"))
-    assert p.ligne.count() == 10 and "20000" in p.indice.text()
+    p.chapitre.setCurrentIndex(p.chapitre.findText("التجهيزات"))
+    assert p.ligne.count() == 8 and "20000" in p.indice.text()
     p.date.setText("05/11/2025")
     p.montant.setText("99999")
     p.reference.setText("فاتورة 1")

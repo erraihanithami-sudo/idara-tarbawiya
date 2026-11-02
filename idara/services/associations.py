@@ -46,8 +46,9 @@ def modifier_association(conn, type_: str, rib: str = "", president: str = "", t
                       date_renouvellement or None, type_))
 
 
-def rubriques(conn, type_: str = "najah", sens: str | None = None) -> list[sqlite3.Row]:
-    sql, args = "SELECT * FROM rubrique WHERE type_association=?", [type_]
+def rubriques(conn, type_: str = "najah", sens: str | None = None, actifs: bool = False) -> list[sqlite3.Row]:
+    """أبواب وبنود الملحق 1 من الدليل المسطري؛ actifs: دون البنود التي لم تعد واردة فيه."""
+    sql, args = "SELECT * FROM rubrique WHERE type_association=?" + (" AND actif=1" if actifs else ""), [type_]
     if sens:
         sql += " AND sens=?"
         args.append(sens)
@@ -196,9 +197,11 @@ def enregistrer(conn, op: Operation) -> int:
     if op.nature == "transfert":
         op.rubrique_id = None
     else:
-        r = conn.execute("SELECT sens FROM rubrique WHERE id=?", (op.rubrique_id,)).fetchone()
+        r = conn.execute("SELECT sens, actif FROM rubrique WHERE id=?", (op.rubrique_id,)).fetchone()
         if r is None:
             raise ErreurAssociation("اختر البند.")
+        if not r["actif"] and op.id is None:
+            raise ErreurAssociation("هذا البند لم يعد وارداً في الدليل المسطري (الملحق 1).")
         if r["sens"] != op.nature:
             raise ErreurAssociation("البند لا يناسب نوع العملية.")
     if op.nature != "recette" and not (op.reference or "").strip():
@@ -282,6 +285,8 @@ def execution(conn, eid: int) -> list[dict]:
     res = []
     for r in rubriques(conn, e["type"]):
         p, x = prev.get(r["id"], 0.0), round(real.get(r["id"], 0.0), 2)
+        if not r["actif"] and not p and not x:
+            continue
         res.append({"id": r["id"], "sens": r["sens"], "chapitre": r["chapitre"], "ligne": r["ligne"],
                     "observation": r["observation"], "prevu": p, "realise": x, "reste": round(p - x, 2),
                     "taux": (f"{x / p * 100:.0f}%" if p else "—")})
@@ -298,10 +303,20 @@ def totaux(conn, eid: int) -> dict[str, float]:
     return t
 
 
+# السقوف السنوية التي ينص عليها الدليل المسطري (يوليوز 2023)
+PLAFONDS = {"التجهيزات": 20000.0}
+
+
 def depassements(conn, eid: int) -> list[str]:
-    """تنبيهات: بنود تجاوز منجزها المتوقع، ومصاريف بدون ميزانية."""
+    """تنبيهات: بنود تجاوز منجزها المتوقع، ومجالات تجاوزت سقف الدليل."""
     res = []
-    for r in execution(conn, eid):
+    ex = execution(conn, eid)
+    for ch, plafond in PLAFONDS.items():
+        for cle, lib in (("realise", "المنجز"), ("prevu", "المتوقع")):
+            m = round(sum(r[cle] for r in ex if r["chapitre"] == ch), 2)
+            if m > plafond:
+                res.append(f"مجال {ch}: {lib} {m:,.2f} يتجاوز السقف السنوي الذي يحدده الدليل ({plafond:,.0f} درهم)")
+    for r in ex:
         if r["sens"] == "depense" and r["realise"] > r["prevu"] + 1e-9:
             res.append(f"{r['ligne']} ({r['chapitre']}): المنجز {r['realise']:,.2f} يتجاوز المتوقع {r['prevu']:,.2f}")
     return res

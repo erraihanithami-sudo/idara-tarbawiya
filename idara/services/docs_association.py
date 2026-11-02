@@ -396,51 +396,105 @@ def generer_registre(conn, dossier: DossierDonnees, eid: int, kind: str) -> Path
 
 # ---------- وثيقة الميزانية (الملحق 1) ----------
 
+def _ombre(cellule, couleur="E7E6F0") -> None:
+    tcpr = cellule._tc.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), couleur)
+    tcpr.append(shd)
+
+
+def _chapitres(lignes: list[dict]) -> list[tuple[str, list[dict]]]:
+    res: list[tuple[str, list[dict]]] = []
+    for r in lignes:
+        if not res or res[-1][0] != r["chapitre"]:
+            res.append((r["chapitre"], []))
+        res[-1][1].append(r)
+    return res
+
+
 def generer_budget(conn, dossier: DossierDonnees, eid: int) -> Path:
+    """الملحق 1: المداخيل (يميناً) والمصاريف (يساراً) متقابلتان، بالمجالات ومجموع كل مجال والمجموع العام."""
     ctx = _contexte(conn, eid)
     ex = asso.execution(conn, eid)
     d = _nouveau()
     para(d, f"{ctx['a']['nom']} — المؤسسة: {ctx['etab']}", gras=True, taille=13)
     para(d, "وثيقة الميزانية", gras=True, taille=22, centre=True, apres=0)
     para(d, f"السنة المالية {ctx['e']['libelle']}", centre=True, apres=8)
-    total_general = {}
-    for sens, titre in (("recette", "المداخيل"), ("depense", "المصاريف")):
-        lignes = [r for r in ex if r["sens"] == sens]
-        chapitres: list[tuple[str, list[dict]]] = []
-        for r in lignes:
-            if not chapitres or chapitres[-1][0] != r["chapitre"]:
-                chapitres.append((r["chapitre"], []))
-            chapitres[-1][1].append(r)
-        para(d, titre, gras=True, taille=18, centre=True, apres=2)
-        n = len(lignes) + len(chapitres) + 2
-        t = tableau(d, n, 3, largeurs=[4.4, 9.4, 3.6])
-        for j, lib in enumerate(("المجالات", "بنود الميزانية", "المبلغ")):
-            _cellule(t.cell(0, j), lib, gras=True)
-        i = 1
-        total = 0.0
-        for ch, rs in chapitres:
-            debut = i
-            for r in rs:
-                _cellule(t.cell(i, 1), r["ligne"], taille=13, centre=False)
-                _cellule(t.cell(i, 2), dh(r["prevu"]) if r["prevu"] else "", taille=13)
-                i += 1
-            if len(rs) > 1:
-                t.cell(debut, 0).merge(t.cell(i - 1, 0))
-            _cellule(t.cell(debut, 0), ch, gras=True, taille=13)
-            st = round(sum(r["prevu"] for r in rs), 2)
-            total += st
-            t.cell(i, 0).merge(t.cell(i, 1))
-            _cellule(t.cell(i, 0), f"مجموع {ch}", gras=True, taille=13, centre=False)
-            _cellule(t.cell(i, 2), dh(st), gras=True, taille=13)
+    T = 10.5
+    cadre = tableau(d, 1, 2, bordures=False, largeurs=[7.0, 10.4])
+    totaux = {}
+
+    # المداخيل: البند (والمجال المرقم في سطر مظلل) والمبلغ
+    rec = _chapitres([r for r in ex if r["sens"] == "recette"])
+    c = cadre.cell(0, 0)
+    n = 2 + sum(1 + len(rs) for _, rs in rec) + 1
+    t = tableau(c, n, 2, largeurs=[4.5, 2.3])
+    t.cell(0, 0).merge(t.cell(0, 1))
+    _cellule(t.cell(0, 0), "المداخيل", gras=True, taille=13)
+    _cellule(t.cell(1, 0), "بنود الميزانية", gras=True, taille=T)
+    _cellule(t.cell(1, 1), "المبلغ", gras=True, taille=T)
+    i, total = 2, 0.0
+    for k, (ch, rs) in enumerate(rec, start=1):
+        st = round(sum(r["prevu"] for r in rs), 2)
+        _cellule(t.cell(i, 0), f"{k} - {ch}", gras=True, taille=T, centre=False)
+        _cellule(t.cell(i, 1), dh(st) if st else "", gras=True, taille=T)
+        _ombre(t.cell(i, 0))
+        _ombre(t.cell(i, 1))
+        i += 1
+        for r in rs:
+            _cellule(t.cell(i, 0), r["ligne"], taille=T, centre=False)
+            _cellule(t.cell(i, 1), dh(r["prevu"]) if r["prevu"] else "", taille=T)
             i += 1
+        total += st
+    _cellule(t.cell(i, 0), "المجموع العام", gras=True, taille=T)
+    _cellule(t.cell(i, 1), dh(total), gras=True, taille=T)
+    _ombre(t.cell(i, 0), "D9D9D9")
+    _ombre(t.cell(i, 1), "D9D9D9")
+    totaux["recette"] = round(total, 2)
+    c.add_paragraph()
+
+    # المصاريف: المجالات، بنود الميزانية، المبلغ، ومجموع نفقات كل مجال
+    dep = _chapitres([r for r in ex if r["sens"] == "depense"])
+    c = cadre.cell(0, 1)
+    n = 2 + sum(len(rs) + 1 for _, rs in dep) + 1
+    t = tableau(c, n, 3, largeurs=[2.4, 5.5, 2.3])
+    t.cell(0, 0).merge(t.cell(0, 2))
+    _cellule(t.cell(0, 0), "المصاريف", gras=True, taille=13)
+    for j, lib in enumerate(("المجالات", "بنود الميزانية", "المبلغ")):
+        _cellule(t.cell(1, j), lib, gras=True, taille=T)
+    i, total = 2, 0.0
+    for ch, rs in dep:
+        debut = i
+        for r in rs:
+            _cellule(t.cell(i, 1), r["ligne"], taille=T, centre=False)
+            _cellule(t.cell(i, 2), dh(r["prevu"]) if r["prevu"] else "", taille=T)
+            i += 1
+        if len(rs) > 1:
+            t.cell(debut, 0).merge(t.cell(i - 1, 0))
+        _cellule(t.cell(debut, 0), ch, gras=True, taille=T)
+        st = round(sum(r["prevu"] for r in rs), 2)
+        total += st
         t.cell(i, 0).merge(t.cell(i, 1))
-        _cellule(t.cell(i, 0), "المجموع العام", gras=True)
-        _cellule(t.cell(i, 2), dh(total), gras=True)
-        total_general[sens] = round(total, 2)
-        para(d, apres=10)
-    if total_general["recette"] != total_general["depense"]:
-        para(d, f"ملاحظة: مجموع المداخيل ({dh(total_general['recette'])}) لا يساوي مجموع المصاريف "
-                f"({dh(total_general['depense'])}). الدليل يوصي بالحرص على التوازن بينهما.", taille=12)
+        nom = ch if ch.startswith("نفقات") else f"نفقات {ch}"
+        _cellule(t.cell(i, 0), f"مجموع {nom}", gras=True, taille=T, centre=False)
+        _cellule(t.cell(i, 2), dh(st), gras=True, taille=T)
+        _ombre(t.cell(i, 0))
+        _ombre(t.cell(i, 2))
+        i += 1
+    t.cell(i, 0).merge(t.cell(i, 1))
+    _cellule(t.cell(i, 0), "المجموع العام", gras=True, taille=T)
+    _cellule(t.cell(i, 2), dh(total), gras=True, taille=T)
+    _ombre(t.cell(i, 0), "D9D9D9")
+    _ombre(t.cell(i, 2), "D9D9D9")
+    totaux["depense"] = round(total, 2)
+    c.add_paragraph()
+
+    para(d, apres=6)
+    if totaux["recette"] != totaux["depense"]:
+        para(d, f"ملاحظة: مجموع المداخيل ({dh(totaux['recette'])}) لا يساوي مجموع المصاريف "
+                f"({dh(totaux['depense'])}). الدليل يوصي بالحرص على التوازن بينهما.", taille=12)
     t = tableau(d, 1, 2, bordures=False, largeurs=[8.7, 8.7])
     _cellule(t.cell(0, 0), "توقيع رئيس الجمعية", gras=True)
     _cellule(t.cell(0, 1), "توقيع أمين المال", gras=True)

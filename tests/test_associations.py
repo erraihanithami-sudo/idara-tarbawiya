@@ -17,12 +17,27 @@ def _rub(conn, ligne, sens=None):
     return conn.execute(sql, (f"%{ligne}%", sens) if sens else (f"%{ligne}%",)).fetchone()[0]
 
 
-def test_nomenclature_du_modele(conn):
-    rs = asso.rubriques(conn)
-    assert len(rs) == 55 and sum(r["sens"] == "recette" for r in rs) == 9
-    eq = [r for r in rs if r["chapitre"] == "ر- التجهيزات"]
-    assert len(eq) == 10 and "20000" in eq[0]["observation"]
+def test_nomenclature_du_guide(conn):
+    """الملحق 1 من الدليل المسطري (يوليوز 2023)، والبنود الزائدة من نموذج Access غير نشطة."""
+    rs = asso.rubriques(conn, actifs=True)
+    assert len(rs) == 52 and sum(r["sens"] == "recette" for r in rs) == 10
+    chapitres = list(dict.fromkeys(r["chapitre"] for r in rs if r["sens"] == "depense"))
+    assert chapitres == ["الأندية التربوية", "التظاهرات المدرسية", "الدعم التربوي", "دعم الصحة المدرسية",
+                         "الدعم النفسي", "التوجيه المدرسي والمهني", "التدبير والشراكة",
+                         "نفقات تشجيع التميز والإبداع والابتكار", "التجهيزات",
+                         "صيانة وإصلاح تجهيزات وبنيات المؤسسة وتأهيلها", "نفقات استثنائية"]
+    eq = [r for r in rs if r["chapitre"] == "التجهيزات"]
+    assert len(eq) == 8 and "20000" in eq[0]["observation"] and eq[-1]["ligne"] == "كراء المعدات والتجهيزات"
+    assert "مداخيل أخرى" in [r["ligne"] for r in rs]
+    assert len(asso.rubriques(conn)) == 56
     assert asso.association(conn)["nom"] == "جمعية دعم مدرسة النجاح"
+
+
+def test_bande_inactive_refusee(conn, ex):
+    r = conn.execute("SELECT id FROM rubrique WHERE ligne='معدات تكييف الهواء'").fetchone()[0]
+    with pytest.raises(asso.ErreurAssociation, match="لم يعد وارداً"):
+        asso.enregistrer(conn, asso.Operation(ex, "2025-11-01", "depense", "banque", 10, r, "فاتورة"))
+    assert r not in [x["id"] for x in asso.execution(conn, ex)]
 
 
 def test_ouverture_report_et_soldes(conn, ex):
@@ -84,7 +99,9 @@ def test_budget_execution_et_depassement(conn, ex):
     asso.enregistrer(conn, asso.Operation(ex, "2025-12-09", "depense", "banque", 45400, r, "سند الطلب 01/2025"))
     l = next(x for x in asso.execution(conn, ex) if x["id"] == r)
     assert (l["prevu"], l["realise"], l["reste"], l["taux"]) == (40000, 45400, -5400, "114%")
-    assert "يتجاوز المتوقع" in asso.depassements(conn, ex)[0]
+    al = asso.depassements(conn, ex)
+    assert any("يتجاوز المتوقع" in a for a in al)
+    assert sum("السقف السنوي" in a for a in al) == 2  # المنجز والمتوقع فوق 20000 درهم للتجهيزات
     with pytest.raises(asso.ErreurAssociation):
         asso.definir_prevision(conn, ex, r, "-5")
 
