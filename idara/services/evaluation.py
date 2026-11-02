@@ -50,6 +50,8 @@ class LigneResultat:
     classe: str
     moyennes: dict[str, float]
     moyenne_massar: float | None
+    s1: float | None = None   # معدل الدورة الأولى
+    s2: float | None = None   # معدل الدورة الثانية
 
 
 @dataclass
@@ -100,6 +102,9 @@ def lire_fichier(chemin: Path) -> FichierResultats:
         fin = next((j for j, h in enumerate(tete) if h in _COLONNES_FIN), len(tete))
         matieres = [(j, str(rows[entete][j]).strip()) for j in range(i_nom + 1, fin) if rows[entete][j]]
         i_annuel = tete.index("المعدلالسنوي") if "المعدلالسنوي" in tete else None
+        i_s1 = next((j for j, h in enumerate(tete) if h in ("الدورةالاولى", "الدورةالأولى")), None)
+        i_s2 = tete.index("الدورةالثانية") if "الدورةالثانية" in tete else None
+        val = lambda r, i: _nombre(r[i]) if i is not None and i < len(r) else None  # noqa: E731
         n_avant = len(res.lignes)
         for r in rows[entete + 1:]:
             code = str(r[i_code] or "").strip().upper()
@@ -111,7 +116,8 @@ def lire_fichier(chemin: Path) -> FichierResultats:
             moy = {m: _nombre(r[j]) for j, m in matieres if j < len(r)}
             moy = {k: v for k, v in moy.items() if v is not None}
             annuel = _nombre(r[i_annuel]) if i_annuel is not None and i_annuel < len(r) else None
-            res.lignes.append(LigneResultat(code, " ".join(str(r[i_nom] or "").split()), classe, moy, annuel))
+            res.lignes.append(LigneResultat(code, " ".join(str(r[i_nom] or "").split()), classe, moy, annuel,
+                                            val(r, i_s1), val(r, i_s2)))
         if len(res.lignes) > n_avant:
             res.classes.append(classe)
     if not res.lignes:
@@ -146,6 +152,8 @@ def _niveau(conn, code_massar: str, classe: str, annee_id: int) -> str | None:
 def moyenne_annuelle(l: LigneResultat, niveau: str | None) -> tuple[float | None, str | None]:
     if l.moyenne_massar is not None:
         return l.moyenne_massar, "massar"
+    if l.s1 is not None and l.s2 is None:
+        return None, None  # ملف منتصف السنة (الدورة الأولى فقط): لا معدل سنوي
     if niveau == "6AP" or not l.moyennes:
         return None, None
     return round(sum(l.moyennes.values()) / len(l.moyennes), 2), "calcul"
@@ -186,12 +194,15 @@ def importer(conn: sqlite3.Connection, chemins: list[Path]) -> RapportImport:
                     inconnus.append(f"{l.nom} ({l.code})")
                 conn.execute(
                     "INSERT INTO resultat(annee_id, code_massar, eleve_id, nom, classe, niveau, moyennes, moyenne, "
-                    "source_moyenne) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(annee_id, code_massar) DO UPDATE SET "
+                    "source_moyenne, moyenne_s1, moyenne_s2) VALUES (?,?,?,?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(annee_id, code_massar) DO UPDATE SET "
                     "eleve_id=excluded.eleve_id, nom=excluded.nom, classe=excluded.classe, niveau=excluded.niveau, "
                     "moyennes=excluded.moyennes, moyenne=excluded.moyenne, source_moyenne=excluded.source_moyenne, "
+                    "moyenne_s1=COALESCE(excluded.moyenne_s1, resultat.moyenne_s1), "
+                    "moyenne_s2=COALESCE(excluded.moyenne_s2, resultat.moyenne_s2), "
                     "importe_le=datetime('now','localtime')",
                     (aid, l.code, e[0] if e else None, l.nom, l.classe, niv,
-                     json.dumps(l.moyennes, ensure_ascii=False), moy, src))
+                     json.dumps(l.moyennes, ensure_ascii=False), moy, src, l.s1, l.s2))
         conn.execute("INSERT INTO journal(action, cible, details) VALUES ('import','resultats',?)",
                      (f"{annee}: {sum(len(f.lignes) for f in fichiers)} تلميذاً",))
     return RapportImport(annee, sum(len(f.lignes) for f in fichiers), classes, sans_niveau, sans_moyenne, inconnus,
@@ -456,3 +467,86 @@ def generer_synthese(conn, dossier: DossierDonnees, annee: str, periode: str = "
                      le: str | None = None) -> dc.DocumentGenere:
     v = valeurs_synthese(conn, annee, periode, le)
     return dc.generer(conn, dossier, "synthese_conseils", v, libelle=f"تقرير مجالس الأقسام {annee}")
+
+
+# ---------- أداء المؤسسة: كل أسدوس مقارنة بالذي قبله ----------
+
+SEMESTRES = {1: "الأسدوس الأول", 2: "الأسدوس الثاني"}
+
+
+@dataclass
+class Indicateur:
+    effectif: int = 0
+    somme: float = 0.0
+    reussis: int = 0
+
+    def ajouter(self, m: float) -> None:
+        self.effectif += 1
+        self.somme += m
+        self.reussis += m >= SEUIL
+
+    @property
+    def moyenne(self) -> float | None:
+        return round(self.somme / self.effectif, 2) if self.effectif else None
+
+    @property
+    def taux(self) -> float | None:
+        return round(self.reussis / self.effectif * 100, 2) if self.effectif else None
+
+
+def periodes(conn) -> list[tuple[str, int]]:
+    """الأسدوسات المتوفرة نتائجها، بالترتيب الزمني: (السنة، 1 أو 2)."""
+    res = []
+    for annee in sorted(annees_disponibles(conn)):
+        for sem, col in ((1, "moyenne_s1"), (2, "moyenne_s2")):
+            if conn.execute(f"SELECT 1 FROM resultat r JOIN annee_scolaire a ON a.id=r.annee_id WHERE a.libelle=? "
+                            f"AND r.{col} IS NOT NULL LIMIT 1", (annee,)).fetchone():
+                res.append((annee, sem))
+    return res
+
+
+def libelle_periode(p: tuple[str, int]) -> str:
+    return f"{SEMESTRES[p[1]]} {p[0]}"
+
+
+def indicateurs(conn, periode: tuple[str, int], par: str = "niveau") -> dict[str, Indicateur]:
+    """par «niveau» (المستويات + المؤسسة) أو «classe». المفتاح «المؤسسة» = المجموع."""
+    col = "moyenne_s1" if periode[1] == 1 else "moyenne_s2"
+    res: dict[str, Indicateur] = {}
+    for r in _lignes(conn, periode[0]):
+        m = r[col]
+        if m is None:
+            continue
+        cle = r["niveau"] if par == "niveau" else r["classe"]
+        if cle:
+            res.setdefault(cle, Indicateur()).ajouter(m)
+        res.setdefault("المؤسسة", Indicateur()).ajouter(m)
+    return res
+
+
+def comparaison(conn, periode: tuple[str, int] | None = None, par: str = "niveau") -> list[dict]:
+    """الأسدوس المختار (الأخير افتراضياً) مقارنة بالأسدوس الذي قبله: المعدل ونسبة الحاصلين على المعدل وتطورهما."""
+    ps = periodes(conn)
+    if not ps:
+        return []
+    periode = periode or ps[-1]
+    i = ps.index(periode)
+    avant = ps[i - 1] if i else None
+    act, prec = indicateurs(conn, periode, par), (indicateurs(conn, avant, par) if avant else {})
+    if par == "niveau":
+        cles = [n for n in ORDINAUX if n in act or n in prec] + ["المؤسسة"]
+    else:
+        cles = sorted(k for k in set(act) | set(prec) if k != "المؤسسة") + ["المؤسسة"]
+    lignes = []
+    for k in cles:
+        a, b = act.get(k), prec.get(k)
+        d = lambda x, y: round(x - y, 2) if x is not None and y is not None else None  # noqa: E731
+        lignes.append({"cle": k, "libelle": (f"المستوى {ORDINAUX[k]}" if k in ORDINAUX else
+                                             (k if k == "المؤسسة" else libelle_classe(k))),
+                       "effectif": a.effectif if a else 0, "moyenne": a.moyenne if a else None,
+                       "taux": a.taux if a else None, "moyenne_avant": b.moyenne if b else None,
+                       "taux_avant": b.taux if b else None,
+                       "ecart_moyenne": d(a.moyenne if a else None, b.moyenne if b else None),
+                       "ecart_taux": d(a.taux if a else None, b.taux if b else None),
+                       "periode": libelle_periode(periode), "avant": libelle_periode(avant) if avant else None})
+    return lignes

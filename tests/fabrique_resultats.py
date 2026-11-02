@@ -9,7 +9,8 @@ MATIERES = ["اللغة العربية", "اللغة الفرنسية", "الا�
 
 
 def classeur_resultats(chemin: Path, classes: dict[str, list[tuple[str, str, list[float]]]],
-                       annee="2026/2027", niveau="الرابع ابتدائي عام", annuels: dict[str, float] | None = None) -> Path:
+                       annee="2026/2027", niveau="الرابع ابتدائي عام", annuels: dict[str, float] | None = None,
+                       semestres: dict[str, tuple] | None = None) -> Path:
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
     for classe, eleves in classes.items():
@@ -25,7 +26,9 @@ def classeur_resultats(chemin: Path, classes: dict[str, list[tuple[str, str, lis
                    "م.إم الإقليمي", "المعدل السنوي"])
         for i, (code, nom, notes) in enumerate(eleves, 1):
             a = (annuels or {}).get(code, "")
-            ws.append([str(i), code, nom, *[f"{n:05.2f}".replace(".", ",") for n in notes], "", "", "", "",
+            s1, s2 = ((semestres or {}).get(code) or ("", ""))
+            f = lambda x: "" if x in ("", None) else f"{x:05.2f}".replace(".", ",")  # noqa: E731
+            ws.append([str(i), code, nom, *[f"{n:05.2f}".replace(".", ",") for n in notes], f(s1), f(s2), "", "",
                        "" if a == "" else str(a).replace(".", ",")])
     wb.save(chemin)
     return chemin

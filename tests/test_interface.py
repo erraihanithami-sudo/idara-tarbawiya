@@ -700,3 +700,51 @@ def test_page_achats_bon_de_commande(app, config_tmp, monkeypatch):
     assert "○" not in p.etapes.text() and len(ouverts) == 5
     assert ac.achat(f.conn, aid)["operation_id"]
     f.close()
+
+
+def test_section_pedagogie(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
+    from idara.ui.saisie import selectionner
+    from tests.fabrique_resultats import classeur_resultats
+    from tests.fabrique_tarl import classeur_niveaux
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("التدبير التربوي")
+    assert f.page_courante() == "أداء المؤسسة"
+    p = f.page_perf
+    fic = classeur_resultats(config_tmp / "r.xlsx", {"4APG-1": [("X000000001", "أ", [6] * 8), ("X000000002", "ب", [6] * 8)]},
+                             semestres={"X000000001": (4, 6), "X000000002": (6, 7)})
+    assert p.importer([fic]) and p.periode.count() == 2
+    assert "الأسدوس الثاني 2026/2027" in p.titre.text()
+    inst = p.table.item(p.table.rowCount() - 1, 0)
+    assert inst.text() == "المؤسسة" and p.table.item(p.table.rowCount() - 1, 6).text() == "▲ +1.50"
+    f.aller_a("التعلمات الأساس")
+    t = f.page_tarl
+    ft = classeur_niveaux(config_tmp / "t.xlsx", {"2APG-1": [("X000000001", "أ", "حرف", "كلمة", "débutant", "lettre",
+                                                              "رقمان", "جمع")]})
+    assert t.importer([ft]) and t.groupe.count() == 3
+    assert t.table.rowCount() == 5 and t.table.item(2, 3).text() == "1"
+    t.matiere.setCurrentIndex(t.matiere.findData("fr"))
+    assert t.difficulte.rowCount() == 1 and "100.00%" not in t.resume.text()
+    f.aller_a("الأندية والأنشطة")
+    v = f.page_vie
+    v.nom_club.setText("النادي البيئي")
+    v.horaire.setText("الأربعاء 15:00")
+    assert v.enregistrer_club(True) and v.clubs.rowCount() == 1
+    selectionner(v.clubs, 0)
+    v.recherche.setText("X000000001")
+    assert v.candidats.count() == 1
+    assert v.ajouter_membre() and v.clubs.item(0, 3).text() == "1"
+    selectionner(v.clubs, 0)
+    assert v.membres.rowCount() == 1 and v.liste_club()
+    v.titre_act.setText("ذكرى المسيرة الخضراء")
+    v.type_act.setCurrentText("يوم وطني أو دولي")
+    v.statut.setCurrentIndex(v.statut.findData("realisee"))
+    v.debut.setText("06/11/2026")
+    v.nb_g.setText("20")
+    v.nb_f.setText("25")
+    assert v.enregistrer_activite(True), v.message.text()
+    assert v.acts.rowCount() == 1 and "45" in v.indic.text()
+    assert v.document("programme") and v.document("bilan") and len(ouverts) == 3
+    f.close()

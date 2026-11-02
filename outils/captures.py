@@ -245,6 +245,28 @@ def main(sortie: Path) -> None:
     f.aller_a("الصرف")
     f.page_achats.afficher_liste(aid)
     photo(f, "37_achats")
+    from tests.fabrique_tarl import classeur_niveaux
+    from idara.services import vie_scolaire as vsx
+    fic2 = classeur_resultats(tmp / "res2.xlsx", {"4APG-5APG-6APG": [("X000000001", "التجريبي سعيد", [8] * 8),
+                                                                      ("X000000002", "الوهمي سلمى", [4.5] * 8)]},
+                              annee=__import__("idara.services.annee", fromlist=["x"]).libelle_pour_date(),
+                              semestres={"X000000001": (7.5, 8.2), "X000000002": (4.2, 4.8)})
+    f.page_perf.importer([fic2])
+    f.aller_a("أداء المؤسسة")
+    photo(f, "38_performance")
+    f.page_tarl.importer([classeur_niveaux(tmp / "tarl.xlsx", {
+        "2APG-1": [("X000000001", "التجريبي سعيد", "حرف", "كلمة", "débutant", "Mot simple", "رقمان", "جمع"),
+                   ("X000000002", "الوهمي سلمى", "مبتدئ", "حرف", "lettre", "lettre", "رقم واحد", "رقمان")]},
+        annee=__import__("idara.services.annee", fromlist=["x"]).libelle_pour_date())])
+    f.aller_a("التعلمات الأساس")
+    photo(f, "39_tarl")
+    cid = vsx.enregistrer_club(f.conn, "النادي البيئي", None, "التربية على البيئة", "الأربعاء 15:00-16:00")
+    vsx.enregistrer_activite(f.conn, vsx.Activite("يوم وطني أو دولي", "ذكرى المسيرة الخضراء", None, "جميع الأطر",
+                                                  "جميع التلاميذ", "نونبر", statut="prevue"))
+    vsx.enregistrer_activite(f.conn, vsx.Activite("نشاط نادٍ تربوي", "حملة نظافة", cid, "منشط النادي", "أعضاء النادي",
+                                                  "شهر أكتوبر"))
+    f.aller_a("الأندية والأنشطة")
+    photo(f, "40_vie_scolaire")
     f.aller_a("مشروع المؤسسة")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")
