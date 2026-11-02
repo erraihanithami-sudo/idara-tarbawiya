@@ -126,6 +126,8 @@ class Operation:
     detail: str = ""
     observation: str = ""
     id: int | None = None
+    tiers: str = ""           # المؤدي أو المستفيد (للوصولات والسندات)
+    tiers_qualite: str = ""
 
 
 def _effet(nature: str, registre: str, montant: float) -> dict[str, float]:
@@ -205,17 +207,18 @@ def enregistrer(conn, op: Operation) -> int:
     if neg:
         raise ErreurAssociation(f"رصيد {REGISTRES[neg[0]]} لا يكفي: يصير سالباً بتاريخ {neg[1]}.")
     vals = (op.date_op, op.nature, op.registre, op.rubrique_id, montant, (op.reference or "").strip() or None,
-            (op.detail or "").strip() or None, (op.observation or "").strip() or None)
+            (op.detail or "").strip() or None, (op.observation or "").strip() or None,
+            " ".join((op.tiers or "").split()) or None, " ".join((op.tiers_qualite or "").split()) or None)
     with conn:
         if op.id is None:
             num = conn.execute("SELECT COALESCE(MAX(numero),0)+1 FROM operation_financiere WHERE exercice_id=?",
                                (e["id"],)).fetchone()[0]
             op.id = conn.execute(
                 "INSERT INTO operation_financiere(exercice_id, numero, date_op, nature, registre, rubrique_id, montant,"
-                " reference, detail, observation) VALUES (?,?,?,?,?,?,?,?,?,?)", (e["id"], num, *vals)).lastrowid
+                " reference, detail, observation, tiers, tiers_qualite) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (e["id"], num, *vals)).lastrowid
         else:
             conn.execute("UPDATE operation_financiere SET date_op=?, nature=?, registre=?, rubrique_id=?, montant=?, "
-                         "reference=?, detail=?, observation=? WHERE id=?", (*vals, op.id))
+                         "reference=?, detail=?, observation=?, tiers=?, tiers_qualite=? WHERE id=?", (*vals, op.id))
         conn.execute("INSERT INTO journal(action, cible, cible_id, details) VALUES ('operation','association',?,?)",
                      (op.id, f"{NATURES[op.nature]} {montant} {REGISTRES[op.registre]}"))
     return op.id
@@ -225,6 +228,9 @@ def supprimer(conn, op_id: int) -> None:
     r = conn.execute("SELECT * FROM operation_financiere WHERE id=?", (op_id,)).fetchone()
     if r is None:
         raise ErreurAssociation("العملية غير موجودة.")
+    if conn.execute("SELECT 1 FROM piece_association WHERE operation_id=?", (op_id,)).fetchone():
+        raise ErreurAssociation("صدرت لهذه العملية وثائق مرقمة (وصل أو سند): لا تُحذف. "
+                                "صحح الخطأ بعملية معاكسة مع ذكر السبب في البيان.")
     if _premier_negatif(conn, r["exercice_id"], sauf=op_id):
         raise ErreurAssociation("حذف هذا المدخول يجعل الرصيد سالباً بعده: احذف المصاريف المرتبطة أولاً.")
     with conn:

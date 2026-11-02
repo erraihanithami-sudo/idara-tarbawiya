@@ -219,13 +219,18 @@ def main(sortie: Path) -> None:
     from idara.services import associations as aso
     ex = aso.ouvrir_exercice(f.conn, "najah", "2025/2026", "2025-09-01", "2026-08-31", 42000, 350, "محضر تسليم المهام")
     def _r(l): return f.conn.execute("SELECT id FROM rubrique WHERE ligne LIKE ?", (f"%{l}%",)).fetchone()[0]
-    aso.enregistrer(f.conn, aso.Operation(ex, "2025-10-01", "recette", "banque", 10000, _r("منحة المديرية")))
+    aso.modifier_association(f.conn, "najah", "", "الرئيس التجريبي", "أمين المال التجريبي")
+    aso.enregistrer(f.conn, aso.Operation(ex, "2025-10-01", "recette", "banque", 10000, _r("منحة المديرية"),
+                                          tiers="المديرية الإقليمية"))
     aso.enregistrer(f.conn, aso.Operation(ex, "2025-10-24", "transfert", "banque", 3000, reference="شيك 01"))
     aso.enregistrer(f.conn, aso.Operation(ex, "2025-11-05", "depense", "caisse", 850, _r("صيانة وإصلاح تجهيزات"),
                                           "فاتورة 12", "إصلاح النوافذ"))
     aso.definir_prevision(f.conn, ex, _r("صيانة وإصلاح تجهيزات"), 600)
     f.aller_a("جمعية دعم مدرسة النجاح")
+    f.page_asso._charger_association()
     photo(f, "35_association")
+    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(f.page_asso.ops, 4)
+    photo(f, "36_association_pieces")
     f.aller_a("مشروع المؤسسة")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")

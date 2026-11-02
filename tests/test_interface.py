@@ -601,3 +601,35 @@ def test_page_association_najah(app, config_tmp, monkeypatch, tmp_path):
     p.rib.setText("12A")
     assert not p.enregistrer_association()
     f.close()
+
+
+def test_association_documents_du_guide(app, config_tmp, monkeypatch):
+    from idara.services import associations as asso
+    from idara.services import bureautique
+    from idara.ui.saisie import selectionner
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("جمعية دعم مدرسة النجاح")
+    p = f.page_asso
+    p.ouvrir(dict(libelle="2025/2026", debut="2025-09-01", fin="2026-08-31", report_banque=5000, report_caisse=300))
+    p.president.setText("الرئيس الوهمي")
+    p.tresorier.setText("أمين المال الوهمي")
+    assert p.enregistrer_association()
+    p.nature.setCurrentIndex(p.nature.findData("recette"))
+    p.registre.setCurrentIndex(p.registre.findData("caisse"))
+    p.chapitre.setCurrentIndex(p.chapitre.findText("الهبات"))
+    p.date.setText("02/10/2025")
+    p.montant.setText("250")
+    p.tiers.setText("محسن وهمي")
+    assert p.enregistrer(), p.message.text()
+    selectionner(p.ops, 2)
+    assert p.b_pieces.isEnabled() and len(p.menu_pieces.actions()) == 1
+    assert p.generer_piece("recu") and "وصل مداخيل 01" in p.l_pieces.text()
+    asso_op = f.conn.execute("SELECT id FROM operation_financiere WHERE numero=1").fetchone()[0]
+    assert asso_op and p.generer_registre("caisse") and p.generer_budget()
+    assert p.passation(dict(date_pv="2026-01-10", ancien="أمين المال الوهمي", nouveau="الأمينة الجديدة",
+                            remarques=[], maj=True))
+    assert p.tresorier.text() == "الأمينة الجديدة" and len(ouverts) == 4
+    assert asso.association(f.conn)["tresorier"] == "الأمينة الجديدة"
+    f.close()

@@ -78,6 +78,8 @@ def verification_installation() -> int:
         from idara.services.moteur_docx import champs_du_modele
         for code in dc.MODELES:
             assert champs_du_modele(dc.chemin_defaut(code)), f"القالب {code} غير مرفق"
+        from docx import Document  # وثائق الجمعية: القالب الافتراضي لـ python-docx مرفق
+        Document()
         AssistantPremierLancement()
         BandeZellige()
         police = QApplication.instance().font().family()

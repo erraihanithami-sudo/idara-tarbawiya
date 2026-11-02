@@ -6,11 +6,13 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGridLayout,
-                               QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
+                               QGridLayout, QHBoxLayout, QLabel, QMenu, QPlainTextEdit, QPushButton, QVBoxLayout,
+                               QWidget)
 
 from idara.services import associations as asso
 from idara.services import bureautique
+from idara.services import docs_association as da
 from idara.services import textes as tx
 from idara.ui.composants import carte, entete
 from idara.ui.formulaires import champ, etiquette
@@ -81,6 +83,42 @@ class DialogueExercice(QDialog):
         return d
 
 
+class DialoguePassation(QDialog):
+    """محضر تسليم المهام المالية (الملحق 25 من الدليل المسطري)."""
+
+    def __init__(self, parent, tresorier: str):
+        super().__init__(parent)
+        self.setWindowTitle("محضر تسليم المهام المالية")
+        self.setLayoutDirection(Qt.RightToLeft)
+        v = QVBoxLayout(self)
+        f = QFormLayout()
+        self.date = ChampDate()
+        self.date.definir(date.today().isoformat())
+        self.ancien, self.nouveau = champ(), champ()
+        self.ancien.setText(tresorier or "")
+        self.remarques = QPlainTextEdit()
+        self.remarques.setPlaceholderText("ملاحظة في كل سطر (اختياري)")
+        self.remarques.setFixedHeight(90)
+        self.maj = QCheckBox("تسجيل أمين المال الجديد في معطيات الجمعية")
+        self.maj.setChecked(True)
+        f.addRow("تاريخ المحضر", self.date)
+        f.addRow("أمين(ة) المال السابق(ة)", self.ancien)
+        f.addRow("أمين(ة) المال الجديد(ة)", self.nouveau)
+        f.addRow("الملاحظات", self.remarques)
+        f.addRow(self.maj)
+        v.addLayout(f)
+        b = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        b.button(QDialogButtonBox.Ok).setText("توليد المحضر")
+        b.button(QDialogButtonBox.Cancel).setText("إلغاء")
+        b.accepted.connect(self.accept)
+        b.rejected.connect(self.reject)
+        v.addWidget(b)
+
+    def valeurs(self) -> dict:
+        return dict(date_pv=_date(self.date, "تاريخ المحضر"), ancien=self.ancien.text(), nouveau=self.nouveau.text(),
+                    remarques=self.remarques.toPlainText().splitlines(), maj=self.maj.isChecked())
+
+
 class PageAssociations(QWidget):
     def __init__(self, fenetre):
         super().__init__()
@@ -91,8 +129,8 @@ class PageAssociations(QWidget):
         racine.setContentsMargins(40, 32, 40, 32)
         racine.setSpacing(16)
         a = asso.association(self.f.conn, TYPE)
-        racine.addWidget(entete(a["nom"], "المداخيل والمصاريف حسب أبواب وبنود نموذجكم، بسجلين: البنك والصندوق. "
-                                          "التطبيق يمنع أي رصيد سالب ويُنبه عند تجاوز المتوقع."))
+        racine.addWidget(entete(a["nom"], "المداخيل والمصاريف حسب أبواب وبنود نموذجكم، بسجلين: البنك والصندوق. الوصولات والسجلات "
+                                          "والمحاضر على نماذج الدليل المسطري للتدبير المالي (يوليوز 2023)."))
         self.message = QLabel()
         self.message.setWordWrap(True)
         self.message.hide()
@@ -110,8 +148,17 @@ class PageAssociations(QWidget):
         self.b_ouvrir.clicked.connect(self.ouvrir)
         self.b_export = QPushButton("تصدير السجلات (Excel)")
         self.b_export.clicked.connect(lambda: self.exporter())
-        h.addWidget(self.b_ouvrir)
-        h.addWidget(self.b_export)
+        self.b_registres = QPushButton("السجلات (Word)")
+        m = QMenu(self.b_registres)
+        for k, (lib, n) in da.REGISTRES_DOC.items():
+            m.addAction(f"{lib} (الملحق {n})", lambda k=k: self.generer_registre(k))
+        self.b_registres.setMenu(m)
+        self.b_budget = QPushButton("وثيقة الميزانية")
+        self.b_budget.clicked.connect(lambda: self.generer_budget())
+        self.b_passation = QPushButton("محضر تسليم المهام المالية")
+        self.b_passation.clicked.connect(lambda: self.passation())
+        for b in (self.b_ouvrir, self.b_registres, self.b_budget, self.b_passation, self.b_export):
+            h.addWidget(b)
         h.addStretch()
         cv.addLayout(h)
         self.chiffres = {}
@@ -158,8 +205,16 @@ class PageAssociations(QWidget):
         self.b_suppr = QPushButton("حذف العملية المحددة")
         self.b_suppr.setEnabled(False)
         self.b_suppr.clicked.connect(self.supprimer)
+        self.b_pieces = QPushButton("وثائق العملية")
+        self.b_pieces.setObjectName("principal")
+        self.b_pieces.setEnabled(False)
+        self.menu_pieces = QMenu(self.b_pieces)
+        self.b_pieces.setMenu(self.menu_pieces)
+        self.l_pieces = QLabel()
+        self.l_pieces.setObjectName("sousTitre")
+        h.addWidget(self.b_pieces)
         h.addWidget(self.b_suppr)
-        h.addStretch()
+        h.addWidget(self.l_pieces, 1)
         cv.addLayout(h)
         racine.addWidget(c)
         corps = QHBoxLayout()
@@ -185,6 +240,8 @@ class PageAssociations(QWidget):
         self.montant = champ("0.00", ltr=True)
         self.reference = champ("فاتورة، سند الطلب، رقم الشيك، كشف الحساب...")
         self.detail = champ("اختياري")
+        self.tiers = champ("المؤدي (وصل مداخيل) أو المستفيد (سند تسلم)")
+        self.tiers_qualite = champ("مثلا: ممون، حرفي، ولي أمر...")
         g = QGridLayout()
         g.setHorizontalSpacing(16)
         g.setVerticalSpacing(4)
@@ -202,6 +259,10 @@ class PageAssociations(QWidget):
             if lab is not None:
                 g.addWidget(lab, i * 2, 0, 1, 2)
             g.addWidget(w, i * 2 + 1, 0, 1, 2)
+        g.addWidget(etiquette("الطرف المعني", self.tiers), 12, 0)
+        g.addWidget(self.tiers, 13, 0)
+        g.addWidget(etiquette("صفته", self.tiers_qualite), 12, 1)
+        g.addWidget(self.tiers_qualite, 13, 1)
         g.setColumnStretch(1, 1)
         fv.addLayout(g)
         h = QHBoxLayout()
@@ -284,7 +345,8 @@ class PageAssociations(QWidget):
     def _changer_exercice(self) -> None:
         self.eid = self.exercice.currentData()
         actif = self.eid is not None
-        for w in (self.b_export, self.b_save, self.date, self.nature, self.registre, self.chapitre, self.ligne,
+        for w in (self.b_export, self.b_registres, self.b_budget, self.b_passation, self.tiers, self.tiers_qualite,
+                  self.b_save, self.date, self.nature, self.registre, self.chapitre, self.ligne,
                   self.montant, self.reference, self.detail, self.b_prev, self.prevu):
             w.setEnabled(actif)
         if actif:
@@ -316,6 +378,8 @@ class PageAssociations(QWidget):
     def afficher_operations(self) -> None:
         self.op_id = None
         self.b_suppr.setEnabled(False)
+        self.b_pieces.setEnabled(False)
+        self.l_pieces.setText("")
         reg = self.vue.currentData()
         lignes = []
         if self.eid is not None:
@@ -410,12 +474,13 @@ class PageAssociations(QWidget):
         try:
             op = asso.Operation(self.eid, _date(self.date, "تاريخ العملية"), self.nature.currentData(),
                                 self.registre.currentData(), self.montant.text(), self.ligne.currentData(),
-                                self.reference.text(), self.detail.text())
+                                self.reference.text(), self.detail.text(), tiers=self.tiers.text(),
+                                tiers_qualite=self.tiers_qualite.text())
             oid = asso.enregistrer(self.f.conn, op)
         except asso.ErreurAssociation as e:
             message(self.message, str(e), True)
             return None
-        for w in (self.montant, self.reference, self.detail):
+        for w in (self.montant, self.reference, self.detail, self.tiers, self.tiers_qualite):
             w.clear()
         self._changer_exercice()
         message(self.message, "سُجلت العملية.")
@@ -425,6 +490,21 @@ class PageAssociations(QWidget):
         rows = {i.row() for i in self.ops.selectedIndexes()}
         self.op_id = self.ops.item(rows.pop(), 0).data(Qt.UserRole) if len(rows) == 1 else None
         self.b_suppr.setEnabled(self.op_id is not None)
+        self.menu_pieces.clear()
+        types = []
+        if self.op_id is not None:
+            op = da._operation(self.f.conn, self.op_id)
+            types = da.pieces_pour(op)
+            emises = da.pieces_emises(self.f.conn, self.op_id)
+            for t in types:
+                lib, n = da.PIECES[t]
+                suffixe = f" — رقم {emises[t]:02d}" if t in emises else ""
+                self.menu_pieces.addAction(f"{lib} (الملحق {n}){suffixe}", lambda t=t: self.generer_piece(t))
+            self.l_pieces.setText("صدرت: " + "، ".join(f"{da.PIECES[t][0]} {n:02d}" for t, n in emises.items())
+                                  if emises else "")
+        else:
+            self.l_pieces.setText("")
+        self.b_pieces.setEnabled(bool(types))
 
     def supprimer(self) -> bool:
         if self.op_id is None:
@@ -476,6 +556,57 @@ class PageAssociations(QWidget):
             return False
         message(self.message, "حُفظت معطيات الجمعية.")
         return True
+
+    # ---------- وثائق الدليل المسطري ----------
+
+    def _produire(self, fabrique, succes: str) -> Path | None:
+        try:
+            p = fabrique()
+        except (da.ErreurDocAssociation, asso.ErreurAssociation) as e:
+            message(self.message, str(e), True)
+            return None
+        message(self.message, f"{succes}: {p.name}")
+        try:
+            bureautique.ouvrir(p)
+        except Exception:  # noqa: BLE001 — الفتح اختياري
+            pass
+        return p
+
+    def generer_piece(self, type_: str) -> Path | None:
+        oid = self.op_id
+        p = self._produire(lambda: da.generer_piece(self.f.conn, self.f.dossier, oid, type_),
+                           f"وُلّد {da.PIECES[type_][0]}")
+        if p and oid is not None:
+            self.op_id = oid
+            self._selection_op()
+        return p
+
+    def generer_registre(self, kind: str) -> Path | None:
+        return self._produire(lambda: da.generer_registre(self.f.conn, self.f.dossier, self.eid, kind),
+                              f"وُلّد {da.REGISTRES_DOC[kind][0]}")
+
+    def generer_budget(self) -> Path | None:
+        return self._produire(lambda: da.generer_budget(self.f.conn, self.f.dossier, self.eid), "وُلّدت وثيقة الميزانية")
+
+    def passation(self, valeurs: dict | None = None) -> Path | None:
+        if valeurs is None:
+            dlg = DialoguePassation(self, asso.association(self.f.conn, TYPE)["tresorier"])
+            if dlg.exec() != QDialog.Accepted:
+                return None
+            try:
+                valeurs = dlg.valeurs()
+            except asso.ErreurAssociation as e:
+                message(self.message, str(e), True)
+                return None
+        maj = valeurs.pop("maj", False)
+        p = self._produire(lambda: da.generer_pv_passation(self.f.conn, self.f.dossier, self.eid, **valeurs),
+                           "وُلّد محضر تسليم المهام المالية")
+        if p and maj:
+            a = asso.association(self.f.conn, TYPE)
+            asso.modifier_association(self.f.conn, TYPE, a["rib"] or "", a["president"] or "", valeurs["nouveau"],
+                                      a["date_renouvellement"] or "")
+            self._charger_association()
+        return p
 
     # ---------- السنة المالية والتصدير ----------
 
