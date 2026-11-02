@@ -212,7 +212,7 @@ def _exiger(valeurs: dict[str, str]) -> None:
 
 
 def _entete_piece(conteneur, ctx, date_doc: str) -> None:
-    t = tableau(conteneur, 1, 2, bordures=False, largeurs=[7.4, 6.2])
+    t = tableau(conteneur, 1, 2, bordures=False, largeurs=[6.8, 7.2])
     _cellule(t.cell(0, 0), ctx["a"]["nom"], gras=True, centre=False)
     _cellule(t.cell(0, 1), f"{ctx['ville']} في: {tx.date_chiffres(date_doc)}", centre=True)
     para(conteneur, f"المؤسسة: {ctx['etab']}", apres=6)
@@ -357,7 +357,7 @@ def generer_registre(conn, dossier: DossierDonnees, eid: int, kind: str) -> Path
     titre, _ = REGISTRES_DOC[kind]
     report, lignes = lignes_registre(conn, eid, kind)
     d = _nouveau()
-    largeurs = [1.6, 2.5, 2.3, 4.6, 2.0, 2.0, 2.4]
+    largeurs = [1.6, 2.4, 2.5, 4.5, 2.0, 2.0, 2.4]
     pages = [lignes[i:i + LIGNES_PAR_PAGE] for i in range(0, len(lignes), LIGNES_PAR_PAGE)] or [[]]
     solde, k = report, 0
     for ip, page in enumerate(pages):
