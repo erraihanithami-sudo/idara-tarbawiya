@@ -566,7 +566,7 @@ def test_page_association_najah(app, config_tmp, monkeypatch, tmp_path):
     eid = p.ouvrir(dict(libelle="2025/2026", debut="2025-09-01", fin="2026-08-31",
                         report_banque=50000, report_caisse=300, reference="محضر تسليم المهام"))
     assert eid and p.b_save.isEnabled() and p.ops.rowCount() == 2
-    assert p.chiffres["banque"].text() == "50 000.00 درهم"
+    assert p.chiffres["banque"].text() == "50\u00a0000.00 درهم"
     # تحويل: يختفي البند
     p.nature.setCurrentIndex(p.nature.findData("transfert"))
     assert p.ligne.isHidden() and p.l_registre.text() == "من *"
@@ -586,9 +586,9 @@ def test_page_association_najah(app, config_tmp, monkeypatch, tmp_path):
     p.montant.setText("1200")
     p.reference.setText("فاتورة 1")
     assert p.enregistrer(), p.message.text()
-    assert p.chiffres["caisse"].text() == "2 100.00 درهم"
+    assert p.chiffres["caisse"].text() == "2\u00a0100.00 درهم"
     p.vue.setCurrentIndex(p.vue.findData("caisse"))
-    assert p.ops.rowCount() == 3 and p.ops.item(2, 5).text() == "2 100.00"
+    assert p.ops.rowCount() == 3 and p.ops.item(2, 5).text() == "2\u00a0100.00"
     # الميزانية والتنبيه
     rid = asso.execution(f.conn, eid)
     i = next(k for k in range(p.budget.rowCount()) if p.budget.item(k, 0).data(Qt.UserRole) == p.ligne.itemData(0))

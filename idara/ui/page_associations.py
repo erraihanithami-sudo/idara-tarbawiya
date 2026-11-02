@@ -20,7 +20,8 @@ TYPE = "najah"
 
 
 def dh(x: float) -> str:
-    return f"{x:,.2f}".replace(",", " ")
+    """فاصل الآلاف مسافة غير قابلة للكسر: يبقى الرقم كتلة واحدة داخل السطر العربي."""
+    return f"{x:,.2f}".replace(",", "\u00a0")
 
 
 def _date(w: ChampDate, lib: str) -> str:
@@ -134,9 +135,6 @@ class PageAssociations(QWidget):
         cv.addWidget(self.alertes)
         racine.addWidget(c)
 
-        corps = QHBoxLayout()
-        corps.setSpacing(20)
-        racine.addLayout(corps)
 
         # ---- العمليات / السجلات ----
         c, cv = carte()
@@ -152,7 +150,7 @@ class PageAssociations(QWidget):
         h.addWidget(self.vue)
         cv.addLayout(h)
         self.ops = tableau(["رقم", "التاريخ", "البيان", "مدخول", "مصروف", "السجل"], etirer=2)
-        self.ops.setMinimumHeight(380)
+        self.ops.setMinimumHeight(340)
         self.ops.itemSelectionChanged.connect(self._selection_op)
         cv.addWidget(self.ops, 1)
         h = QHBoxLayout()
@@ -162,7 +160,10 @@ class PageAssociations(QWidget):
         h.addWidget(self.b_suppr)
         h.addStretch()
         cv.addLayout(h)
-        corps.addWidget(c, 6)
+        racine.addWidget(c)
+        corps = QHBoxLayout()
+        corps.setSpacing(20)
+        racine.addLayout(corps)
 
         # ---- عملية جديدة ----
         c, fv = carte("عملية جديدة")
@@ -225,12 +226,13 @@ class PageAssociations(QWidget):
         self.sens.currentIndexChanged.connect(lambda _: self.afficher_budget())
         h.addWidget(self.sens)
         bv.addLayout(h)
-        self.budget = tableau(["الباب", "البند", "المتوقع", "المنجز", "الباقي", "النسبة"], etirer=1)
-        self.budget.setMinimumHeight(320)
+        self.budget = tableau(["البند", "المتوقع", "المنجز", "الباقي", "النسبة"], etirer=0)
+        self.budget.setMinimumHeight(420)
         self.budget.itemSelectionChanged.connect(self._selection_budget)
         bv.addWidget(self.budget)
         h = QHBoxLayout()
         self.l_prev = QLabel("اختر بنداً لتحديد المبلغ المتوقع")
+        self.l_prev.setWordWrap(True)
         self.prevu = champ("0.00", ltr=True)
         self.prevu.setMaximumWidth(160)
         self.b_prev = QPushButton("حفظ المتوقع")
@@ -239,7 +241,7 @@ class PageAssociations(QWidget):
             h.addWidget(w)
         h.addStretch()
         bv.addLayout(h)
-        racine.addWidget(c)
+        corps.addWidget(c, 6)
 
         # ---- معطيات الجمعية ----
         c, av = carte("معطيات الجمعية")
@@ -284,7 +286,9 @@ class PageAssociations(QWidget):
         for w in (self.b_export, self.b_save, self.date, self.nature, self.registre, self.chapitre, self.ligne,
                   self.montant, self.reference, self.detail, self.b_prev, self.prevu):
             w.setEnabled(actif)
-        if not actif:
+        if actif:
+            self.message.hide()
+        else:
             message(self.message, "ابدأ بفتح السنة المالية الأولى، مع المنقول من السنة السابقة "
                                   "(من محضر تسليم المهام أو كشف الحساب).")
         e = asso.exercice(self.f.conn, self.eid) if actif else None
@@ -345,16 +349,14 @@ class PageAssociations(QWidget):
         lignes = [r for r in asso.execution(self.f.conn, self.eid) if r["sens"] == sens] if self.eid else []
         self.budget.setRowCount(len(lignes))
         for i, r in enumerate(lignes):
-            self.budget.setItem(i, 0, cellule(r["chapitre"], r["id"]))
-            it = cellule(r["ligne"])
-            if r["observation"]:
-                it.setToolTip(r["observation"])
-            self.budget.setItem(i, 1, it)
-            for j, k in enumerate(("prevu", "realise", "reste"), start=2):
+            it = cellule(r["ligne"], r["id"])
+            it.setToolTip("\n".join(x for x in (r["chapitre"], r["observation"]) if x))
+            self.budget.setItem(i, 0, it)
+            for j, k in enumerate(("prevu", "realise", "reste"), start=1):
                 self.budget.setItem(i, j, cellule(dh(r[k]) if r[k] else "—"))
-            self.budget.setItem(i, 5, cellule(r["taux"]))
+            self.budget.setItem(i, 4, cellule(r["taux"]))
             if sens == "depense" and r["realise"] > r["prevu"] + 1e-9:
-                for j in range(6):
+                for j in range(5):
                     self.budget.item(i, j).setForeground(Qt.darkRed)
 
     def _charger_association(self) -> None:
@@ -439,9 +441,9 @@ class PageAssociations(QWidget):
         rows = {i.row() for i in self.budget.selectedIndexes()}
         if len(rows) == 1:
             r = rows.pop()
-            self.l_prev.setText(f"المتوقع لبند «{self.budget.item(r, 1).text()}»")
-            v = self.budget.item(r, 2).text()
-            self.prevu.setText("" if v == "—" else v.replace(" ", ""))
+            self.l_prev.setText(f"المتوقع لبند «{self.budget.item(r, 0).text()}»")
+            v = self.budget.item(r, 1).text()
+            self.prevu.setText("" if v == "—" else v.replace("\u00a0", ""))
 
     def enregistrer_prevision(self) -> bool:
         rows = {i.row() for i in self.budget.selectedIndexes()}
