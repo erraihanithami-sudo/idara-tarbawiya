@@ -123,6 +123,7 @@ class PageAssociations(QWidget):
             t.setObjectName("etiquette")
             n = QLabel("—")
             n.setObjectName("titreCarte")
+            n.setAlignment(Qt.AlignRight | Qt.AlignAbsolute | Qt.AlignVCenter)
             b.addWidget(t)
             b.addWidget(n)
             g.addLayout(b)
