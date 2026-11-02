@@ -63,6 +63,18 @@ def _table_edit(colonnes: list[str], lignes: int, etirer: int = 0) -> QTableWidg
     return t
 
 
+def _grille(paires: list[tuple[str, QWidget]], etirer: int | None = None) -> QGridLayout:
+    """حقول متجاورة، العنوان فوق كل حقل (لا تتجاوز الصفحة عرضها)."""
+    g = QGridLayout()
+    g.setHorizontalSpacing(16)
+    g.setVerticalSpacing(4)
+    for j, (lib, w) in enumerate(paires):
+        g.addWidget(etiquette(lib, w), 0, j)
+        g.addWidget(w, 1, j)
+    g.setColumnStretch(len(paires) if etirer is None else etirer, 1)
+    return g
+
+
 def _val(t: QTableWidget, i: int, j: int) -> str:
     it = t.item(i, j)
     return it.text().strip() if it else ""
@@ -209,30 +221,22 @@ class PageAchats(QWidget):
 
         # 2. طلب عروض الأثمان
         c, v = carte("2. طلب عروض الأثمان")
-        h = QHBoxLayout()
         self.date_demande = ChampDate()
         self.delai, self.nb = champ("15", ltr=True), champ("3", ltr=True)
         for w in (self.delai, self.nb):
             w.setMaximumWidth(80)
-        for lib, w in (("التاريخ", self.date_demande), ("أجل الرد (يوماً، 15 على الأكثر)", self.delai),
-                       ("عدد الطلبات الموجهة (3 على الأقل)", self.nb)):
-            h.addWidget(QLabel(lib))
-            h.addWidget(w)
-        h.addStretch()
-        v.addLayout(h)
+        v.addLayout(_grille([("التاريخ", self.date_demande), ("أجل الرد (15 يوماً على الأكثر)", self.delai),
+                             ("عدد الطلبات (3 على الأقل)", self.nb)]))
         v.addLayout(self._ligne_boutons([("حفظ", self.enregistrer_demande)], ["demande_devis", "modele_devis"]))
         z.addWidget(c)
 
         # 3. اللجنة
         c, v = carte("3. لجنة دراسة عروض الأثمان")
-        h = QHBoxLayout()
         self.date_comm, self.heure = ChampDate(), champ("10:00", ltr=True)
         self.heure.setMaximumWidth(90)
         self.absents = champ("اختياري")
-        for lib, w in (("التاريخ", self.date_comm), ("الساعة", self.heure), ("المتغيبون", self.absents)):
-            h.addWidget(QLabel(lib))
-            h.addWidget(w)
-        v.addLayout(h)
+        v.addLayout(_grille([("التاريخ", self.date_comm), ("الساعة", self.heure), ("المتغيبون", self.absents)],
+                            etirer=2))
         self.membres = _table_edit(["الاسم", "الصفة"], 5)
         self.membres.setMinimumHeight(210)
         v.addWidget(self.membres)
@@ -244,15 +248,12 @@ class PageAchats(QWidget):
         self.offres = tableau(["الممون", "المبلغ باحتساب الضريبة", "بالحروف"], etirer=2)
         self.offres.setMinimumHeight(170)
         v.addWidget(self.offres)
-        h = QHBoxLayout()
         self.nom_offre = QComboBox()
         self.nom_offre.setEditable(True)
-        self.nom_offre.setMinimumWidth(220)
         self.montant_offre = champ("0.00", ltr=True)
         self.montant_offre.setMaximumWidth(140)
-        for lib, w in (("الممون", self.nom_offre), ("المبلغ", self.montant_offre)):
-            h.addWidget(QLabel(lib))
-            h.addWidget(w)
+        v.addLayout(_grille([("الممون", self.nom_offre), ("المبلغ باحتساب الضريبة", self.montant_offre)], etirer=0))
+        h = QHBoxLayout()
         b = QPushButton("تسجيل العرض")
         b.clicked.connect(lambda: self.ajouter_offre())
         h.addWidget(b)
@@ -271,21 +272,12 @@ class PageAchats(QWidget):
 
         # 5. التنفيذ
         c, v = carte("5. سند الطلب أو الاتفاقية، ثم التسليم")
-        h = QHBoxLayout()
         self.date_conv, self.date_bc, self.date_liv = ChampDate(), ChampDate(), ChampDate()
-        self.l_conv = QLabel("تاريخ الاتفاقية")
-        h.addWidget(self.l_conv)
-        h.addWidget(self.date_conv)
-        h.addWidget(QLabel("تاريخ سند الطلب / الطلب"))
-        h.addWidget(self.date_bc)
-        h.addStretch()
-        v.addLayout(h)
+        g = _grille([("تاريخ الاتفاقية", self.date_conv), ("تاريخ سند الطلب / الطلب", self.date_bc)])
+        self.l_conv = g.itemAtPosition(0, 0).widget()
+        v.addLayout(g)
         v.addLayout(self._ligne_boutons([("إصدار", self.engager)], ["convention", "bon_commande"]))
-        h = QHBoxLayout()
-        h.addWidget(QLabel("تاريخ التسليم / إنجاز الخدمة"))
-        h.addWidget(self.date_liv)
-        h.addStretch()
-        v.addLayout(h)
+        v.addLayout(_grille([("تاريخ التسليم / إنجاز الخدمة", self.date_liv)]))
         self.l_reception = QLabel("لجنة التسليم الجزئي أو الكلي للخدمة (شخصان على الأقل):")
         v.addWidget(self.l_reception)
         self.reception_t = _table_edit(["الاسم الكامل", "الصفة"], 3)
@@ -297,31 +289,17 @@ class PageAchats(QWidget):
 
         # 6. الفاتورة والأداء
         c, v = carte("6. الفاتورة والأداء")
-        h = QHBoxLayout()
         self.num_facture, self.date_facture = champ(ltr=True), ChampDate()
         self.num_facture.setMaximumWidth(160)
-        for lib, w in (("رقم الفاتورة", self.num_facture), ("تاريخها", self.date_facture)):
-            h.addWidget(QLabel(lib))
-            h.addWidget(w)
-        b = QPushButton("تسجيل الفاتورة")
-        b.clicked.connect(lambda: self.enregistrer_facture())
-        h.addWidget(b)
-        h.addStretch()
-        v.addLayout(h)
-        h = QHBoxLayout()
+        v.addLayout(_grille([("رقم الفاتورة", self.num_facture), ("تاريخها", self.date_facture)]))
+        v.addLayout(self._ligne_boutons([("تسجيل الفاتورة", self.enregistrer_facture)], []))
         self.date_paie, self.mode_paie, self.ref_paie = ChampDate(), QComboBox(), champ(ltr=True)
         self.mode_paie.addItem("شيك", "cheque")
         self.mode_paie.addItem("تحويل بنكي", "virement")
         self.ref_paie.setMaximumWidth(160)
-        for lib, w in (("تاريخ الأداء", self.date_paie), ("الطريقة", self.mode_paie), ("رقم الشيك / المرجع", self.ref_paie)):
-            h.addWidget(QLabel(lib))
-            h.addWidget(w)
-        b = QPushButton("تسجيل الأداء بسجل البنك")
-        b.setObjectName("principal")
-        b.clicked.connect(lambda: self.payer())
-        h.addWidget(b)
-        h.addStretch()
-        v.addLayout(h)
+        v.addLayout(_grille([("تاريخ الأداء", self.date_paie), ("الطريقة", self.mode_paie),
+                             ("رقم الشيك / المرجع", self.ref_paie)]))
+        v.addLayout(self._ligne_boutons([("تسجيل الأداء بسجل البنك", self.payer)], []))
         t = QLabel("ملف الأداء:")
         t.setObjectName("titreCarte")
         v.addWidget(t)
@@ -367,6 +345,8 @@ class PageAchats(QWidget):
         self.b_nouveau.setEnabled(self.eid is not None)
         if self.eid is None:
             message(self.message, "افتح السنة المالية أولاً في صفحة «جمعية دعم مدرسة النجاح».")
+        else:
+            self.message.hide()
         self.afficher_liste()
 
     def afficher_liste(self, selection: int | None = None) -> None:
