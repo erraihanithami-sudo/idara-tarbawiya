@@ -50,6 +50,7 @@ _RH = ("date_redaction", "sayyid_mudir", "rai_mudir", "ana_mouwaqqi", "bisifati"
 
 _MV = ("date_redaction", "date_enregistrement", "numero", "etab_cible", "sous_couvert", "al_tilmidh",
        "nom_N", "niveau_N", "code_N", "obs_N")
+_STATS = tuple(f"s_{k}_N" for k in ("lib", "g", "f", "t", "rg", "rf", "rt", "eg", "ef", "et", "pc"))
 _HORS = ("notre_direction", "notre_academie", "direction_cible", "academie_cible")
 
 MODELES: dict[str, DefModele] = {d.code: d for d in [
@@ -88,6 +89,12 @@ MODELES: dict[str, DefModele] = {d.code: d for d in [
     DefModele("envoi_dossier", "إرسال وثائق مدرسية (داخل الإقليم)", "ar", _COMMUNS + _MV + ("bina",)),
     DefModele("envoi_dossier_hors", "إرسال وثائق مدرسية (خارج الإقليم)", "ar", _COMMUNS + _MV + _HORS + (
         "bina", "reference")),
+    # التقييم
+    DefModele("conseil_niveau", "محضر مجلس القسم (المستوى)", "ar", _COMMUNS + _STATS + (
+        "date_conseil", "ordinal", "annee", "phase_isa", "difficultes", "solutions", "i_lib_N", "i_ar_N", "i_fr_N",
+        "i_ma_N", "i_gl_N", "m_a_N", "m_b_N", "m_sa_N", "m_sb_N")),
+    DefModele("synthese_conseils", "تقرير تركيبي لمجالس الأقسام", "ar", _COMMUNS + _STATS + (
+        "date_conseil", "annee", "periode")),
 ]}
 
 
@@ -458,6 +465,8 @@ def exemple(conn: sqlite3.Connection, code: str, sexe: str = "M"):
     if code == "convocation_parent":
         eleves = [_eleve_exemple("M"), _eleve_exemple("F"), _eleve_exemple("M", prenom_ar="يوسف")]
         return champs_convocation(conn, eleves)
+    if code in ("conseil_niveau", "synthese_conseils"):
+        return _exemple_conseil(conn, code), None
     if code in ("demande_dossier", "demande_dossier_hors", "envoi_dossier", "envoi_dossier_hors"):
         from idara.services import mouvements  # تفادي الاستيراد الدائري
         return mouvements.exemple(conn, code), None
@@ -468,3 +477,19 @@ def exemple(conn: sqlite3.Connection, code: str, sexe: str = "M"):
         except conges.ErreurConge as e:
             raise ErreurDocument(str(e)) from e
     raise ErreurDocument(f"قالب غير معروف: {code}")
+
+
+def _exemple_conseil(conn, code: str) -> dict[str, str]:
+    from idara.services import evaluation as ev
+    s = ev.Stats("4APG1", 12, 9, 21, 12, 8, 20)
+    v = champs_communs(conn)
+    v.update({"date_conseil": "[تاريخ المجلس]", "annee": "[السنة الدراسية]", "periode": "للأسدوس الثاني",
+              "ordinal": "الرابع", "phase_isa": "الخامسة", "difficultes": "[الصعوبات]", "solutions": "[الحلول]"})
+    n = 4 if code == "conseil_niveau" else 8
+    for i in range(1, n + 1):
+        v.update(s.valeurs("s_", i))
+    if code == "conseil_niveau":
+        for i in range(1, 5):
+            v.update({f"i_lib_{i}": "4APG1", f"i_ar_{i}": "—", f"i_fr_{i}": "—", f"i_ma_{i}": "—", f"i_gl_{i}": "—",
+                      f"m_a_{i}": "[الاسم]", f"m_b_{i}": "[الاسم]", f"m_sa_{i}": "", f"m_sb_{i}": ""})
+    return v

@@ -208,7 +208,15 @@ def main(sortie: Path) -> None:
     f.aller_a("تتبع السلوك")
     __import__("idara.ui.saisie", fromlist=["x"]).selectionner(f.page_comportement.liste, 0)
     photo(f, "33_comportement")
-    f.aller_a("التقييم")
+    from tests.fabrique_resultats import classeur_resultats
+    fic = classeur_resultats(tmp / "res.xlsx", {
+        "PS1-PS2": [], "4APG-5APG-6APG": [("X000000001", "التجريبي سعيد", [8] * 8),
+                                           ("X000000002", "الوهمي سلمى", [4.5] * 8)]},
+        annee=__import__("idara.services.annee", fromlist=["x"]).libelle_pour_date())
+    f.aller_a("مجالس الأقسام")
+    f.page_conseils.importer([fic])
+    photo(f, "34_conseils")
+    f.aller_a("مشروع المؤسسة")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")
     photo(f, "30_sections_onglets")

@@ -110,6 +110,7 @@ def test_fenetre_principale_et_edition(app, config_tmp):
         f.aller_a(titre)
         assert f.pile.currentIndex() == i and f.boutons[i].isChecked()
         assert ("قريباً" in f.boutons[i].text()) == (not noms)
+    assert f.page_courante() is not None
     f.aller_a("الرخص")
     f.aller([t for t, _ in SECTIONS].index("التلاميذ"))
     assert f.page_courante() == "التلاميذ"
@@ -520,4 +521,33 @@ def test_page_comportement_et_exclus(app, config_tmp, monkeypatch):
     m = f.page_mouvements
     m.r_autres.setChecked(True)
     assert m.liste.rowCount() == 1 and "مفصول" in m.liste.item(0, 1).text() and m.b_demande.isHidden()
+    f.close()
+
+
+
+def test_page_conseils(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
+    from tests.fabrique_resultats import classeur_resultats
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("التقييم")
+    p = f.page_conseils
+    assert f.page_courante() == "مجالس الأقسام" and not p.b_pv.isEnabled()
+    fic = classeur_resultats(config_tmp / "r.xlsx", {
+        "4APG-1": [("X000000001", "التجريبي سعيد", [8] * 8), ("X000000002", "الوهمي سلمى", [4] * 8)],
+        "4APG-5APG-6APG": [("X000000004", "النموذج مريم", [6] * 8)]})
+    r = p.importer([fic])
+    assert r is not None and p.annee.currentText() == "2026/2027", p.message.text()
+    assert not p.niveaux_manquants.isHidden() and p.niveaux_manquants.rowCount() == 1
+    cb = p.niveaux_manquants.cellWidget(0, 1)
+    cb.setCurrentIndex(cb.findData("5AP"))
+    assert p.enregistrer_niveaux() == 1 and p.niveaux_manquants.isHidden()
+    p.niveau.setCurrentIndex(p.niveau.findData("4AP"))
+    assert p.stats.rowCount() == 1 and p.stats.item(0, 6).text() == "50.00%"
+    p.isa["4APG-1"]["ar"].setText("66.03")
+    p.difficultes.setPlainText("ضعف القراءة")
+    p.date.setText("04/07/2026")
+    assert p.generer_pv() is not None, p.message.text()
+    assert p.generer_synthese() is not None and len(ouverts) == 2
     f.close()
