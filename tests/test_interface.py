@@ -776,3 +776,20 @@ def test_page_riyada(app, config_tmp, monkeypatch):
     assert ry.pieces(f.conn, "2026/2027")[1]["disponible"]
     assert p.document("dossier") and p.document("synthese") and len(ouverts) == 2
     f.close()
+
+
+def test_bouton_ouvrir_exercice(app, config_tmp, monkeypatch):
+    """النقر على «فتح سنة مالية جديدة» (لا الاستدعاء المباشر): زر Qt يمرر checked=False."""
+    from PySide6.QtWidgets import QDialog
+    from idara.services import associations as asso
+    from idara.ui import page_associations as pa
+    monkeypatch.setattr(pa.DialogueExercice, "exec", lambda self: QDialog.Accepted)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("جمعية دعم مدرسة النجاح")
+    p = f.page_asso
+    p.b_ouvrir.click()
+    ex = asso.exercices(f.conn)
+    assert len(ex) == 1 and ex[0]["date_debut"].endswith("-01-01"), p.message.text()
+    p.b_ouvrir.click()  # السنة الموالية تُقترح آلياً
+    assert [e["libelle"] for e in asso.exercices(f.conn)][0] == str(int(ex[0]["libelle"]) + 1)
+    f.close()

@@ -224,7 +224,7 @@ class PageAssociations(QWidget):
         self.exercice.currentIndexChanged.connect(lambda _: self._changer_exercice())
         h.addWidget(self.exercice)
         self.b_ouvrir = QPushButton("فتح سنة مالية جديدة")
-        self.b_ouvrir.clicked.connect(self.ouvrir)
+        self.b_ouvrir.clicked.connect(lambda: self.ouvrir())
         self.b_export = QPushButton("تصدير السجلات (Excel)")
         self.b_export.clicked.connect(lambda: self.exporter())
         self.b_registres = QPushButton("السجلات (Word)")
