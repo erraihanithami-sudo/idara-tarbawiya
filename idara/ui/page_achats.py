@@ -19,6 +19,10 @@ from idara.ui.formulaires import champ, etiquette
 from idara.ui.saisie import ChampDate, cellule, message, tableau
 
 TYPE = "najah"
+COURTS = {"demande_devis": "طلب عرض أثمان", "modele_devis": "نموذج عرض الأثمان", "invitations": "دعوات اللجنة",
+          "pv_commission": "محضر اللجنة", "convention": "الاتفاقية", "bon_commande": "سند الطلب",
+          "bon_livraison": "سند التسليم", "pv_service": "محضر إنجاز الخدمة"}
+ETAPES_COURTES = ("الحاجة", "طلب العروض", "اختيار العرض", "الاتفاقية", "سند الطلب", "التسليم", "الفاتورة", "الأداء")
 
 
 def _iso(w: ChampDate, lib: str) -> str:
@@ -213,6 +217,7 @@ class PageAchats(QWidget):
         self.b_besoin = QPushButton("حفظ الحاجة")
         self.b_besoin.clicked.connect(lambda: self.enregistrer_besoin())
         self.l_totaux = QLabel()
+        self.l_totaux.setWordWrap(True)
         h.addWidget(self.b_besoin)
         h.addWidget(b)
         h.addWidget(self.l_totaux, 1)
@@ -319,7 +324,8 @@ class PageAchats(QWidget):
         self.boutons_docs = getattr(self, "boutons_docs", {})
         for code in docs:
             titre, n, _ = ac.DOCUMENTS[code]
-            b = QPushButton(f"{titre.split(' (')[0]} (الملحق {n})")
+            b = QPushButton(f"{COURTS[code]} (م{n})")
+            b.setToolTip(f"{titre} — الملحق {n} من الدليل المسطري")
             b.setObjectName("principal")
             b.clicked.connect(lambda _=False, code=code: self.document(code))
             h.addWidget(b)
@@ -356,7 +362,8 @@ class PageAchats(QWidget):
         cible = None
         for i, a in enumerate(lignes):
             et = ac.etapes(self.f.conn, a["id"])
-            faite = [lib for lib, ok in et if ok]
+            noms = [n for n in ETAPES_COURTES if a["mode"] == "convention" or n != "الاتفاقية"]
+            faite = [n for n, (_, ok) in zip(noms, et) if ok]
             t = ac.totaux(self.f.conn, a["id"])
             for j, v in enumerate((a["id"], a["objet"], ac.MODES[a["mode"]], a["fournisseur"] or "—",
                                    f"{t['ttc']:,.2f}".replace(",", " ") if t["ttc"] else "—",
