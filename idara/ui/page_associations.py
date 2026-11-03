@@ -520,6 +520,10 @@ class PageAssociations(QWidget):
         self.alertes.setVisible(bool(al))
 
     def afficher_operations(self) -> None:
+        # تحديد سابق يبقى ظاهراً بعد إعادة الملء دون تفعيل الأزرار: يُلغى
+        self.ops.blockSignals(True)
+        self.ops.clearSelection()
+        self.ops.blockSignals(False)
         self.op_id = None
         self.b_suppr.setEnabled(False)
         self.b_modif.setEnabled(False)
