@@ -106,11 +106,39 @@ def test_fenetre_principale_et_edition(app, config_tmp):
     for nom in f.noms_pages():
         f.aller_a(nom)
         assert f.page_courante() == nom
-    for i, (titre, noms) in enumerate(SECTIONS):
+    for i, (titre, fils) in enumerate(SECTIONS):
         f.aller_a(titre)
-        assert f.pile.currentIndex() == i and f.boutons[i].isChecked()
-        assert ("قريباً" in f.boutons[i].text()) == (not noms)
+        assert f.page_courante() in [n for n, _ in fils] and f.boutons[i].actif
+        assert sum(b.actif for b in f.boutons) == 1
+        programmes = [n for n, _ in fils if n in f.pages]
+        assert ("قريباً" in f.boutons[i].text()) == (not programmes)
     assert f.page_courante() is not None
+
+
+def test_navigation_deroulante(app, config_tmp):
+    """اقتراح المدير (2026-11-03): الفروع تحت القسم الرئيسي، تظهر بالضغط عليه وتختفي بالضغطة الثانية."""
+    from idara.ui.fenetre import SECTIONS
+    f = _fenetre_avec_eleves(config_tmp)
+    titres = [t for t, _ in SECTIONS]
+    assert titres[:7] == ["القيادة والتدبير", "التلاميذ", "التدبير التربوي", "التدبير المالي والمادي", "التقييم",
+                          "مشروع المؤسسة", "تسليم المهام"]
+    assert [l for _, l in SECTIONS[0][1]] == ["معلومات عامة", "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة"]
+    assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
+    i = titres.index("التدبير المالي والمادي")
+    f.boutons[i].click()
+    assert f.est_ouvert(i) and not f.est_ouvert(0) and f.page_courante() == "لوحة القيادة"
+    assert [b.text().split("  ")[0] for b in f.sous[i]][:2] == ["الجرد", "جمعية دعم مدرسة النجاح"]
+    assert "قريباً" in f.sous[i][0].text() and "قريباً" not in f.sous[i][1].text()
+    f.sous[i][1].click()
+    assert f.page_courante() == "جمعية دعم مدرسة النجاح" and f.sous[i][1].isChecked() and f.boutons[i].actif
+    f.boutons[i].click()   # الضغطة الثانية تطوي الفروع، والصفحة تبقى
+    assert not f.est_ouvert(i) and f.page_courante() == "جمعية دعم مدرسة النجاح"
+    f.aller_a("الجرد")
+    assert f.page_courante() == "الجرد" and f.est_ouvert(i)
+    j = titres.index("تسليم المهام")   # قسم دون فروع: يفتح صفحته مباشرة
+    f.boutons[j].click()
+    assert f.page_courante() == "تسليم المهام" and f.boutons[j].isChecked() and not f.est_ouvert(i)
+    f.close()
     f.aller_a("الرخص")
     f.aller([t for t, _ in SECTIONS].index("التلاميذ"))
     assert f.page_courante() == "التلاميذ"
@@ -774,7 +802,7 @@ def test_section_pedagogie(app, config_tmp, monkeypatch):
     ouverts = []
     monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
     f = _fenetre_avec_eleves(config_tmp)
-    f.aller_a("التدبير التربوي")
+    f.aller_a("أداء المؤسسة")
     assert f.page_courante() == "أداء المؤسسة"
     p = f.page_perf
     fic = classeur_resultats(config_tmp / "r.xlsx", {"4APG-1": [("X000000001", "أ", [6] * 8), ("X000000002", "ب", [6] * 8)]},

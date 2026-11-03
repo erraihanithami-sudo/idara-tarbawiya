@@ -96,6 +96,11 @@ QTabBar::tab:hover:!selected {{ color: {ENCRE}; }}
 QPushButton#nav:checked {{ background: {VERT_CLAIR}; color: {MARINE}; font-weight: 600;
     border-right: 4px solid {VERT}; }}
 QPushButton#nav:hover:!checked {{ background: {PLATRE}; }}
+QPushButton#sousnav {{ border: 0; border-radius: 8px; min-height: 38px; background: transparent; }}
+QPushButton#sousnav QLabel {{ background: transparent; }}
+QPushButton#sousnav:checked {{ background: {VERT_CLAIR}; border-right: 3px solid {VERT}; }}
+QPushButton#sousnav:hover:!checked {{ background: {PLATRE}; }}
+QScrollArea#defilNav, QWidget#navigation {{ background: {BLANC}; border: 0; }}
 QRadioButton {{ min-height: 36px; }}
 QRadioButton::indicator, QCheckBox::indicator {{ width: 18px; height: 18px; }}
 QTableWidget, QTableView, QListWidget, QPlainTextEdit, QTextEdit {{

@@ -14,6 +14,8 @@ from idara.ui import theme
 
 # لون كل قسم (ألوان الإنفوغرافيا)
 COULEURS = {
+    "القيادة والتدبير": theme.SARCELLE,
+    "تسليم المهام": theme.ORANGE,
     "لوحة القيادة": theme.SARCELLE,
     "التلاميذ": theme.SARCELLE,
     "الموارد البشرية": theme.BLEU,
@@ -119,6 +121,17 @@ def _projet(p, a, m):            # مشروع المؤسسة: مكعبات ور�
     p.drawPolygon(QPolygonF([QPointF(16.8, 2), QPointF(21.5, 3.2), QPointF(16.8, 5.2)]))
 
 
+def _passation(p, a, m):         # تسليم المهام: ملف يُسلَّم (سهم بين يدين)
+    _rr(p, 2, 6, 13, 15, 2, m)
+    _rr(p, 2, 4, 6, 4, 1.5, m)
+    _rr(p, 4.5, 11, 8, 1.6, 0.8, theme.BLANC)
+    _rr(p, 4.5, 14.5, 8, 1.6, 0.8, theme.BLANC)
+    p.setPen(QPen(QColor(a), 2.6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+    p.setBrush(Qt.NoBrush)
+    p.drawLine(QPointF(12, 17), QPointF(21, 17))
+    p.drawPolyline(QPolygonF([QPointF(18, 13.5), QPointF(21.5, 17), QPointF(18, 20.5)]))
+
+
 def _parametres(p, a, m):        # الإعدادات: مسنن
     p.setPen(Qt.NoPen)
     p.setBrush(QColor(m))
@@ -136,6 +149,7 @@ def _parametres(p, a, m):        # الإعدادات: مسنن
 
 
 DESSINS = {
+    "القيادة والتدبير": _tableau, "تسليم المهام": _passation,
     "لوحة القيادة": _tableau, "التلاميذ": _eleves, "الموارد البشرية": _personnel,
     "التدبير التربوي": _pedagogie, "التقييم": _evaluation, "مجالس المؤسسة": _conseils,
     "التدبير المالي والمادي": _finance, "المراسلات": _correspondance, "مشروع المؤسسة": _projet,

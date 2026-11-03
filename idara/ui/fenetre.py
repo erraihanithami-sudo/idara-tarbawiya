@@ -235,51 +235,82 @@ class PageAVenir(QWidget):
         v.addStretch()
 
 
-# الأقسام (اقتراح المدير 2026-11-01): كل قسم في القائمة الجانبية، وصفحاته في ألسنة داخله.
+# الأقسام الرئيسية وفروعها (ترتيب المدير 2026-11-03). كل فرع: (اسم الصفحة الداخلي، العنوان في القائمة).
+# الفروع غير المبرمجة بعد تفتح صفحة «قريباً» (A_VENIR). تظهر الفروع تحت القسم عند الضغط عليه وتختفي بالضغطة الثانية.
+# الموارد البشرية والمراسلات والإعدادات لم ترد في ترتيب المدير، فأُبقيت أقساماً رئيسية بعده حتى لا تضيع وظائفها.
 SECTIONS = [
-    ("لوحة القيادة", ["لوحة القيادة"]),
-    ("التلاميذ", ["التلاميذ", "حركية التلاميذ", "تتبع السلوك", "التلاميذ القدامى", "الاستيراد من مسار"]),
-    ("الموارد البشرية", ["الموارد البشرية", "الرخص", "تدبير الفائض"]),
-    ("التدبير التربوي", ["أداء المؤسسة", "التعلمات الأساس", "الريادة", "الأندية والأنشطة"]),
-    ("التقييم", ["مجالس الأقسام"]),
-    ("مجالس المؤسسة", ["مجالس المؤسسة"]),
-    ("التدبير المالي والمادي", ["جمعية دعم مدرسة النجاح", "الصرف"]),
-    ("المراسلات", ["سجل الصادر"]),
-    ("مشروع المؤسسة", []),
-    ("الإعدادات", ["إعداد المؤسسة", "الوثائق"]),
+    ("القيادة والتدبير", [("لوحة القيادة", "معلومات عامة"), ("أداء المؤسسة", "الأداء العام للمؤسسة"),
+                          ("تتبع الغياب", "تتبع الغياب"), ("مجالس المؤسسة", "مجالس المؤسسة")]),
+    ("التلاميذ", [("التلاميذ", "وثائق التلاميذ"), ("حركية التلاميذ", "حركية التلاميذ"),
+                  ("تتبع السلوك", "تتبع سلوكات التلاميذ"), ("أولياء الأمور", "معلومات أولياء الأمور"),
+                  ("التلاميذ القدامى", "التلاميذ القدامى"), ("الاستيراد من مسار", "الاستيراد من مسار")]),
+    ("التدبير التربوي", [("الأندية والأنشطة", "الحياة المدرسية"), ("التعلمات الأساس", "تتبع التعلمات الأساس"),
+                         ("الريادة", "المدرسة الرائدة")]),
+    ("التدبير المالي والمادي", [("الجرد", "الجرد"), ("جمعية دعم مدرسة النجاح", "جمعية دعم مدرسة النجاح"),
+                                ("الصرف", "الصرف: سند الطلب والاتفاقية"), ("الجمعية الرياضية", "الجمعية الرياضية"),
+                                ("جمعية تنمية التعاون المدرسي", "جمعية تنمية التعاون المدرسي")]),
+    ("التقييم", [("المراقبة المستمرة", "المراقبة المستمرة"), ("الامتحان", "الامتحان"),
+                 ("استثمار النتائج", "استثمار النتائج"), ("مجالس الأقسام", "المحاضر: مجالس الأقسام")]),
+    ("مشروع المؤسسة", [("مشروع المؤسسة", "مشروع المؤسسة")]),
+    ("تسليم المهام", [("تسليم المهام", "تسليم المهام")]),
+    ("الموارد البشرية", [("الموارد البشرية", "الموظفون"), ("الرخص", "الرخص"), ("تدبير الفائض", "تدبير الفائض")]),
+    ("المراسلات", [("سجل الصادر", "سجل الصادر")]),
+    ("الإعدادات", [("إعداد المؤسسة", "المؤسسة"), ("الوثائق", "نماذج الوثائق")]),
 ]
-ETIQUETTES = {"الصرف": "الصرف: سند الطلب والاتفاقية", "التلاميذ": "البحث والوثائق", "الموارد البشرية": "الموظفون", "الوثائق": "نماذج الوثائق",
-              "إعداد المؤسسة": "المؤسسة"}
 A_VENIR = {
-    "التدبير التربوي": (
-        ["تتبع أداء المؤسسة ونتائج التلاميذ حسب الأقسام والمستويات والمواد.",
-         "مؤشرات تربوية تُستخرج آلياً من النتائج المسجلة في قسم التقييم.",
-         "الحياة المدرسية والأنشطة: الأندية، الأنشطة الثقافية والرياضية، تقاريرها."],
-        ["المؤشرات التي تعتمدونها في تتبع أداء المؤسسة.", "نماذج تقارير الأنشطة إن وُجدت."]),
-    "التقييم": (
-        ["تدبير الامتحان المحلي والإقليمي: الاستدعاءات، ترقيم الطاولات، الوثائق المرتبطة.",
-         "محاضر مجالس الأقسام بنتائج التلاميذ، مذيلة بتوقيع أساتذة كل قسم على حدة."],
-        ["نموذج محضر مجلس القسم.", "نماذج وثائق الامتحان المحلي والإقليمي.",
-         "صيغة ملف النتائج الذي يُستخرج من مسار (إن أمكن)."]),
-    "التدبير المالي والمادي": (
-        ["الجمعيات الثلاث: المداخيل والمصاريف بحسابات منفصلة، التقارير المالية والأدبية، الحصيلة السنوية.",
-         "جرد الممتلكات بالمجموعات وحالاتها، النقل والإعارة والمفقودات.",
-         "محضر تسليم المهام: يُحيَّن آلياً من معطيات المؤسسة (المحاور اختيارية)."],
-        ["وثائق الجمعيات الثلاث ونماذج التقارير المالية والأدبية.", "سجل الجرد الحالي."]),
+    "تتبع الغياب": (
+        ["غياب التلاميذ: التسجيل اليومي، الإحصاء الشهري حسب الأقسام، تنبيه الغياب المتكرر، إشعار الأولياء.",
+         "غياب الموظفين وتأخرهم، مرتبطاً بالرخص المسجلة."],
+        ["الوثائق التي تعتمدونها حالياً في تتبع الغياب (السجل، الإحصاء الشهري، الإشعار)."]),
+    "أولياء الأمور": (
+        ["معلومات الأولياء: الاسم، صلة القرابة، الهاتف، العنوان، لكل تلميذ.",
+         "استعمالها في الاستدعاءات والإشعارات، ولوائح الاتصال حسب القسم."],
+        ["مصدر هذه المعلومات عندكم (بطاقة التسجيل، مسار...) والخانات التي تحتاجونها."]),
+    "الجرد": (
+        ["سجل الجرد (الدليل المسطري، الملحقان 20 و24): الممتلكات، مصدرها، حالتها، النقل والإعارة والإتلاف.",
+         "ربط التجهيزات المقتناة من جمعية النجاح بالجرد آلياً."],
+        ["سجل الجرد الحالي أو نموذجه."]),
+    "الجمعية الرياضية": (
+        ["المداخيل والمصاريف بحساب مستقل، السجلات، التقرير المالي والأدبي."],
+        ["وثائق الجمعية الرياضية: القانون الأساسي، نماذج السجلات والتقارير المعتمدة."]),
+    "جمعية تنمية التعاون المدرسي": (
+        ["المداخيل والمصاريف بحساب مستقل، السجلات، التقرير المالي والأدبي، الحصيلة السنوية."],
+        ["وثائق الجمعية: القانون الأساسي، نماذج السجلات والتقارير المعتمدة."]),
+    "المراقبة المستمرة": (
+        ["تتبع إنجاز فروض المراقبة المستمرة حسب الأقسام والمواد، ومسك النقط في مسار."],
+        ["تصدير النقط من مسار أو نموذج جدولة الفروض الذي تعتمدونه."]),
+    "الامتحان": (
+        ["تدبير الامتحان الموحد المحلي: الاستدعاءات، ترقيم الطاولات، لوائح الحراسة، المحاضر."],
+        ["نماذج وثائق الامتحان المعتمدة في مديريتكم."]),
+    "استثمار النتائج": (
+        ["تحليل نتائج المراقبة المستمرة والامتحان حسب المستويات والمواد، وتحديد حاجيات الدعم."],
+        ["نموذج تقرير استثمار النتائج الذي تعتمدونه إن وُجد."]),
     "مشروع المؤسسة": (
         ["إدراج المشروع: الأهداف، العمليات، المسؤوليات، المؤشرات.",
          "تتبع الإنجاز وتقييم النتائج، واقتراح أولويات المشروع اللاحق."],
-        ["أنموذج من مشروع المؤسسة والمذكرات المؤطرة له (اتفقنا أن يكون هذا القسم آخر العمل)."]),
+        ["أنموذج من مشروع المؤسسة والمذكرات المؤطرة له (اتفقنا أن نفصل فيه لاحقاً)."]),
+    "تسليم المهام": (
+        ["محضر تسليم المهام الإدارية: يُحيَّن آلياً من معطيات المؤسسة (التلاميذ، الموظفون، الجرد، الجمعيات)، "
+         "والمحاور اختيارية.",
+         "محضر تسليم المهام المالية لجمعية النجاح موجود في صفحتها (الملحق 25)."],
+        ["نموذج محضر تسليم المهام المعتمد عندكم."]),
 }
 
 
-class BoutonNav(QPushButton):
-    """زر القائمة الجانبية: الأيقونة ثم العنوان محاذيين لليمين بتخطيط صريح (محاذاة النص في Qt تنعكس مع RTL)."""
+def _programmes(fils, pages) -> list[str]:
+    return [n for n, _ in fils if n in pages]
 
-    def __init__(self, section: str, libelle: str):
+
+class BoutonNav(QPushButton):
+    """زر قسم رئيسي: الأيقونة ثم العنوان محاذيين لليمين بتخطيط صريح (محاذاة النص في Qt تنعكس مع RTL)،
+    وعلامة الفتح للأقسام ذات الفروع."""
+
+    def __init__(self, section: str, libelle: str, deroulant: bool = False):
         super().__init__()
         self.setObjectName("nav")
-        self.setCheckable(True)
+        self.setCheckable(not deroulant)
+        self.deroulant = deroulant
+        self.actif = False
         self._icone = icones.icone(section)
         h = QHBoxLayout(self)
         h.setContentsMargins(12, 0, 12, 0)
@@ -290,21 +321,56 @@ class BoutonNav(QPushButton):
         self.l_texte = QLabel(libelle)
         self.l_texte.setAlignment(Qt.AlignRight | Qt.AlignAbsolute | Qt.AlignVCenter)
         self.l_texte.setWordWrap(True)
-        for w in (self.l_icone, self.l_texte):
+        self.l_fleche = QLabel("‹" if deroulant else "")
+        self.l_fleche.setVisible(deroulant)
+        for w in (self.l_icone, self.l_texte, self.l_fleche):
             w.setAttribute(Qt.WA_TransparentForMouseEvents)
         h.addWidget(self.l_icone)   # في RTL أول عنصر يكون في أقصى اليمين
         h.addWidget(self.l_texte, 1)
-        self.toggled.connect(self._etat)
-        self._etat(False)
+        h.addWidget(self.l_fleche)
+        self.toggled.connect(lambda c: self.marquer(c))
+        self.marquer(False)
 
-    def _etat(self, coche: bool) -> None:
-        self.l_texte.setStyleSheet(f"color:{theme.MARINE}; font-weight:{600 if coche else 400};")
+    def marquer(self, actif: bool) -> None:
+        """القسم الذي فيه الصفحة المفتوحة: عنوانه بخط عريض."""
+        self.actif = actif
+        couleur = theme.VERT if actif and self.deroulant else theme.MARINE
+        self.l_texte.setStyleSheet(f"color:{couleur}; font-weight:{600 if actif else 400};")
+        self.l_fleche.setStyleSheet(f"color:{theme.GRIS}; font-size:14pt; font-weight:600;")
+
+    def ouvrir(self, ouvert: bool) -> None:
+        self.l_fleche.setText("⌄" if ouvert else "‹")
 
     def text(self) -> str:  # noqa: D401
         return self.l_texte.text()
 
     def icon(self):
         return self._icone
+
+
+class BoutonSous(QPushButton):
+    """فرع تحت قسم رئيسي، بإزاحة تحت عنوانه."""
+
+    def __init__(self, libelle: str):
+        super().__init__()
+        self.setObjectName("sousnav")
+        self.setCheckable(True)
+        h = QHBoxLayout(self)
+        h.setContentsMargins(12, 0, 48, 0)
+        self.l_texte = QLabel(libelle)
+        self.l_texte.setAlignment(Qt.AlignRight | Qt.AlignAbsolute | Qt.AlignVCenter)
+        self.l_texte.setWordWrap(True)
+        self.l_texte.setAttribute(Qt.WA_TransparentForMouseEvents)
+        h.addWidget(self.l_texte, 1)
+        self.toggled.connect(self._etat)
+        self._etat(False)
+
+    def _etat(self, coche: bool) -> None:
+        self.l_texte.setStyleSheet(f"color:{theme.MARINE if coche else theme.GRIS}; "
+                                   f"font-weight:{600 if coche else 400};")
+
+    def text(self) -> str:  # noqa: D401
+        return self.l_texte.text()
 
 
 class FenetrePrincipale(QMainWindow):
@@ -346,25 +412,17 @@ class FenetrePrincipale(QMainWindow):
                       "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs}
-        self.emplacement = {}   # اسم الصفحة ← (رقم القسم، رقم اللسان)
+        self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
+        self.section_de = {}    # اسم الصفحة ← رقم القسم الرئيسي
         self.pile = QStackedWidget()
-        self.onglets = {}
-        for i, (titre, noms) in enumerate(SECTIONS):
-            if not noms:
-                self.pile.addWidget(page_defilante(PageAVenir(titre, *A_VENIR[titre])))
-            elif len(noms) == 1:
-                self.pile.addWidget(page_defilante(self.pages[noms[0]]))
-                self.emplacement[noms[0]] = (i, None)
-            else:
-                t = QTabWidget()
-                t.setObjectName("sections")
-                t.setDocumentMode(True)
-                for j, nom in enumerate(noms):
-                    t.addTab(page_defilante(self.pages[nom]), ETIQUETTES.get(nom, nom))
-                    self.emplacement[nom] = (i, j)
-                t.currentChanged.connect(lambda j, noms=noms: self._rafraichir(noms[j]))
-                self.onglets[i] = t
-                self.pile.addWidget(t)
+        for i, (titre, fils) in enumerate(SECTIONS):
+            for nom, lib in fils:
+                if nom in self.pages:
+                    w = page_defilante(self.pages[nom])
+                else:
+                    w = page_defilante(PageAVenir(lib, *A_VENIR[nom]))
+                self.emplacement[nom] = self.pile.addWidget(w)
+                self.section_de[nom] = i
         h.addWidget(self._barre_laterale())
         h.addWidget(self.pile, 1)
         self.setCentralWidget(centre)
@@ -393,21 +451,52 @@ class FenetrePrincipale(QMainWindow):
         tete.addLayout(noms, 1)
         v.addLayout(tete)
 
-        nav = QVBoxLayout()
+        contenu = QWidget()
+        contenu.setObjectName("navigation")
+        nav = QVBoxLayout(contenu)
         nav.setContentsMargins(12, 8, 12, 8)
         nav.setSpacing(2)
-        self.groupe = QButtonGroup(self)
+        self.groupe = QButtonGroup(self)   # الصفحة المفتوحة: فرع أو قسم دون فروع
         self.groupe.setExclusive(True)
-        self.boutons = []
-        for i, (nom, noms) in enumerate(SECTIONS):
-            b = BoutonNav(nom, nom if noms else f"{nom}  ·  قريباً")
+        self.boutons, self.sous, self.blocs, self.boutons_pages = [], [], [], {}
+        for i, (nom, fils) in enumerate(SECTIONS):
+            deroulant = len(fils) > 1
+            prog = _programmes(fils, self.pages)
+            b = BoutonNav(nom, nom if prog else f"{nom}  ·  قريباً", deroulant)
             b.setCursor(Qt.PointingHandCursor)
-            b.clicked.connect(lambda _=False, i=i: self.aller(i))
-            self.groupe.addButton(b, i)
             nav.addWidget(b)
             self.boutons.append(b)
-        v.addLayout(nav)
-        v.addStretch()
+            bloc = QWidget()
+            bv = QVBoxLayout(bloc)
+            bv.setContentsMargins(0, 0, 0, 4)
+            bv.setSpacing(1)
+            sous = []
+            if deroulant:
+                b.clicked.connect(lambda _=False, i=i: self.basculer(i))
+                for page, lib in fils:
+                    sb = BoutonSous(lib if page in self.pages else f"{lib}  ·  قريباً")
+                    sb.setCursor(Qt.PointingHandCursor)
+                    sb.clicked.connect(lambda _=False, page=page: self.aller_a(page))
+                    self.groupe.addButton(sb)
+                    self.boutons_pages[page] = sb
+                    bv.addWidget(sb)
+                    sous.append(sb)
+            else:
+                b.clicked.connect(lambda _=False, page=fils[0][0]: self.aller_a(page))
+                self.groupe.addButton(b)
+                self.boutons_pages[fils[0][0]] = b
+            bloc.setVisible(False)
+            nav.addWidget(bloc)
+            self.blocs.append(bloc)
+            self.sous.append(sous)
+        nav.addStretch()
+        defil = QScrollArea()
+        defil.setObjectName("defilNav")
+        defil.setWidgetResizable(True)
+        defil.setFrameShape(QFrame.NoFrame)
+        defil.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        defil.setWidget(contenu)
+        v.addWidget(defil, 1)
 
         bas = FondZellige()
         bas.setMinimumHeight(110)
@@ -434,37 +523,46 @@ class FenetrePrincipale(QMainWindow):
 
     def page_courante(self) -> str | None:
         i = self.pile.currentIndex()
-        t = self.onglets.get(i)
-        for nom, (si, j) in self.emplacement.items():
-            if si == i and (t is None or j == t.currentIndex()):
-                return nom
-        return None
+        return next((nom for nom, k in self.emplacement.items() if k == i), None)
 
     def _rafraichir(self, nom: str) -> None:
         page = self.pages.get(nom)
         if page is not None and hasattr(page, "rafraichir"):
             page.rafraichir()
 
+    def est_ouvert(self, i: int) -> bool:
+        return not self.blocs[i].isHidden()
+
+    def basculer(self, i: int, ouvert: bool | None = None) -> None:
+        """يُظهر فروع القسم i أو يخفيها (الضغطة الثانية). فتح قسم يطوي الأقسام الأخرى."""
+        ouvert = not self.est_ouvert(i) if ouvert is None else ouvert
+        for k, bloc in enumerate(self.blocs):
+            o = ouvert and k == i
+            bloc.setVisible(o and bool(self.sous[k]))
+            self.boutons[k].ouvrir(o)
+
     def aller_a(self, nom: str) -> None:
-        """يفتح صفحة باسمها (القسم واللسان)، أو قسماً باسمه."""
-        if nom in self.emplacement:
-            i, j = self.emplacement[nom]
-            self.boutons[i].setChecked(True)
-            self.pile.setCurrentIndex(i)
-            if j is not None and self.onglets[i].currentIndex() != j:
-                self.onglets[i].setCurrentIndex(j)  # يحدّث الصفحة عبر currentChanged
-            else:
-                self._rafraichir(nom)
+        """يفتح صفحة باسمها، أو قسماً رئيسياً باسمه (أول فرع مبرمج فيه)."""
+        if nom not in self.emplacement:
+            titres = [t for t, _ in SECTIONS]
+            if nom not in titres:
+                raise KeyError(nom)
+            self.aller(titres.index(nom))
             return
-        self.aller([t for t, _ in SECTIONS].index(nom))
+        i = self.section_de[nom]
+        if self.sous[i] and not self.est_ouvert(i):
+            self.basculer(i, True)
+        self.boutons_pages[nom].setChecked(True)
+        for k, b in enumerate(self.boutons):
+            b.marquer(k == i)
+        self.pile.setCurrentIndex(self.emplacement[nom])
+        self._rafraichir(nom)
 
     def aller(self, i: int) -> None:
-        """يفتح القسم رقم i على لسانه الحالي."""
-        self.boutons[i].setChecked(True)
-        self.pile.setCurrentIndex(i)
-        nom = self.page_courante()
-        if nom:
-            self._rafraichir(nom)
+        """يفتح القسم الرئيسي رقم i على أول فرع مبرمج فيه."""
+        fils = SECTIONS[i][1]
+        prog = _programmes(fils, self.pages)
+        self.aller_a(prog[0] if prog else fils[0][0])
 
     def exporter(self) -> None:
         d = QFileDialog.getExistingDirectory(self, "اختيار القرص الخارجي أو المجلد")
