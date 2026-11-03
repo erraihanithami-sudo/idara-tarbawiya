@@ -201,6 +201,7 @@ def test_statut_exclu(base):
     el.changer_statut(base, eid, "exclu", "2026-12-01", "", "قرار مجلس القسم رقم 3")
     r = el.fiche(base, eid)
     assert r["statut"] == "exclu" and el.STATUTS["exclu"] == "مفصول"
+    assert el.STATUTS["inscrit"] == "يتابع دراسته"  # قرار المدير 2026-11-03
     assert base.execute("SELECT COUNT(*) FROM inscription WHERE statut IN ('inscrit','arrive')").fetchone()[0] == 4
     p = el.parcours(base, eid)[0]
     assert p["date_sortie"] == "2026-12-01"

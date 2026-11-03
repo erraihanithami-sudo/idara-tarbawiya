@@ -175,7 +175,7 @@ def enregistrer_directeur(conn: sqlite3.Connection, d: Directeur, nouveau: bool 
             try:
                 pid = conn.execute(
                     f"INSERT INTO personnel({cols}, categorie, fonction, date_affectation) "
-                    f"VALUES ({marques}, 'directeur', 'الإدارة التربوية', ?)",
+                    f"VALUES ({marques}, 'directeur', 'الإدارة', ?)",
                     (*champs.values(), d.date_affectation or None)).lastrowid
             except sqlite3.IntegrityError as e:
                 raise ErreurValidation("رقم التأجير مسجل لموظف آخر.") from e

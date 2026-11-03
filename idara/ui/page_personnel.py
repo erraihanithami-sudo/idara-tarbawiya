@@ -93,9 +93,9 @@ class PagePersonnel(QWidget):
         filtres.addWidget(self.voir_partis)
         filtres.addStretch()
         cv.addLayout(filtres)
-        self.liste = tableau(["الاسم", "الفئة", "الملف"], etirer=0)
+        self.liste = tableau(["الاسم", "المهمة"], etirer=0)   # قرار المدير 2026-11-03: المهمة بدل الفئة، دون عمود الملف
         h = self.liste.horizontalHeader()
-        for i, largeur in ((1, 95), (2, 70)):
+        for i, largeur in ((1, 110),):
             h.setSectionResizeMode(i, h.ResizeMode.Fixed)
             h.resizeSection(i, largeur)
         self.liste.setMinimumHeight(420)
@@ -167,13 +167,14 @@ class PagePersonnel(QWidget):
                 c.addItem(v, v)
             return c
         self.cadre, self.grade = liste_fixe(rh.CADRES), liste_fixe(rh.GRADES)
+        self.fonction = liste_fixe(rh.FONCTIONS)   # قرار المدير 2026-11-03: التدريس أو الإدارة
 
         section("الهوية", [("النسب *", self.c["nom_ar"]), ("الاسم *", self.c["prenom_ar"]),
                            ("Nom", self.c["nom_fr"]), ("Prénom", self.c["prenom_fr"]),
                            ("النوع *", sexe), ("الفئة *", self.categorie)])
         section("الوضعية الإدارية", [("رقم التأجير", self.c["ppr"]), ("رقم البطاقة الوطنية", self.c["cin"]),
                                      ("الإطار", self.cadre), ("الدرجة", self.grade),
-                                     ("المهمة", self.c["fonction"]), ("السلك", self.c["cycle"]),
+                                     ("المهمة", self.fonction), ("السلك", self.c["cycle"]),
                                      ("الوحدة المدرسية", self.unite)])
         self.dates = {k: (self.date_aff if k == "date_affectation" else ChampDate()) for k, _ in rh.DATES_CARRIERE}
         # قرار المدير: المسار المهني (الفائض) لا يظهر لفئة المدير
@@ -285,13 +286,9 @@ class PagePersonnel(QWidget):
             nom = f"{p.prenom_ar} {p.nom_ar}"
             if p.statut != "actif":
                 nom += f" ({rh.STATUTS[p.statut]})"
-            m = rh.manquants_documents(self.f.conn, p) + rh.manquants_carriere(p)
             self.liste.setItem(i, 0, cellule(nom, p.id))
-            self.liste.setItem(i, 1, cellule(rh.libelle_categorie(p.categorie, p.sexe)))
-            self.liste.item(i, 0).setToolTip(f"رقم التأجير: {p.ppr or '—'}")
-            it = cellule("مكتمل" if not m else f"ينقص {len(m)}")
-            it.setToolTip("، ".join(m))
-            self.liste.setItem(i, 2, it)
+            self.liste.setItem(i, 1, cellule(p.fonction or "—"))
+            self.liste.item(i, 0).setToolTip(f"{rh.libelle_categorie(p.categorie, p.sexe)} · رقم التأجير: {p.ppr or '—'}")
 
     def _selection(self) -> None:
         lignes = {i.row() for i in self.liste.selectedIndexes()}
@@ -332,6 +329,8 @@ class PagePersonnel(QWidget):
 
     def _maj_categorie(self) -> None:
         cat = self.categorie.currentData()
+        if not self.fonction.currentData() and rh.fonction_par_defaut(cat or ""):
+            self.fonction.setCurrentIndex(self.fonction.findData(rh.fonction_par_defaut(cat)))
         self.bloc_ens.setVisible(cat in ("enseignant", "educatrice"))
         directeur = cat == "directeur"
         self.bloc_carriere.setVisible(not directeur)
@@ -379,6 +378,7 @@ class PagePersonnel(QWidget):
         self.date_doctorat.definir(p.date_exemption_fa or None)
         self.date_doctorat.setEnabled(p.exemption_fa == "doctorat")
         for w, val, n in ((self.cadre, p.cadre, len(rh.CADRES)), (self.grade, p.grade, len(rh.GRADES)),
+                          (self.fonction, p.fonction, len(rh.FONCTIONS)),
                           (self.matiere, None, len(rh.MATIERES))):
             while w.count() > n + 1:  # حذف القيم القديمة المضافة لعرض سابق
                 w.removeItem(w.count() - 1)
@@ -432,6 +432,7 @@ class PagePersonnel(QWidget):
         v = {k: (w.currentText() if isinstance(w, QComboBox) else w.text()) for k, w in self.c.items()}
         v["matiere"] = self.matiere.currentData() or ""
         v["cadre"] = self.cadre.currentData() or ""
+        v["fonction"] = self.fonction.currentData() or ""
         v["grade"] = self.grade.currentData() or ""
         v["exemption_fa"] = self.exemption.currentData() or ""
         try:

@@ -81,7 +81,7 @@ class DialogueStatut(QDialog):
         for code in ("parti", "interrompu", "exclu", "arrive", "inscrit"):
             self.statut.addItem({"parti": "مغادر (انتقال إلى مؤسسة أخرى)", "interrompu": "منقطع",
                                  "exclu": "مفصول (السبب ومرجع القرار في خانة السبب)",
-                                 "arrive": "وافد من مؤسسة أخرى", "inscrit": "مسجّل (إلغاء مغادرة أو انقطاع)"}[code], code)
+                                 "arrive": "وافد من مؤسسة أخرى", "inscrit": "يتابع دراسته (إلغاء مغادرة أو انقطاع)"}[code], code)
         self.le = ChampDate()
         self.le.definir(date.today().isoformat())
         self.etab = champ("اسم المؤسسة")

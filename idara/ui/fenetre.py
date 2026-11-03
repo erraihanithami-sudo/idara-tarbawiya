@@ -76,7 +76,7 @@ class PageTableauBord(QWidget):
         grille = QGridLayout()
         grille.setSpacing(16)
         for i, (lib, val, note) in enumerate([
-                ("عدد التلاميذ", str(n_eleves), "المسجلون هذه السنة"),
+                ("عدد التلاميذ", str(n_eleves), "يتابعون دراستهم هذه السنة"),
                 ("الأقسام", str(n_classes), ""),
                 ("الموظفون", str(n_pers), "دون المدير"),
                 ("آخر نسخة احتياطية", derniere, f"{len(sv)} نسخة محفوظة")]):

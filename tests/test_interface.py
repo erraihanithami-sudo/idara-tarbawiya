@@ -354,6 +354,10 @@ def test_page_personnel(app, config_tmp):
     pid = p.enregistrer()
     assert pid is not None, p.message.text()
     assert p.liste.rowCount() == 2 and "الأساتذة: 1" in p.effectifs.text()
+    # قرار المدير (2026-11-03): المهمة بدل الفئة (التدريس أو الإدارة)، دون عمود الملف
+    assert p.liste.columnCount() == 2 and p.liste.horizontalHeaderItem(1).text() == "المهمة"
+    assert sorted(p.liste.item(i, 1).text() for i in range(2)) == ["الإدارة", "التدريس"]
+    assert [p.fonction.itemText(i) for i in range(p.fonction.count())][1:] == ["التدريس", "الإدارة"]
     assert "ينقص" in p.manquants.text() and "الدرجة" in p.manquants.text()
     assert "ينقص لتحديد الفائض" in p.manquants.text()
     assert rh.lire(f.conn, pid).cin == "AB123456" and rh.lire(f.conn, pid).matiere == "مزدوجة"

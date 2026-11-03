@@ -14,7 +14,8 @@ from idara.services import documents as dc
 from idara.services import textes as tx
 from idara.services.massar import MOTIF_CODE, normaliser
 
-STATUTS = {"inscrit": "مسجّل", "arrive": "وافد", "parti": "مغادر", "interrompu": "منقطع", "exclu": "مفصول"}
+# قرار المدير (2026-11-03): «يتابع دراسته» بدل «مسجّل»
+STATUTS = {"inscrit": "يتابع دراسته", "arrive": "وافد", "parti": "مغادر", "interrompu": "منقطع", "exclu": "مفصول"}
 SORTIES = ("parti", "interrompu", "exclu")  # وضعيات تُخرج التلميذ من لائحة الحاضرين
 CHAMPS_MODIFIABLES = ("nom_ar", "prenom_ar", "nom_fr", "prenom_fr", "sexe", "date_naissance")
 

@@ -48,7 +48,7 @@ def test_ajout_normalisation_et_lecture(base):
     for t in ("فاطمة", "الأستاذة فاطمة", "1234567", "ab123456"):
         assert [x.id for x in rh.lister(base, t)] == [pid], t
     assert [x.id for x in rh.lister(base, categorie="gardien")] == []
-    assert set(rh.suggestions(base, "fonction")) == {"التدريس", "الإدارة التربوية"}
+    assert {x.fonction for x in rh.lister(base)} == {"التدريس", "الإدارة"} and rh.FONCTIONS == ("التدريس", "الإدارة")
 
 
 @pytest.mark.parametrize("modif, message", [
