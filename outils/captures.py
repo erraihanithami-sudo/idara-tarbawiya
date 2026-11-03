@@ -275,6 +275,13 @@ def main(sortie: Path) -> None:
         ryx.enregistrer_isa(f.conn, an_, cl_, ph, vals)
     f.aller_a("الريادة")
     photo(f, "41_riyada")
+    from idara.services import conseils_etab as cex
+    cex.enregistrer_membres(f.conn, "gestion", [(n or f"العضو {i}", q) for i, (n, q, _) in
+                                                 enumerate(cex.proposition(f.conn, "gestion"))])
+    cex.enregistrer_seance(f.conn, cex.Seance("gestion", "2026-10-03", [cex.SUGGESTIONS["gestion"][0],
+                                                                        cex.SUGGESTIONS["gestion"][1]]))
+    f.aller_a("مجالس المؤسسة")
+    photo(f, "42_conseils_etab")
     f.aller_a("مشروع المؤسسة")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")

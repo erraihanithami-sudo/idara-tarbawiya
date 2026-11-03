@@ -32,6 +32,7 @@ from idara.ui.page_comportement import PageComportement
 from idara.ui.page_conseils import PageConseils
 from idara.ui.page_associations import PageAssociations
 from idara.ui.page_achats import PageAchats
+from idara.ui.page_conseils_etab import PageConseilsEtab
 from idara.ui.page_pedagogie import PagePerformance, PageRiyada, PageTarl, PageVieScolaire
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
@@ -241,6 +242,7 @@ SECTIONS = [
     ("الموارد البشرية", ["الموارد البشرية", "الرخص", "تدبير الفائض"]),
     ("التدبير التربوي", ["أداء المؤسسة", "التعلمات الأساس", "الريادة", "الأندية والأنشطة"]),
     ("التقييم", ["مجالس الأقسام"]),
+    ("مجالس المؤسسة", ["مجالس المؤسسة"]),
     ("التدبير المالي والمادي", ["جمعية دعم مدرسة النجاح", "الصرف"]),
     ("المراسلات", ["سجل الصادر"]),
     ("مشروع المؤسسة", []),
@@ -294,6 +296,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_conseils = PageConseils(self)
         self.page_asso = PageAssociations(self)
         self.page_achats = PageAchats(self)
+        self.page_conseils_etab = PageConseilsEtab(self)
         self.page_perf = PagePerformance(self)
         self.page_tarl = PageTarl(self)
         self.page_vie = PageVieScolaire(self)
@@ -306,7 +309,7 @@ class FenetrePrincipale(QMainWindow):
         self.pages = {"لوحة القيادة": self.tableau, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
-                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "الاستيراد من مسار": self.page_import,
+                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs}
         self.emplacement = {}   # اسم الصفحة ← (رقم القسم، رقم اللسان)

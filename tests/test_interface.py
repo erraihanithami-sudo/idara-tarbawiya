@@ -793,3 +793,36 @@ def test_bouton_ouvrir_exercice(app, config_tmp, monkeypatch):
     p.b_ouvrir.click()  # السنة الموالية تُقترح آلياً
     assert [e["libelle"] for e in asso.exercices(f.conn)][0] == str(int(ex[0]["libelle"]) + 1)
     f.close()
+
+
+def test_page_conseils_etablissement(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
+    from idara.services import conseils_etab as ce
+    from idara.ui.saisie import selectionner
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("مجالس المؤسسة")
+    p = f.page_conseils_etab
+    assert f.page_courante() == "مجالس المؤسسة" and p.suivi.rowCount() == 3
+    p.proposer()
+    assert p.membres.item(0, 1).text() == "رئيس المجلس"
+    for i in range(1, p.membres.rowCount()):
+        it = p.membres.item(i, 0)
+        if it is not None and not it.text():
+            it.setText(f"العضو {i}")
+    assert p.enregistrer_membres(), p.message.text()
+    assert p.presence.count() == 10 and p.l_ecarts.isHidden()
+    p.date.setText("03/10/2026")
+    p.suggestion.setCurrentIndex(0)
+    p._ajouter_point()
+    for i in range(6):
+        p.presence.item(i).setCheckState(Qt.Unchecked)
+    assert not p.enregistrer(True) and "النصاب غير مكتمل" in p.message.text()
+    p.convoc.setCurrentIndex(p.convoc.findData("seconde"))
+    assert p.enregistrer(True) and p.seances.rowCount() == 1
+    selectionner(p.seances, 0)
+    assert p.sid and p.odj.toPlainText().startswith("دراسة برنامج العمل السنوي")
+    assert p.pv() and p.convocation() and len(ouverts) == 2
+    assert ce.suivi(f.conn)[0]["nombre"] == 1
+    f.close()
