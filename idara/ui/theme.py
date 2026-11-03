@@ -27,7 +27,8 @@ BLANC = "#FFFFFF"
 ENCRE = MARINE           # النصوص (13:1 على الخلفية)
 GRIS = "#5A6172"         # النصوص الثانوية (5.7:1)
 LIGNE = "#E4E2DD"
-BORDURE_CHAMP = "#C9C6BD"
+BORDURE_CHAMP = "#4B5468"  # حواف الخانات والأزرار والجداول: كحلي رمادي واضح (7.6:1 على الأبيض) — طلب المدير 2026-11-03
+BORDURE_CARTE = "#7A8191"  # حواف البطاقات والقائمة الجانبية (4:1)
 
 DOSSIER_POLICES = Path(__file__).resolve().parent.parent / "resources" / "fonts"
 POLICE_PREFEREE = "IBM Plex Sans Arabic"
@@ -56,13 +57,13 @@ QScrollArea > QWidget#qt_scrollarea_viewport {{ background: {PLATRE}; }}
 QToolButton {{ background: {BLANC}; border: 1px solid {BORDURE_CHAMP}; border-radius: 10px;
     padding: 0 12px; min-height: 40px; }}
 QToolButton::menu-indicator {{ image: none; }}
-QMenu {{ background: {BLANC}; border: 1px solid {LIGNE}; padding: 4px; }}
+QMenu {{ background: {BLANC}; border: 1px solid {BORDURE_CHAMP}; padding: 4px; }}
 QMenu::item {{ padding: 8px 18px; border-radius: 6px; }}
 QMenu::item:selected {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; }}
 #ok {{ color: {VERT_FONCE}; }}
 #alerte {{ color: {ROUGE_TEXTE}; }}
-#barreLaterale {{ background: {BLANC}; border-left: 1px solid {LIGNE}; }}
-#carte {{ background: {BLANC}; border: 1px solid {LIGNE}; border-radius: 12px; }}
+#barreLaterale {{ background: {BLANC}; border-left: 2px solid {BORDURE_CARTE}; }}
+#carte {{ background: {BLANC}; border: 1px solid {BORDURE_CARTE}; border-radius: 12px; }}
 #titrePage {{ font-size: 20pt; font-weight: 600; }}
 #sousTitre {{ color: {GRIS}; }}
 #titreCarte {{ font-size: 12pt; font-weight: 600; }}
@@ -84,8 +85,8 @@ QPushButton:hover {{ border-color: {VERT}; }}
 QPushButton#principal {{ background: {VERT}; color: {BLANC}; border: 0; font-weight: 600; }}
 QPushButton#principal:hover {{ background: {VERT_FONCE}; }}
 QPushButton#principal:disabled {{ background: #A9CFC9; }}
-QPushButton#nav {{
-    text-align: right; border: 0; border-radius: 10px; padding: 0 12px; min-height: 46px; }}
+QPushButton#nav {{ border: 0; border-radius: 10px; min-height: 46px; }}
+QPushButton#nav QLabel {{ background: transparent; }}
 QTabWidget#sections::pane {{ border: 0; }}
 QTabWidget#sections > QTabBar {{ background: {PLATRE}; }}
 QTabBar::tab {{ background: transparent; color: {GRIS}; padding: 10px 22px; margin: 0 2px;
@@ -97,4 +98,11 @@ QPushButton#nav:checked {{ background: {VERT_CLAIR}; color: {MARINE}; font-weigh
 QPushButton#nav:hover:!checked {{ background: {PLATRE}; }}
 QRadioButton {{ min-height: 36px; }}
 QRadioButton::indicator, QCheckBox::indicator {{ width: 18px; height: 18px; }}
+QTableWidget, QTableView, QListWidget, QPlainTextEdit, QTextEdit {{
+    background: {BLANC}; border: 1px solid {BORDURE_CHAMP}; border-radius: 6px; gridline-color: {BORDURE_CARTE}; }}
+QHeaderView::section {{ background: {PLATRE}; color: {MARINE}; font-weight: 600; padding: 6px 8px;
+    border: 0; border-bottom: 2px solid {BORDURE_CHAMP}; border-left: 1px solid {BORDURE_CARTE}; }}
+QTableWidget::item:selected, QListWidget::item:selected {{ background: {VERT_CLAIR}; color: {MARINE}; }}
+QPlainTextEdit:focus, QTextEdit:focus {{ border: 2px solid {VERT}; }}
+QTabWidget#sections > QTabBar {{ border-bottom: 1px solid {BORDURE_CARTE}; }}
 """

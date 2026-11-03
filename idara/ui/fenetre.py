@@ -273,6 +273,40 @@ A_VENIR = {
 }
 
 
+class BoutonNav(QPushButton):
+    """زر القائمة الجانبية: الأيقونة ثم العنوان محاذيين لليمين بتخطيط صريح (محاذاة النص في Qt تنعكس مع RTL)."""
+
+    def __init__(self, section: str, libelle: str):
+        super().__init__()
+        self.setObjectName("nav")
+        self.setCheckable(True)
+        self._icone = icones.icone(section)
+        h = QHBoxLayout(self)
+        h.setContentsMargins(12, 0, 12, 0)
+        h.setSpacing(12)
+        self.l_icone = QLabel()
+        self.l_icone.setPixmap(icones.pixmap(section))
+        self.l_icone.setFixedSize(QSize(24, 24))
+        self.l_texte = QLabel(libelle)
+        self.l_texte.setAlignment(Qt.AlignRight | Qt.AlignAbsolute | Qt.AlignVCenter)
+        self.l_texte.setWordWrap(True)
+        for w in (self.l_icone, self.l_texte):
+            w.setAttribute(Qt.WA_TransparentForMouseEvents)
+        h.addWidget(self.l_icone)   # في RTL أول عنصر يكون في أقصى اليمين
+        h.addWidget(self.l_texte, 1)
+        self.toggled.connect(self._etat)
+        self._etat(False)
+
+    def _etat(self, coche: bool) -> None:
+        self.l_texte.setStyleSheet(f"color:{theme.MARINE}; font-weight:{600 if coche else 400};")
+
+    def text(self) -> str:  # noqa: D401
+        return self.l_texte.text()
+
+    def icon(self):
+        return self._icone
+
+
 class FenetrePrincipale(QMainWindow):
     def __init__(self, dossier: DossierDonnees):
         super().__init__()
@@ -366,11 +400,7 @@ class FenetrePrincipale(QMainWindow):
         self.groupe.setExclusive(True)
         self.boutons = []
         for i, (nom, noms) in enumerate(SECTIONS):
-            b = QPushButton("  " + (nom if noms else f"{nom}  ·  قريباً"))  # فراغ بين الأيقونة والنص
-            b.setObjectName("nav")
-            b.setIcon(icones.icone(nom))
-            b.setIconSize(QSize(24, 24))
-            b.setCheckable(True)
+            b = BoutonNav(nom, nom if noms else f"{nom}  ·  قريباً")
             b.setCursor(Qt.PointingHandCursor)
             b.clicked.connect(lambda _=False, i=i: self.aller(i))
             self.groupe.addButton(b, i)
