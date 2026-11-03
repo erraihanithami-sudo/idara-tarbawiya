@@ -134,6 +134,12 @@ def main(sortie: Path) -> None:
                  ("date_affectation_academie", "16/09/2003"), ("date_affectation_direction", "01/09/2008"),
                  ("date_affectation", "01/09/2015")):
         r.dates[k].setText(v)
+    r.d_tanzim["date_grade"].setText("01/01/2020")
+    r.echelon.setCurrentIndex(r.echelon.findData("7"))
+    r.d_tanzim["date_echelon"].setText("01/06/2023")
+    r.note_insp.setText("16.5")
+    r.d_tanzim["date_inspection"].setText("10/03/2025")
+    r.inspecteur.setText("المفتش التجريبي")
     r.enregistrer()
     photo(f, "21_personnel_fiche")
     r.dates["date_naissance"].ouvrir_calendrier()
@@ -290,6 +296,8 @@ def main(sortie: Path) -> None:
     photo(f, "43_navigation_fils")
     f.aller_a("الجرد")
     photo(f, "44_fil_a_venir")
+    f.aller_a("التنظيم التربوي")
+    photo(f, "45_tanzim_tarbawi")
     f.close()
     app.quit()
     print("captures:", sorted(p.name for p in sortie.glob("*.png")))

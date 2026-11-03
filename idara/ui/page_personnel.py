@@ -176,6 +176,48 @@ class PagePersonnel(QWidget):
                                      ("الإطار", self.cadre), ("الدرجة", self.grade),
                                      ("المهمة", self.fonction), ("السلك", self.c["cycle"]),
                                      ("الوحدة المدرسية", self.unite)])
+        # ---- التنظيم التربوي (نموذج المدير 2026-11-03) ----
+        self.d_tanzim = {k: ChampDate() for k, _ in rh.DATES_TANZIM}
+        self.echelon = liste_fixe(rh.ECHELONS)
+        self.note_insp = champ("مثال: 16.5", ltr=True)
+        self.inspecteur = champ("اسم المفتش(ة)")
+        self.sans_insp = QCheckBox("لم يخضع(تخضع) للتفتيش بعد")
+        self.sans_insp.toggled.connect(lambda c: [w.setEnabled(not c) for w in
+                                                  (self.note_insp, self.d_tanzim["date_inspection"], self.inspecteur)])
+        self.repos_matin, self.repos_soir = liste_fixe(rh.JOURS), liste_fixe(rh.JOURS)
+        self.situation = QComboBox()
+        for k, lib in rh.SITUATIONS.items():
+            self.situation.addItem(lib, k)
+        self.etab_charge = champ()
+        self.situation.currentIndexChanged.connect(lambda _: self._maj_situation())
+        self.bloc_tanzim = QWidget()
+        bt = QVBoxLayout(self.bloc_tanzim)
+        bt.setContentsMargins(0, 0, 0, 0)
+        fv.addWidget(self.bloc_tanzim)
+        section("التنظيم التربوي (مطلوب للأساتذة)", [
+            ("تاريخ الدرجة", self.d_tanzim["date_grade"]), ("الرتبة", self.echelon),
+            ("تاريخ الرتبة", self.d_tanzim["date_echelon"]), ("تاريخ المهمة الحالية", self.d_tanzim["date_fonction"]),
+            ("آخر نقطة تفتيش", self.note_insp), ("تاريخ آخر تفتيش", self.d_tanzim["date_inspection"]),
+            ("المفتش(ة) الذي منحها", self.inspecteur), ("", self.sans_insp)], bt)
+        self.bloc_charge = QWidget()
+        bch = QVBoxLayout(self.bloc_charge)
+        bch.setContentsMargins(0, 0, 0, 0)
+        g_ch = QGridLayout()
+        g_ch.setHorizontalSpacing(16)
+        self.l_etab_charge = etiquette("المؤسسة", self.etab_charge)
+        for i, (lab, w) in enumerate(((etiquette("التكليف", self.situation), self.situation),
+                                      (self.l_etab_charge, self.etab_charge),
+                                      (etiquette("تاريخ التكليف", self.d_tanzim["date_charge"]),
+                                       self.d_tanzim["date_charge"]))):
+            g_ch.addWidget(lab, (i // 2) * 2, i % 2)
+            g_ch.addWidget(w, (i // 2) * 2 + 1, i % 2)
+        bch.addLayout(g_ch)
+        bt.addWidget(self.bloc_charge)
+        self.bloc_repos = QWidget()
+        br = QVBoxLayout(self.bloc_repos)
+        br.setContentsMargins(0, 0, 0, 0)
+        section("أنصاف أيام العطلة الأسبوعية", [("صباحاً", self.repos_matin), ("مساءً", self.repos_soir)], br)
+        bt.addWidget(self.bloc_repos)
         self.dates = {k: (self.date_aff if k == "date_affectation" else ChampDate()) for k, _ in rh.DATES_CARRIERE}
         # قرار المدير: المسار المهني (الفائض) لا يظهر لفئة المدير
         self.bloc_carriere = QWidget()
@@ -224,7 +266,14 @@ class PagePersonnel(QWidget):
         be.addWidget(self.calcul)
         g = QGridLayout()
         g.setHorizontalSpacing(16)
-        for i, (lib, w) in enumerate((("مادة التدريس", self.matiere),
+        self.matiere_tarl = QComboBox()
+        self.matiere_tarl.addItem("نفس مادة التدريس", "")
+        for m in rh.MATIERES:
+            self.matiere_tarl.addItem(m, m)
+        self.classes_tarl = champ("إن اختلفت عن الأقسام المسندة")
+        for i, (lib, w) in enumerate((("مادة التدريس (فترة إرساء الموارد)", self.matiere),
+                                      ("المادة خلال فترة الدعم TaRL", self.matiere_tarl),
+                                      ("الأقسام أو المجموعات خلال فترة الدعم TaRL", self.classes_tarl),
                                       ("ساعات العمل الأسبوعية", self.c["heures_hebdo"]),
                                       ("مستوى التدريس (يدوي)", self.c["niveau_enseigne"]),
                                       ("عدد التلاميذ (يدوي)", self.c["nb_eleves"]))):
@@ -327,8 +376,19 @@ class PagePersonnel(QWidget):
                 if self.classes.item(i).data(Qt.UserRole) is not None
                 and self.classes.item(i).checkState() == Qt.Checked]
 
+    def _maj_situation(self) -> None:
+        s = self.situation.currentData()
+        for w in (self.etab_charge, self.d_tanzim["date_charge"], self.l_etab_charge,
+                  self.etiquettes.get("تاريخ التكليف")):
+            if w is not None:
+                w.setEnabled(s != "normal")
+        self.l_etab_charge.setText("المؤسسة الأصلية" if s == "charge_in" else "مؤسسة التكليف")
+
     def _maj_categorie(self) -> None:
         cat = self.categorie.currentData()
+        self.bloc_tanzim.setVisible(cat in ("enseignant", "directeur", "assistant"))
+        self.bloc_charge.setVisible(cat == "enseignant")
+        self.bloc_repos.setVisible(cat == "directeur")
         if not self.fonction.currentData() and rh.fonction_par_defaut(cat or ""):
             self.fonction.setCurrentIndex(self.fonction.findData(rh.fonction_par_defaut(cat)))
         self.bloc_ens.setVisible(cat in ("enseignant", "educatrice"))
@@ -377,8 +437,20 @@ class PagePersonnel(QWidget):
         self.exemption.setCurrentIndex(max(0, self.exemption.findData(p.exemption_fa or "")))
         self.date_doctorat.definir(p.date_exemption_fa or None)
         self.date_doctorat.setEnabled(p.exemption_fa == "doctorat")
+        for k, w in self.d_tanzim.items():
+            w.definir(getattr(p, k) or None)
+        self.note_insp.setText("" if p.note_inspection in (None, "") else f"{float(p.note_inspection):g}")
+        self.inspecteur.setText(p.inspecteur or "")
+        self.sans_insp.setChecked(bool(p.sans_inspection))
+        self.situation.setCurrentIndex(max(0, self.situation.findData(p.situation or "normal")))
+        self.etab_charge.setText(p.etab_charge or "")
+        self.matiere_tarl.setCurrentIndex(max(0, self.matiere_tarl.findData(p.matiere_tarl or "")))
+        self.classes_tarl.setText(p.classes_tarl or "")
+        self._maj_situation()
         for w, val, n in ((self.cadre, p.cadre, len(rh.CADRES)), (self.grade, p.grade, len(rh.GRADES)),
                           (self.fonction, p.fonction, len(rh.FONCTIONS)),
+                          (self.echelon, p.echelon, len(rh.ECHELONS)), (self.repos_matin, p.repos_matin, len(rh.JOURS)),
+                          (self.repos_soir, p.repos_soir, len(rh.JOURS)),
                           (self.matiere, None, len(rh.MATIERES))):
             while w.count() > n + 1:  # حذف القيم القديمة المضافة لعرض سابق
                 w.removeItem(w.count() - 1)
@@ -433,6 +505,12 @@ class PagePersonnel(QWidget):
         v["matiere"] = self.matiere.currentData() or ""
         v["cadre"] = self.cadre.currentData() or ""
         v["fonction"] = self.fonction.currentData() or ""
+        v["echelon"] = self.echelon.currentData() or ""
+        v["repos_matin"], v["repos_soir"] = self.repos_matin.currentData() or "", self.repos_soir.currentData() or ""
+        v["note_inspection"], v["inspecteur"] = self.note_insp.text(), self.inspecteur.text()
+        v["sans_inspection"] = self.sans_insp.isChecked()
+        v["situation"], v["etab_charge"] = self.situation.currentData(), self.etab_charge.text()
+        v["matiere_tarl"], v["classes_tarl"] = self.matiere_tarl.currentData() or "", self.classes_tarl.text()
         v["grade"] = self.grade.currentData() or ""
         v["exemption_fa"] = self.exemption.currentData() or ""
         try:
@@ -440,9 +518,9 @@ class PagePersonnel(QWidget):
         except ValueError:
             raise rh.ErreurPersonnel("تاريخ الحصول على الدكتوراه غير صحيح.") from None
         dates = {}
-        for k, lib in rh.DATES_CARRIERE:
+        for k, lib in rh.DATES_CARRIERE + rh.DATES_TANZIM:
             try:
-                dates[k] = self.dates[k].iso()
+                dates[k] = (self.dates.get(k) or self.d_tanzim[k]).iso()
             except ValueError:
                 raise rh.ErreurPersonnel(f"{lib} غير صحيح.") from None
         ids = self.classes_cochees()
@@ -458,7 +536,12 @@ class PagePersonnel(QWidget):
 
     def enregistrer(self) -> int | None:
         try:
-            pid = rh.enregistrer(self.f.conn, self.lire_formulaire())
+            p = self.lire_formulaire()
+            m = rh.obligatoires_manquants(p)
+            if m:   # قرار المدير 2026-11-03: معطيات التنظيم التربوي مطلوبة عند ملء ملف الأستاذ(ة)
+                raise rh.ErreurPersonnel("معطيات مطلوبة لملف الأستاذ(ة) (التنظيم التربوي): " + "، ".join(m)
+                                         + ". إن لم يخضع(تخضع) للتفتيش بعد، أشّر على الخانة الخاصة بذلك.")
+            pid = rh.enregistrer(self.f.conn, p)
         except rh.ErreurPersonnel as e:
             message(self.message, str(e), True)
             return None

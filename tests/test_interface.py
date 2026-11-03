@@ -351,14 +351,24 @@ def test_page_personnel(app, config_tmp):
         if p.classes.item(i).text().startswith("PS1-PS2"):
             p.classes.item(i).setCheckState(Qt.Checked)
     assert not p.c["nb_eleves"].isEnabled() and "2 تلميذاً" in p.calcul.text()
+    # قرار المدير (2026-11-03): معطيات التنظيم التربوي مطلوبة لملف الأستاذ(ة)
+    assert not p.bloc_tanzim.isHidden() and p.bloc_repos.isHidden()
+    assert p.enregistrer() is None and "تاريخ الدرجة" in p.message.text() and "آخر نقطة تفتيش" in p.message.text()
+    p.grade.setCurrentIndex(p.grade.findData("الدرجة الأولى"))
+    p.d_tanzim["date_grade"].setText("01/01/2020")
+    p.echelon.setCurrentIndex(p.echelon.findData("7"))
+    p.d_tanzim["date_echelon"].setText("01/06/2023")
+    p.sans_insp.setChecked(True)
+    assert not p.note_insp.isEnabled()
     pid = p.enregistrer()
     assert pid is not None, p.message.text()
+    assert rh.lire(f.conn, pid).echelon == "7" and rh.lire(f.conn, pid).sans_inspection
     assert p.liste.rowCount() == 2 and "الأساتذة: 1" in p.effectifs.text()
     # قرار المدير (2026-11-03): المهمة بدل الفئة (التدريس أو الإدارة)، دون عمود الملف
     assert p.liste.columnCount() == 2 and p.liste.horizontalHeaderItem(1).text() == "المهمة"
     assert sorted(p.liste.item(i, 1).text() for i in range(2)) == ["الإدارة", "التدريس"]
     assert [p.fonction.itemText(i) for i in range(p.fonction.count())][1:] == ["التدريس", "الإدارة"]
-    assert "ينقص" in p.manquants.text() and "الدرجة" in p.manquants.text()
+    assert "ينقص" in p.manquants.text() and "العنوان الشخصي" in p.manquants.text()
     assert "ينقص لتحديد الفائض" in p.manquants.text()
     assert rh.lire(f.conn, pid).cin == "AB123456" and rh.lire(f.conn, pid).matiere == "مزدوجة"
     # المسار المهني
@@ -976,4 +986,40 @@ def test_icones_des_sections(app, config_tmp):
         assert contraste(texte, fond) >= 4.5, (texte, fond)
     f = _fenetre_avec_eleves(config_tmp)
     assert all(not b.icon().isNull() for b in f.boutons)
+    f.close()
+
+
+def test_page_tanzim_tarbawi(app, config_tmp, monkeypatch):
+    """التنظيم التربوي (طلب المدير 2026-11-03): فرع تحت التدبير التربوي، معطيات الأطر في صفحة واحدة، وزر التوليد."""
+    from idara.services import bureautique
+    from idara.services import etablissement as et
+    from idara.services import personnel as rh
+    from idara.ui.fenetre import SECTIONS
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    td = dict(SECTIONS)["التدبير التربوي"]
+    assert td[0] == ("التنظيم التربوي", "التنظيم التربوي")
+    f.aller_a("التنظيم التربوي")
+    p = f.page_tanzim
+    assert f.page_courante() == "التنظيم التربوي" and not p.b_generer.isEnabled()
+    assert "رمز المؤسسة" in p.l_manquants.text() and p.tables["structure"].rowCount() == 6
+    e = et.lire_etablissement(f.conn)
+    e.code_etab, e.telephone, e.commune_ar = "12345X", "0536000000", "الجماعة"
+    et.enregistrer_etablissement(f.conn, e)
+    d = next(x for x in rh.lister(f.conn) if x.categorie == "directeur")
+    d.date_recrutement, d.date_fonction, d.date_affectation, d.ppr = "2000-09-16", "2018-09-01", "2018-09-01", "1000000"
+    rh.enregistrer(f.conn, d)
+    rh.enregistrer(f.conn, rh.Personnel(
+        nom_ar="التجريبي", prenom_ar="سعيد", sexe="M", categorie="enseignant", ppr="2000001", grade="الدرجة الأولى",
+        matiere="عربية", date_recrutement="2005-09-16", date_affectation="2015-09-01", date_grade="2020-01-01",
+        echelon="7", date_echelon="2023-06-01", note_inspection=16.5, date_inspection="2025-03-10",
+        inspecteur="المفتش", niveau_enseigne="الرابع", nb_eleves=20))
+    p.insp["tanzim_insp_ar"].setText("المفتش أ")
+    assert p.enregistrer_inspecteurs()
+    p.rafraichir()
+    assert p.l_manquants.isHidden() and p.b_generer.isEnabled(), p.l_manquants.text()
+    assert p.tables["enseignants"].rowCount() == 1 and "16.5" in p.tables["enseignants"].item(0, 7).text()
+    chemin = p.generer()
+    assert chemin and chemin.exists() and ouverts == [chemin]
     f.close()

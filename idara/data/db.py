@@ -59,14 +59,26 @@ def migrer(conn: sqlite3.Connection, dossier: Path = DOSSIER_MIGRATIONS) -> list
             continue
         script = fichier.read_text(encoding="utf-8")
         nom_sql = nom.replace("'", "''")
+        # إعادة بناء جدول (لتغيير قيد CHECK مثلاً) حسب طريقة SQLite: المفاتيح الخارجية معطلة خلال الترحيل،
+        # ثم فحص سلامتها قبل الحفظ.
+        reconstruction = script.lstrip().startswith("-- reconstruction")
+        if reconstruction:
+            conn.execute("PRAGMA foreign_keys = OFF")
         try:
             conn.executescript(
                 "BEGIN;\n"
                 + script
-                + f"\nINSERT INTO schema_version(version, nom) VALUES ({numero}, '{nom_sql}');\nCOMMIT;"
+                + f"\nINSERT INTO schema_version(version, nom) VALUES ({numero}, '{nom_sql}');\n"
+                + ("" if reconstruction else "COMMIT;")
             )
+            if reconstruction:
+                erreurs = conn.execute("PRAGMA foreign_key_check").fetchall()
+                if erreurs:
+                    raise sqlite3.IntegrityError(f"مفاتيح خارجية غير سليمة: {erreurs[:3]}")
+                conn.commit()
         except sqlite3.Error as e:
             conn.rollback()
+            conn.execute("PRAGMA foreign_keys = ON")
             raise ErreurMigration(f"فشل الترحيل {nom}: {e}") from e
         conn.execute("PRAGMA foreign_keys = ON")
         appliquees.append(nom)

@@ -217,3 +217,34 @@ def test_academie_coherente(base, modif, message):
 def test_cadre_accorde(cadre, sexe, attendu):
     assert rh.cadre_accorde(cadre, sexe) == attendu
     assert rh.grade_court("الدرجة الممتازة") == "الممتازة"
+
+
+def test_donnees_tanzim_tarbawi(base):
+    """معطيات «التنظيم التربوي» (نموذج المدير 2026-11-03): مطلوبة للأستاذ(ة)، ومحفوظة ومقروءة."""
+    p = _prof()
+    assert rh.obligatoires_manquants(p) == ["تاريخ الدرجة", "الرتبة", "تاريخ الرتبة", "آخر نقطة تفتيش",
+                                            "تاريخ آخر تفتيش", "المفتش(ة) الذي منحها"]
+    p.sans_inspection = True
+    assert rh.obligatoires_manquants(p) == ["تاريخ الدرجة", "الرتبة", "تاريخ الرتبة"]
+    p = _prof(date_grade="2020-01-01", echelon="7", date_echelon="2023-06-01", note_inspection="17,5",
+              date_inspection="2025-03-10", inspecteur="المفتش التجريبي", date_recrutement="2005-09-16",
+              matiere_tarl="فرنسية", classes_tarl="مجموعة المستوى 3", situation="charge_in",
+              etab_charge="مدرسة أخرى", date_charge="2026-09-01", classes=[_classe(base, "4APG-5APG-6APG")])
+    assert rh.obligatoires_manquants(p) == []
+    pid = rh.enregistrer(base, p)
+    q = rh.lire(base, pid)
+    assert (q.note_inspection, q.echelon, q.situation, q.etab_charge) == (17.5, "7", "charge_in", "مدرسة أخرى")
+    assert rh.manquants_tanzim(base, q) == []
+    q.situation = "normal"
+    rh.enregistrer(base, q)
+    assert rh.lire(base, pid).etab_charge == ""
+    for modif, msg in ((dict(note_inspection="25"), "بين 0 و20"), (dict(echelon="12"), "الرتبة"),
+                       (dict(repos_matin="الأحد"), "العطلة"), (dict(date_grade="2099-01-01"), "المستقبل")):
+        with pytest.raises(rh.ErreurPersonnel, match=msg):
+            rh.enregistrer(base, _prof(ppr="", cin="", **modif))
+    # المساعدون التربويون: فئة جديدة
+    aid = rh.enregistrer(base, rh.Personnel(nom_ar="المساعد", prenom_ar="سعيد", sexe="M", categorie="assistant"))
+    assert rh.manquants_tanzim(base, rh.lire(base, aid)) == ["رقم البطاقة الوطنية", "تاريخ الالتحاق بالمؤسسة"]
+    assert rh.libelle_categorie("assistant", "F") == "مساعدة تربوية"
+    d = next(x for x in rh.lister(base) if x.categorie == "directeur")
+    assert "تاريخ المهمة الحالية" in rh.manquants_tanzim(base, d)

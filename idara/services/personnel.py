@@ -16,6 +16,7 @@ from idara.services.massar import niveaux_du_code_classe, normaliser
 
 CATEGORIES = {"enseignant": ("أستاذ", "أستاذة", "الأساتذة"),
               "educatrice": ("مربي التعليم الأولي", "مربية التعليم الأولي", "المربيات والمربون"),
+              "assistant": ("مساعد تربوي", "مساعدة تربوية", "المساعدون التربويون"),
               "gardien": ("حارس", "حارسة", "الحراس"),
               "proprete": ("عون نظافة", "عونة نظافة", "أعوان النظافة"),
               "autre": ("موظف", "موظفة", "آخرون"),
@@ -25,6 +26,16 @@ STATUTS = {"actif": "في العمل", "retraite": "متقاعد(ة)", "mute": "
 CHAMPS_SUGGERES = ("cycle",)
 # قرار المدير (2026-11-03): المهمة من قائمة ثابتة
 FONCTIONS = ("التدريس", "الإدارة")
+
+
+# التنظيم التربوي (نموذج المدير 2026-11-03)
+ECHELONS = tuple(str(i) for i in range(1, 11)) + ("الاستثنائية",)
+SITUATIONS = {"normal": "يعمل بالمؤسسة", "charge_in": "مكلف(ة) بالمؤسسة (من مؤسسة أخرى)",
+              "charge_out": "مكلف(ة) خارج المؤسسة"}
+JOURS = ("الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت")
+DATES_TANZIM = (("date_grade", "تاريخ الدرجة"), ("date_echelon", "تاريخ الرتبة"),
+                ("date_inspection", "تاريخ آخر تفتيش"), ("date_fonction", "تاريخ المهمة الحالية"),
+                ("date_charge", "تاريخ التكليف"))
 
 
 def fonction_par_defaut(categorie: str) -> str:
@@ -108,6 +119,22 @@ class Personnel:
     remarques: str = ""
     exemption_fa: str = ""        # agrege | doctorat
     date_exemption_fa: str = ""   # تاريخ الحصول على الدكتوراه
+    # التنظيم التربوي
+    date_grade: str = ""
+    echelon: str = ""             # الرتبة
+    date_echelon: str = ""
+    note_inspection: float | str | None = None
+    date_inspection: str = ""
+    inspecteur: str = ""          # المفتش(ة) الذي منح النقطة
+    sans_inspection: bool = False  # لم يخضع للتفتيش بعد
+    date_fonction: str = ""       # تاريخ المهمة الحالية
+    repos_matin: str = ""         # نصف يوم العطلة الأسبوعية صباحاً
+    repos_soir: str = ""
+    situation: str = "normal"
+    etab_charge: str = ""
+    date_charge: str = ""
+    matiere_tarl: str = ""
+    classes_tarl: str = ""
     id: int | None = None
     classes: list[int] = field(default_factory=list)   # أقسام السنة الجارية
 
@@ -148,8 +175,30 @@ class Personnel:
             if v < 0 or (k == "heures_hebdo" and v > 60):
                 raise ErreurPersonnel(f"{lib}: قيمة غير معقولة.")
             setattr(self, k, v)
+        if self.note_inspection in ("", None):
+            self.note_inspection = None
+        else:
+            try:
+                self.note_inspection = round(float(str(self.note_inspection).replace(",", ".")), 2)
+            except ValueError:
+                raise ErreurPersonnel("نقطة التفتيش: عدد بين 0 و20.") from None
+            if not 0 <= self.note_inspection <= 20:
+                raise ErreurPersonnel("نقطة التفتيش: عدد بين 0 و20.")
+        if self.sans_inspection:
+            self.note_inspection, self.date_inspection, self.inspecteur = None, "", ""
+        if self.echelon and self.echelon not in ECHELONS:
+            raise ErreurPersonnel("الرتبة: اختر من القائمة.")
+        if self.situation not in SITUATIONS:
+            raise ErreurPersonnel("وضعية التكليف غير صحيحة.")
+        if self.situation == "normal":
+            self.etab_charge, self.date_charge = "", ""
+        for k in ("repos_matin", "repos_soir"):
+            if getattr(self, k) and getattr(self, k) not in JOURS:
+                raise ErreurPersonnel("أنصاف أيام العطلة الأسبوعية: اختر اليوم من القائمة.")
+        if self.matiere_tarl and self.matiere_tarl not in MATIERES:
+            raise ErreurPersonnel("مادة فترة الدعم: اختر من القائمة (" + "، ".join(MATIERES) + ").")
         d = {}
-        for k, lib in DATES_CARRIERE + (("date_depart", "تاريخ المغادرة"),):
+        for k, lib in DATES_CARRIERE + DATES_TANZIM + (("date_depart", "تاريخ المغادرة"),):
             v = getattr(self, k)
             if v:
                 try:
@@ -225,6 +274,7 @@ def _ligne_vers(conn, r: sqlite3.Row) -> Personnel:
             v = r[f.name]
             setattr(p, f.name, ("" if v is None else v) if f.type in ("str", str) else v)
     p.dossier_disponible = bool(r["dossier_disponible"])
+    p.sans_inspection = bool(r["sans_inspection"])
     p.unite = r["unite"] or ""
     p.classes = [c[0] for c in conn.execute(
         "SELECT a.classe_id FROM affectation_classe a JOIN classe c ON c.id=a.classe_id "
@@ -243,7 +293,7 @@ def lire(conn: sqlite3.Connection, pid: int) -> Personnel:
     return _ligne_vers(conn, r)
 
 
-_ORDRE_CAT = {c: i for i, c in enumerate(("directeur", "enseignant", "educatrice", "gardien", "proprete", "autre"))}
+_ORDRE_CAT = {c: i for i, c in enumerate(("directeur", "enseignant", "educatrice", "assistant", "gardien", "proprete", "autre"))}
 
 
 def lister(conn: sqlite3.Connection, texte: str = "", categorie: str | None = None,
@@ -329,6 +379,49 @@ def manquants_documents(conn: sqlite3.Connection, p: Personnel) -> list[str]:
     return res
 
 
+def manquants_tanzim(conn: sqlite3.Connection, p: Personnel) -> list[str]:
+    """ما يلزم لوثيقة «التنظيم التربوي» (نموذج المدير). للأساتذة: مطلوب أيضاً عند حفظ الملف."""
+    if p.categorie == "directeur":
+        requis = [("ppr", "رقم التأجير"), ("date_recrutement", "تاريخ التوظيف"),
+                  ("date_fonction", "تاريخ المهمة الحالية"), ("date_affectation", "تاريخ الالتحاق بالمؤسسة")]
+    elif p.categorie == "assistant":
+        requis = [("cin", "رقم البطاقة الوطنية"), ("date_affectation", "تاريخ الالتحاق بالمؤسسة")]
+    elif p.categorie == "enseignant":
+        requis = [("ppr", "رقم التأجير"), ("date_recrutement", "تاريخ التوظيف"),
+                  ("date_affectation", "تاريخ الالتحاق بالمؤسسة")] + list(OBLIGATOIRES_ENSEIGNANT)
+        requis.append(("matiere", "مادة التدريس"))
+        if not p.sans_inspection:
+            requis += list(OBLIGATOIRES_INSPECTION)
+        if p.situation != "normal":
+            requis += [("etab_charge", "المؤسسة الأصلية" if p.situation == "charge_in" else "مؤسسة التكليف"),
+                       ("date_charge", "تاريخ التكليف")]
+    else:
+        return []
+    res = [lib for k, lib in requis if getattr(p, k) in ("", None)]
+    if p.categorie == "enseignant" and p.situation != "charge_out":
+        e = enseignement(conn, p)
+        if not e["classes"] and not p.niveau_enseigne:
+            res.append("القسم المسند")
+        if e["nb_eleves"] in (None, ""):
+            res.append("عدد التلاميذ")
+    return res
+
+
+# قرار المدير (2026-11-03): هذه المعطيات مطلوبة عند ملء ملف الأستاذ(ة)
+OBLIGATOIRES_ENSEIGNANT = (("grade", "الدرجة"), ("date_grade", "تاريخ الدرجة"), ("echelon", "الرتبة"),
+                           ("date_echelon", "تاريخ الرتبة"))
+OBLIGATOIRES_INSPECTION = (("note_inspection", "آخر نقطة تفتيش"), ("date_inspection", "تاريخ آخر تفتيش"),
+                           ("inspecteur", "المفتش(ة) الذي منحها"))
+
+
+def obligatoires_manquants(p: Personnel) -> list[str]:
+    """ما يُشترط لحفظ ملف الأستاذ(ة) من الاستمارة: الدرجة والرتبة وتاريخهما وآخر تفتيش (أو «لم يُفتَّش بعد»)."""
+    if p.categorie != "enseignant":
+        return []
+    requis = list(OBLIGATOIRES_ENSEIGNANT) + ([] if p.sans_inspection else list(OBLIGATOIRES_INSPECTION))
+    return [lib for k, lib in requis if getattr(p, k) in ("", None)]
+
+
 def manquants_carriere(p: Personnel) -> list[str]:
     """تواريخ المسار المهني اللازمة لتحديد الفائض (للأساتذة والمربين)."""
     if p.categorie not in ("enseignant", "educatrice"):
@@ -370,7 +463,9 @@ _COLONNES = ("nom_ar", "prenom_ar", "nom_fr", "prenom_fr", "sexe", "categorie", 
              "grade", "fonction", "cycle", "matiere", "niveau_enseigne", "nb_eleves", "heures_hebdo",
              "adresse", "telephone", "date_affectation", "statut", "date_depart", "remarques",
              "date_naissance", "date_recrutement", "date_affectation_academie", "date_affectation_direction",
-             "exemption_fa", "date_exemption_fa")
+             "exemption_fa", "date_exemption_fa", "date_grade", "echelon", "date_echelon", "note_inspection",
+             "date_inspection", "inspecteur", "date_fonction", "repos_matin", "repos_soir", "situation",
+             "etab_charge", "date_charge", "matiere_tarl", "classes_tarl")
 
 
 def enregistrer(conn: sqlite3.Connection, p: Personnel) -> int:
@@ -399,14 +494,14 @@ def enregistrer(conn: sqlite3.Connection, p: Personnel) -> int:
         if p.id is None:
             cols = ", ".join(_COLONNES)
             p.id = conn.execute(
-                f"INSERT INTO personnel({cols}, unite_id, dossier_disponible) VALUES "
-                f"({', '.join('?' * len(_COLONNES))}, ?, ?)",
-                (*valeurs, unite, int(p.dossier_disponible))).lastrowid
+                f"INSERT INTO personnel({cols}, unite_id, dossier_disponible, sans_inspection) VALUES "
+                f"({', '.join('?' * len(_COLONNES))}, ?, ?, ?)",
+                (*valeurs, unite, int(p.dossier_disponible), int(p.sans_inspection))).lastrowid
             action = "ajout"
         else:
             sets = ", ".join(f"{k}=?" for k in _COLONNES)
-            conn.execute(f"UPDATE personnel SET {sets}, unite_id=?, dossier_disponible=? WHERE id=?",
-                         (*valeurs, unite, int(p.dossier_disponible), p.id))
+            conn.execute(f"UPDATE personnel SET {sets}, unite_id=?, dossier_disponible=?, sans_inspection=? "
+                         f"WHERE id=?", (*valeurs, unite, int(p.dossier_disponible), int(p.sans_inspection), p.id))
             action = "modification"
         conn.execute("DELETE FROM affectation_classe WHERE personnel_id=? AND classe_id IN "
                      "(SELECT id FROM classe WHERE annee_id=?)", (p.id, annee))
