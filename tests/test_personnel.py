@@ -248,3 +248,35 @@ def test_donnees_tanzim_tarbawi(base):
     assert rh.libelle_categorie("assistant", "F") == "مساعدة تربوية"
     d = next(x for x in rh.lister(base) if x.categorie == "directeur")
     assert "تاريخ المهمة الحالية" in rh.manquants_tanzim(base, d)
+
+
+def test_enseignement_classe_hors_format_massar(base):
+    """قسم برمز غير مسار (تصحيح 2026-11-03): المستوى من تلاميذه، وإلا اسم القسم؛ لا يُطلب «إسناد قسم»."""
+    c = _classe(base, "4APG-5APG-6APG")
+    base.execute("UPDATE classe SET code='القسم المشترك أ' WHERE id=?", (c,))
+    pid = rh.enregistrer(base, _prof(classes=[c]))
+    p = rh.lire(base, pid)
+    e = rh.enseignement(base, p)
+    assert e["niveau"] and e["nb_eleves"]
+    assert not any("إسناد قسم" in m for m in rh.manquants_documents(base, p))
+    annee = base.execute("SELECT annee_id FROM classe WHERE id=?", (c,)).fetchone()[0]
+    vide = base.execute("INSERT INTO classe(annee_id, code) VALUES (?, 'قسم جديد')", (annee,)).lastrowid
+    p.classes = [vide]
+    rh.enregistrer(base, p)
+    e = rh.enseignement(base, rh.lire(base, pid))
+    assert e["niveau"] == "قسم جديد" and e["nb_eleves"] == 0
+
+
+def test_supprimer_personnel(base):
+    pid = rh.enregistrer(base, _prof(classes=[_classe(base, "PS1-PS2")]))
+    rh.supprimer(base, pid)
+    assert not base.execute("SELECT 1 FROM personnel WHERE id=?", (pid,)).fetchone()
+    assert not base.execute("SELECT 1 FROM affectation_classe WHERE personnel_id=?", (pid,)).fetchone()
+    d = rh.lister(base)[0]
+    with pytest.raises(rh.ErreurPersonnel, match="المدير"):
+        rh.supprimer(base, d.id)
+    pid = rh.enregistrer(base, _prof())
+    base.execute("INSERT INTO club(annee_id, nom, animateur_id) SELECT id, 'نادي', ? FROM annee_scolaire LIMIT 1",
+                 (pid,))
+    with pytest.raises(rh.ErreurPersonnel, match="تأطير أندية"):
+        rh.supprimer(base, pid)

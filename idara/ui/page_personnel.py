@@ -8,12 +8,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout,
                                QGridLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QPlainTextEdit, QPushButton, QRadioButton, QVBoxLayout, QWidget)
+                               QMessageBox, QPlainTextEdit, QPushButton, QRadioButton, QVBoxLayout, QWidget)
 
 from idara.services import etablissement as et
 from idara.services import import_rh as irh
 from idara.services import personnel as rh
-from idara.ui.composants import carte, entete
+from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.saisie import ChampDate, cellule, message, selectionner, tableau
 
@@ -95,9 +95,10 @@ class PagePersonnel(QWidget):
         filtres.addWidget(self.voir_partis)
         filtres.addStretch()
         cv.addLayout(filtres)
-        self.liste = tableau(["الاسم", "المهمة"], etirer=0)   # قرار المدير 2026-11-03: المهمة بدل الفئة، دون عمود الملف
+        # قرار المدير 2026-11-03: المهمة بدل الفئة، دون عمود الملف، مع الوحدة المدرسية
+        self.liste = tableau(["الاسم", "الوحدة المدرسية", "المهمة"], etirer=0)
         h = self.liste.horizontalHeader()
-        for i, largeur in ((1, 110),):
+        for i, largeur in ((1, 130), (2, 90)):
             h.setSectionResizeMode(i, h.ResizeMode.Fixed)
             h.resizeSection(i, largeur)
         self.liste.setMinimumHeight(420)
@@ -310,7 +311,10 @@ class PagePersonnel(QWidget):
         self.b_depart.clicked.connect(self.dialogue_depart)
         self.b_retour = QPushButton("إرجاع إلى العمل")
         self.b_retour.clicked.connect(self.reintegrer)
-        for b in (b_save, self.b_depart, self.b_retour):
+        self.b_suppr = bouton("حذف الموظف")
+        self.b_suppr.setToolTip("لموظف أُدخل خطأً. من غادر المؤسسة يُسجَّل بـ«مغادرة» ليبقى تاريخه.")
+        self.b_suppr.clicked.connect(lambda: self.supprimer())
+        for b in (b_save, self.b_depart, self.b_retour, self.b_suppr):
             boutons.addWidget(b)
         boutons.addStretch()
         fv.addLayout(boutons)
@@ -327,8 +331,10 @@ class PagePersonnel(QWidget):
             f"{rh.CATEGORIES[k][2]}: {n}" for k, n in eff.items() if n))
         self.unite.clear()
         self.unite.addItem("—", "")
-        for u in et.unites(self.f.conn):
+        unites = et.unites(self.f.conn)
+        for u in unites:
             self.unite.addItem(u, u)
+        self.liste.setColumnHidden(1, not unites)   # مؤسسة بلا وحدات: لا فائدة من العمود
         for k in rh.CHAMPS_SUGGERES:
             w, t = self.c[k], self.c[k].currentText()
             w.clear()
@@ -345,7 +351,8 @@ class PagePersonnel(QWidget):
             if p.statut != "actif":
                 nom += f" ({rh.STATUTS[p.statut]})"
             self.liste.setItem(i, 0, cellule(nom, p.id))
-            self.liste.setItem(i, 1, cellule(p.fonction or "—"))
+            self.liste.setItem(i, 1, cellule(p.unite or "—"))
+            self.liste.setItem(i, 2, cellule(p.fonction or "—"))
             self.liste.item(i, 0).setToolTip(f"{rh.libelle_categorie(p.categorie, p.sexe)} · رقم التأجير: {p.ppr or '—'}")
 
     def choisir_xml(self) -> None:
@@ -537,6 +544,7 @@ class PagePersonnel(QWidget):
             self.manquants.hide()
         self.b_depart.setVisible(bool(p.id) and p.statut == "actif" and p.categorie != "directeur")
         self.b_retour.setVisible(bool(p.id) and p.statut != "actif")
+        self.b_suppr.setVisible(bool(p.id) and p.categorie != "directeur")
         self.message.hide()
 
     def lire_formulaire(self) -> rh.Personnel:
@@ -595,6 +603,23 @@ class PagePersonnel(QWidget):
             self.liste.blockSignals(False)
         message(self.message, "حُفظ ملف الموظف.")
         return pid
+
+    def supprimer(self, confirmer: bool = True) -> bool:
+        if self.pid is None:
+            return False
+        nom = self.titre.text().split(" · ")[0]
+        if confirmer and QMessageBox.question(
+                self, "حذف الموظف", f"سيُحذف ملف «{nom}» نهائياً. متابعة؟") != QMessageBox.Yes:
+            return False
+        try:
+            rh.supprimer(self.f.conn, self.pid)
+        except rh.ErreurPersonnel as e:
+            message(self.message, str(e), True)
+            return False
+        self.rafraichir()
+        self.nouveau()
+        message(self.message, f"حُذف ملف «{nom}».")
+        return True
 
     def dialogue_depart(self) -> None:
         d = DialogueDepart(self.titre.text(), self)

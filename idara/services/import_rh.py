@@ -85,11 +85,20 @@ def _date(v: str) -> str:
 
 
 def _separer(nom: str) -> tuple[str, str]:
-    """الملف يضع النسب ثم الاسم في خانة واحدة: الكلمة الأخيرة اسم، وما قبلها نسب (قابل للتصحيح بعد الاستيراد)."""
+    """NOML (بالفرنسية): النسب ثم الاسم؛ الكلمة الأخيرة اسم وما قبلها نسب (EL MOUSTAID ...)."""
     mots = nom.split()
     if len(mots) < 2:
         return nom, ""
     return " ".join(mots[:-1]), mots[-1]
+
+
+def _separer_ar(nom: str) -> tuple[str, str]:
+    """NOMA (بالعربية): الاسم ثم النسب (عكس الخانة الفرنسية، تصحيح المدير 2026-11-03)؛ الكلمة الأولى اسم
+    وما بعدها نسب. يرجع (النسب، الاسم)."""
+    mots = nom.split()
+    if len(mots) < 2:
+        return nom, ""
+    return " ".join(mots[1:]), mots[0]
 
 
 def _grade(ll: str) -> str:
@@ -138,7 +147,7 @@ def lire_xml(source) -> list[Agent]:
         if _txt(e, "PRENOMA"):
             v["nom_ar"], v["prenom_ar"] = _txt(e, "NOMA"), _txt(e, "PRENOMA")
         else:
-            v["nom_ar"], v["prenom_ar"] = _separer(_txt(e, "NOMA"))
+            v["nom_ar"], v["prenom_ar"] = _separer_ar(_txt(e, "NOMA"))
         if _txt(e, "PRENOML"):
             v["nom_fr"], v["prenom_fr"] = _txt(e, "NOML"), _txt(e, "PRENOML")
         else:
@@ -254,8 +263,11 @@ def comparer(conn: sqlite3.Connection, agents: list[Agent]) -> list[Proposition]
             ancien = rh.lire(conn, pid)
             p = replace(ancien, classes=list(ancien.classes))
             changements = []
+            inverse = {k for a, b in (("nom_ar", "prenom_ar"), ("nom_fr", "prenom_fr"))
+                       if v.get(a) and v.get(b) and getattr(ancien, a) == v[b] and getattr(ancien, b) == v[a]
+                       for k in (a, b)}   # استيراد سابق قلب النسب والاسم: يُصحَّح
             for k, x in v.items():
-                if k in _NOMS and getattr(ancien, k):
+                if k in _NOMS and getattr(ancien, k) and k not in inverse:
                     continue
                 if k == "categorie" and (ancien.categorie == "directeur" or x == "directeur"
                                          or x == "autre"):

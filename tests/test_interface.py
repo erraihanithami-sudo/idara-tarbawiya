@@ -365,8 +365,23 @@ def test_page_personnel(app, config_tmp):
     assert rh.lire(f.conn, pid).echelon == "7" and rh.lire(f.conn, pid).sans_inspection
     assert p.liste.rowCount() == 2 and "الأساتذة: 1" in p.effectifs.text()
     # قرار المدير (2026-11-03): المهمة بدل الفئة (التدريس أو الإدارة)، دون عمود الملف
-    assert p.liste.columnCount() == 2 and p.liste.horizontalHeaderItem(1).text() == "المهمة"
-    assert sorted(p.liste.item(i, 1).text() for i in range(2)) == ["الإدارة", "التدريس"]
+    assert p.liste.columnCount() == 3 and p.liste.horizontalHeaderItem(2).text() == "المهمة"
+    assert p.liste.horizontalHeaderItem(1).text() == "الوحدة المدرسية" and not p.liste.isColumnHidden(1)
+    assert sorted(p.liste.item(i, 2).text() for i in range(2)) == ["الإدارة", "التدريس"]
+    # حذف موظف أُدخل خطأً (طلب المدير 2026-11-03)، والمدير لا يُحذف
+    assert p.b_suppr.objectName() == "danger" and not p.b_suppr.isHidden()
+    p.c["ppr"].setText("")
+    p.nouveau()
+    p.c["nom_ar"].setText("خطأ")
+    p.c["prenom_ar"].setText("إدخال")
+    p.r_m.setChecked(True)
+    p.categorie.setCurrentIndex(p.categorie.findData("gardien"))
+    p.fonction.setCurrentIndex(0)
+    pid_err = p.enregistrer()
+    assert pid_err is not None, p.message.text()
+    assert p.liste.rowCount() == 3
+    assert p.supprimer(confirmer=False) and p.liste.rowCount() == 2 and "حُذف" in p.message.text()
+    p.afficher(pid)
     assert [p.fonction.itemText(i) for i in range(p.fonction.count())][1:] == ["التدريس", "الإدارة"]
     assert "ينقص" in p.manquants.text() and "العنوان الشخصي" in p.manquants.text()
     assert "ينقص لتحديد الفائض" in p.manquants.text()

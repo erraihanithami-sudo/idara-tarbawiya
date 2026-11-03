@@ -349,9 +349,17 @@ def enseignement(conn: sqlite3.Connection, p: Personnel) -> dict:
             for n in niveaux_du_code_classe(r["code"]):
                 if n not in niveaux:
                     niveaux.append(n)
+        # رمز القسم لا يتبع صيغة مسار (قسم أنشئ يدوياً مثلاً): مستويات تلاميذه المسجلين
+        for (n,) in conn.execute(
+                f"SELECT DISTINCT n.code FROM inscription i JOIN niveau n ON n.id=i.niveau_id "
+                f"WHERE i.classe_id IN ({marques}) AND i.statut IN ('inscrit','arrive')", p.classes):
+            if n in tx.NIVEAUX and n not in niveaux:
+                niveaux.append(n)
         ordre = list(tx.NIVEAUX)
         niveaux.sort(key=ordre.index)
-        return {"niveau": "، ".join(tx.niveau_ar(n) for n in niveaux) or p.niveau_enseigne,
+        niveau = "، ".join(tx.niveau_ar(n) for n in niveaux) or p.niveau_enseigne \
+            or "، ".join(r["code"] for r in lignes)   # آخر حل: اسم القسم كما سمّاه المدير
+        return {"niveau": niveau,
                 "nb_eleves": sum(r["n"] for r in lignes),
                 "classes": [r["code"] for r in lignes], "source": "أقسام"}
     return {"niveau": p.niveau_enseigne, "nb_eleves": p.nb_eleves, "classes": [], "source": "يدوي"}
@@ -529,3 +537,37 @@ def reintegrer(conn: sqlite3.Connection, pid: int) -> None:
     p = lire(conn, pid)
     p.statut, p.date_depart = "actif", ""
     enregistrer(conn, p)
+
+
+# ما يمنع الحذف: سجلات تاريخية مرتبطة بالموظف (تبقى، والموظف يُسجَّل كمغادر بدل حذفه)
+_LIENS = (("conge", "personnel_id", "رخص"), ("reprise_travail", "personnel_id", "محاضر استئناف"),
+          ("document_genere", "personnel_id", "وثائق مولَّدة"),
+          ("affectation_equipement", "personnel_id", "تجهيزات مسلَّمة"),
+          ("conseil_membre", "personnel_id", "عضوية مجالس"), ("club", "animateur_id", "تأطير أندية"),
+          ("examen_affectation", "personnel_id", "مهام في الامتحان"))
+
+
+def liens(conn: sqlite3.Connection, pid: int) -> list[str]:
+    res = []
+    for t, col, lib in _LIENS:
+        n = conn.execute(f"SELECT COUNT(*) FROM {t} WHERE {col}=?", (pid,)).fetchone()[0]
+        if n:
+            res.append(f"{lib} ({n})")
+    return res
+
+
+def supprimer(conn: sqlite3.Connection, pid: int) -> None:
+    """حذف موظف أُدخل خطأً (طلب المدير 2026-11-03). يُرفض إن ارتبطت به سجلات، فتُسجَّل مغادرته بدل ذلك."""
+    p = lire(conn, pid)
+    if p.categorie == "directeur" or conn.execute(
+            "SELECT 1 FROM mandat_directeur WHERE personnel_id=?", (pid,)).fetchone():
+        raise ErreurPersonnel("المدير لا يُحذف؛ يُغيَّر من صفحة «إعداد المؤسسة».")
+    l = liens(conn, pid)
+    if l:
+        raise ErreurPersonnel("لا يمكن حذف هذا الموظف لأن له سجلات في التطبيق: " + "، ".join(l) +
+                              ". استعمل «مغادرة (انتقال، تقاعد...)» ليبقى التاريخ محفوظاً.")
+    with conn:
+        conn.execute("DELETE FROM affectation_classe WHERE personnel_id=?", (pid,))
+        conn.execute("DELETE FROM personnel WHERE id=?", (pid,))
+        conn.execute("INSERT INTO journal(action, cible, cible_id, details) VALUES ('suppression', 'personnel', ?, ?)",
+                     (pid, f"{p.prenom_ar} {p.nom_ar}"))

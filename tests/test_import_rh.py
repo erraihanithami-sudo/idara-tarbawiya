@@ -77,3 +77,21 @@ def test_directeur_complete_par_ppr(base):  # noqa: F811
     irh.appliquer(conn, props)
     d = rh.lire(conn, props[0].pid)
     assert d.categorie == "directeur" and d.nom_ar == "المدير" and d.cadre == "متصرف(ة) تربوي(ة)"
+
+
+def test_nom_ar_compose_et_correction_inversion(base):  # noqa: F811
+    conn = base
+    ag = list(AGENTS[1])
+    ag[3] = "فاطمة الزهراء بن علي"
+    v = irh.lire_xml(xml_rh([tuple(ag)]))[0].valeurs
+    assert (v["prenom_ar"], v["nom_ar"]) == ("فاطمة", "الزهراء بن علي")   # الاسم المركب يُصحَّح يدوياً
+    # موظف استورد سابقاً بالنسب والاسم مقلوبين: يُقترح التصحيح
+    irh.appliquer(conn, irh.comparer(conn, irh.lire_xml(xml_rh([AGENTS[0]]))))
+    p = rh.lire(conn, rh.lister(conn, "9000001")[0].id)
+    p.nom_ar, p.prenom_ar = p.prenom_ar, p.nom_ar
+    rh.enregistrer(conn, p)
+    pr = irh.comparer(conn, irh.lire_xml(xml_rh([AGENTS[0]])))[0]
+    assert pr.etat == "maj" and [c[0] for c in pr.changements] == ["النسب", "الاسم"]
+    irh.appliquer(conn, [pr])
+    p = rh.lire(conn, p.id)
+    assert (p.nom_ar, p.prenom_ar) == ("الوهمي", "سعيد")
