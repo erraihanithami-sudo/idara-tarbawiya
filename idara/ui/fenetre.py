@@ -339,7 +339,7 @@ class FenetrePrincipale(QMainWindow):
     def _barre_laterale(self) -> QWidget:
         barre = QFrame()
         barre.setObjectName("barreLaterale")
-        barre.setFixedWidth(270)
+        barre.setFixedWidth(290)
         v = QVBoxLayout(barre)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
@@ -366,7 +366,7 @@ class FenetrePrincipale(QMainWindow):
         self.groupe.setExclusive(True)
         self.boutons = []
         for i, (nom, noms) in enumerate(SECTIONS):
-            b = QPushButton(nom if noms else f"{nom}  ·  قريباً")
+            b = QPushButton("  " + (nom if noms else f"{nom}  ·  قريباً"))  # فراغ بين الأيقونة والنص
             b.setObjectName("nav")
             b.setIcon(icones.icone(nom))
             b.setIconSize(QSize(24, 24))

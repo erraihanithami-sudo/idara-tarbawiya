@@ -92,7 +92,7 @@ QTabBar::tab {{ background: transparent; color: {GRIS}; padding: 10px 22px; marg
     border: 0; border-bottom: 3px solid transparent; font-size: 11pt; }}
 QTabBar::tab:selected {{ color: {VERT_FONCE}; border-bottom: 3px solid {VERT}; font-weight: 600; }}
 QTabBar::tab:hover:!selected {{ color: {ENCRE}; }}
-QPushButton#nav:checked {{ background: {VERT_CLAIR}; color: {MARINE}; font-weight: 700;
+QPushButton#nav:checked {{ background: {VERT_CLAIR}; color: {MARINE}; font-weight: 600;
     border-right: 4px solid {VERT}; }}
 QPushButton#nav:hover:!checked {{ background: {PLATRE}; }}
 QRadioButton {{ min-height: 36px; }}
