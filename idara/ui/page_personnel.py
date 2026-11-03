@@ -5,11 +5,13 @@ from __future__ import annotations
 from datetime import date
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
+                               QFormLayout,
                                QGridLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
                                QPlainTextEdit, QPushButton, QRadioButton, QVBoxLayout, QWidget)
 
 from idara.services import etablissement as et
+from idara.services import import_rh as irh
 from idara.services import personnel as rh
 from idara.ui.composants import carte, entete
 from idara.ui.formulaires import champ, etiquette
@@ -101,9 +103,16 @@ class PagePersonnel(QWidget):
         self.liste.setMinimumHeight(420)
         self.liste.itemSelectionChanged.connect(self._selection)
         cv.addWidget(self.liste, 1)
+        h_ajout = QHBoxLayout()
         b = QPushButton("+ موظف جديد")
         b.clicked.connect(self.nouveau)
-        cv.addWidget(b)
+        h_ajout.addWidget(b)
+        # خيار ثانٍ: الاستيراد من ملف XML للموارد البشرية (طلب المدير 2026-11-03)
+        b_xml = QPushButton("استيراد من ملف XML")
+        b_xml.setToolTip("ملف تصدير الموارد البشرية (DsAgentExport). تُراجَع النتيجة قبل الاعتماد.")
+        b_xml.clicked.connect(self.choisir_xml)
+        h_ajout.addWidget(b_xml)
+        cv.addLayout(h_ajout)
         corps.addWidget(c, 5)
 
         # ---- الملف ----
@@ -338,6 +347,36 @@ class PagePersonnel(QWidget):
             self.liste.setItem(i, 0, cellule(nom, p.id))
             self.liste.setItem(i, 1, cellule(p.fonction or "—"))
             self.liste.item(i, 0).setToolTip(f"{rh.libelle_categorie(p.categorie, p.sexe)} · رقم التأجير: {p.ppr or '—'}")
+
+    def choisir_xml(self) -> None:
+        f, _ = QFileDialog.getOpenFileName(self, "ملف XML للموارد البشرية", "", "XML (*.xml)")
+        if f:
+            self.importer_xml(f)
+
+    def importer_xml(self, source, valider: bool | None = None) -> dict | None:
+        """يقرأ الملف ويعرض المراجعة؛ valider (للاختبار) يعتمد دون نافذة."""
+        try:
+            props = irh.comparer(self.f.conn, irh.lire_xml(source))
+        except irh.ErreurImportRH as e:
+            message(self.message, str(e), erreur=True)
+            return None
+        d = DialogueImportRH(props, self)
+        if valider is None:
+            if d.exec() != QDialog.Accepted:
+                return None
+        elif not valider:
+            return None
+        choisis = d.choisies()
+        try:
+            n = irh.appliquer(self.f.conn, choisis)
+        except rh.ErreurPersonnel as e:
+            message(self.message, str(e), erreur=True)
+            self.rafraichir()
+            return None
+        message(self.message, f"الاستيراد من ملف XML: أُضيف {n['ajoutes']} وحُدِّث {n['maj']}. "
+                              "أكمل ما لا يتضمنه الملف (التفتيش، الأقسام، أنصاف أيام العطلة...) من ملف كل موظف.")
+        self.rafraichir()
+        return n
 
     def _selection(self) -> None:
         lignes = {i.row() for i in self.liste.selectedIndexes()}
@@ -589,3 +628,58 @@ class PagePersonnel(QWidget):
         self.rafraichir()
         self.afficher(pid)
         message(self.message, "أُرجع الموظف إلى لائحة العاملين.")
+
+
+class DialogueImportRH(QDialog):
+    """مراجعة نتيجة الاستيراد من ملف XML قبل الاعتماد: سطر لكل موظف مع ما سيُضاف أو يُغيَّر."""
+
+    ETATS = {"nouveau": "جديد", "maj": "تحديث", "identique": "دون تغيير", "ignore": "لا يُستورد",
+             "erreur": "يحتاج تصحيحاً"}
+
+    def __init__(self, props: list, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("مراجعة الاستيراد من ملف XML")
+        self.setLayoutDirection(Qt.RightToLeft)
+        self.resize(900, 520)
+        self.props = props
+        v = QVBoxLayout(self)
+        n = {k: sum(p.etat == k for p in props) for k in self.ETATS}
+        resume = QLabel("   ·   ".join(f"{lib}: {n[k]}" for k, lib in self.ETATS.items() if n[k]) +
+                        "\nلا شيء يُحذف. القيم المدخلة سابقاً لا تُمحى بخانة فارغة، والاسمان لا يُغيَّران عند "
+                        "موظف مسجل.")
+        resume.setWordWrap(True)
+        v.addWidget(resume)
+        self.table = tableau(["اعتماد", "الموظف", "الحالة", "التفاصيل"], etirer=3)
+        self.table.setRowCount(len(props))
+        self.cases: list[QCheckBox | None] = []
+        for i, p in enumerate(props):
+            if p.etat in ("nouveau", "maj"):
+                c = QCheckBox()
+                c.setChecked(True)
+                self.table.setCellWidget(i, 0, c)
+                self.cases.append(c)
+            else:
+                self.cases.append(None)
+            self.table.setItem(i, 1, cellule(p.agent.nom))
+            self.table.setItem(i, 2, cellule(self.ETATS[p.etat]))
+            if p.etat == "nouveau":
+                det = "يُضاف بـ " + str(len(p.changements)) + " معلومة."
+            elif p.etat == "maj":
+                det = "؛ ".join(f"{lib}: {a or '—'} ← {b}" for lib, a, b in p.changements)
+            else:
+                det = p.raison
+            if p.agent.notes:
+                det = (det + " " if det else "") + " ".join(p.agent.notes)
+            it = cellule(det)
+            it.setToolTip("\n".join(f"{lib}: {a or '—'} ← {b}" for lib, a, b in p.changements) or det)
+            self.table.setItem(i, 3, it)
+        v.addWidget(self.table, 1)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.button(QDialogButtonBox.Ok).setText("اعتماد المحدد")
+        bb.button(QDialogButtonBox.Cancel).setText("إلغاء")
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        v.addWidget(bb)
+
+    def choisies(self) -> list:
+        return [p for p, c in zip(self.props, self.cases) if c is not None and c.isChecked()]

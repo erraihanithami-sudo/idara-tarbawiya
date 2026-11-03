@@ -1111,3 +1111,22 @@ def test_lauha_qiyada_et_boutons_suppression(app, config_tmp):
     rouges = [b for b in f.findChildren(QPushButton) if b.text().startswith("حذف")]
     assert rouges and all(b.objectName() == "danger" and not b.icon().isNull() for b in rouges)
     f.close()
+
+
+def test_personnel_import_xml(app, config_tmp):
+    from tests.fabrique_rh_xml import xml_rh
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("الموارد البشرية")
+    p = f.page_rh
+    assert p.importer_xml(b"<x/>", valider=True) is None and "DATAIDENTIFPERSONNEL" in p.message.text()
+    assert p.importer_xml(xml_rh(), valider=False) is None and p.liste.rowCount() == 1
+    assert p.importer_xml(xml_rh(), valider=True) == {"ajoutes": 2, "maj": 0}
+    assert p.liste.rowCount() == 3 and "أُضيف 2" in p.message.text()
+    assert p.importer_xml(xml_rh(), valider=True) == {"ajoutes": 0, "maj": 0}
+    assert p.liste.rowCount() == 3
+    from idara.services import import_rh as irh
+    d = __import__("idara.ui.page_personnel", fromlist=["x"]).DialogueImportRH(
+        irh.comparer(f.conn, irh.lire_xml(xml_rh())), p)
+    assert [d.table.item(i, 2).text() for i in range(3)] == ["دون تغيير", "دون تغيير", "لا يُستورد"]
+    assert d.choisies() == []
+    f.close()
