@@ -537,6 +537,7 @@ class PagePersonnel(QWidget):
     def enregistrer(self) -> int | None:
         try:
             p = self.lire_formulaire()
+            p.valider()   # الحقول الأساسية أولاً (النسب، الاسم، النوع...)
             m = rh.obligatoires_manquants(p)
             if m:   # قرار المدير 2026-11-03: معطيات التنظيم التربوي مطلوبة عند ملء ملف الأستاذ(ة)
                 raise rh.ErreurPersonnel("معطيات مطلوبة لملف الأستاذ(ة) (التنظيم التربوي): " + "، ".join(m)
