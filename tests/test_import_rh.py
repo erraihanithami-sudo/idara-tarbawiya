@@ -95,3 +95,22 @@ def test_nom_ar_compose_et_correction_inversion(base):  # noqa: F811
     irh.appliquer(conn, [pr])
     p = rh.lire(conn, p.id)
     assert (p.nom_ar, p.prenom_ar) == ("الوهمي", "سعيد")
+
+
+
+def test_reimport_garde_saisie_manuelle(base):  # noqa: F811
+    """ساعات العمل والوحدة والمادة المدخلة يدوياً تبقى بعد إعادة الاستيراد."""
+    conn = base
+    irh.appliquer(conn, irh.comparer(conn, irh.lire_xml(xml_rh([AGENTS[0]]))))
+    p = rh.lire(conn, rh.lister(conn, "9000001")[0].id)
+    assert p.heures_hebdo == 28
+    p.heures_hebdo, p.unite, p.matiere, p.telephone = 30, "وحدة فرعية", "مزدوجة", "0611111111"
+    rh.enregistrer(conn, p)
+    ag = list(AGENTS[0])
+    ag[11] = 8   # ترقية في الرتبة: تُقترح
+    pr = irh.comparer(conn, irh.lire_xml(xml_rh([tuple(ag)])))[0]
+    assert pr.etat == "maj" and [c[0] for c in pr.changements] == ["الرتبة"]
+    irh.appliquer(conn, [pr])
+    p = rh.lire(conn, p.id)
+    assert (p.heures_hebdo, p.unite, p.matiere, p.telephone, p.echelon) == (30, "وحدة فرعية", "مزدوجة",
+                                                                            "0611111111", "8")

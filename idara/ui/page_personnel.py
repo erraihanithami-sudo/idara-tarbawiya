@@ -318,6 +318,11 @@ class PagePersonnel(QWidget):
             boutons.addWidget(b)
         boutons.addStretch()
         fv.addLayout(boutons)
+        # نتيجة الحفظ بجانب الزر أيضاً: رسالة أعلى الصفحة لا تُرى بعد التمرير إلى أسفل الملف
+        self.message_bas = QLabel()
+        self.message_bas.setWordWrap(True)
+        self.message_bas.hide()
+        fv.addWidget(self.message_bas)
         fv.addStretch()
         corps.addWidget(c2, 7)
         self.rafraichir()
@@ -546,6 +551,7 @@ class PagePersonnel(QWidget):
         self.b_retour.setVisible(bool(p.id) and p.statut != "actif")
         self.b_suppr.setVisible(bool(p.id) and p.categorie != "directeur")
         self.message.hide()
+        self.message_bas.hide()
 
     def lire_formulaire(self) -> rh.Personnel:
         v = {k: (w.currentText() if isinstance(w, QComboBox) else w.text()) for k, w in self.c.items()}
@@ -592,6 +598,7 @@ class PagePersonnel(QWidget):
             pid = rh.enregistrer(self.f.conn, p)
         except rh.ErreurPersonnel as e:
             message(self.message, str(e), True)
+            message(self.message_bas, "لم يُحفظ الملف: " + str(e), True)
             return None
         self.rafraichir()
         self.afficher(pid)
@@ -602,6 +609,7 @@ class PagePersonnel(QWidget):
             selectionner(self.liste, ligne)
             self.liste.blockSignals(False)
         message(self.message, "حُفظ ملف الموظف.")
+        message(self.message_bas, "حُفظ ملف الموظف.")
         return pid
 
     def supprimer(self, confirmer: bool = True) -> bool:

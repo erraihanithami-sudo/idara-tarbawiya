@@ -49,6 +49,9 @@ LIBELLES = {"nom_ar": "النسب", "prenom_ar": "الاسم", "nom_fr": "الن
             "date_affectation_direction": "تاريخ التعيين بالمديرية الإقليمية",
             "date_affectation_academie": "تاريخ التعيين بالأكاديمية"}
 _NOMS = ("nom_ar", "prenom_ar", "nom_fr", "prenom_fr")
+# معطيات يدبّرها المدير محلياً: يملؤها الملف إن كانت فارغة فقط، ولا يغيّرها عند إعادة الاستيراد
+# (ملاحظة المدير 2026-11-03: ساعات العمل المدخلة يدوياً كانت تُستبدل بقيمة جدول الخدمة)
+LOCAUX = ("heures_hebdo", "niveau_enseigne", "matiere", "cycle", "fonction", "adresse", "telephone")
 
 
 @dataclass
@@ -272,7 +275,7 @@ def comparer(conn: sqlite3.Connection, agents: list[Agent]) -> list[Proposition]
                 if k == "categorie" and (ancien.categorie == "directeur" or x == "directeur"
                                          or x == "autre"):
                     continue
-                if k == "fonction" and ancien.fonction:
+                if k in LOCAUX and getattr(ancien, k) not in ("", None):
                     continue
                 avant = getattr(ancien, k)
                 if str(avant if avant is not None else "") != str(x):
