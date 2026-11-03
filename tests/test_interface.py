@@ -1169,7 +1169,8 @@ def test_programme_annuel_et_rappels(app, config_tmp, monkeypatch):
     p.debut.setText("07/10/2026")
     assert p.enregistrer(True) is not None, p.message.text()
     assert p.t_stations.rowCount() == 1
-    p.t_stations.selectRow(0)
+    from idara.ui.saisie import selectionner
+    selectionner(p.t_stations, 0)
     assert p.sid is not None and p.titre.text() == "اجتماع مجلس التدبير" and p.b_suppr.objectName() == "danger"
     p.titre.setText("")
     assert p.enregistrer(False) is None and "إجباري" in p.message.text()
@@ -1177,7 +1178,7 @@ def test_programme_annuel_et_rappels(app, config_tmp, monkeypatch):
     p.afficher_rappels(date(2027, 1, 20))
     etats = [p.t_rappels.item(i, 0).text() for i in range(p.t_rappels.rowCount())]
     assert "جارية" in etats and "قادمة" in etats
-    p.t_rappels.selectRow(0)
+    selectionner(p.t_rappels, 0)
     assert p.marquer_selection(p.t_rappels, True) == 1
     assert sum(1 for s in cal.stations(f.conn) if s.fait_le) == 1
     assert p.generer() is not None and "برنامج العمل السنوي" in p.message.text()
