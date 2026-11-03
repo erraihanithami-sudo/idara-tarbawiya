@@ -288,6 +288,7 @@ class PageAssociations(QWidget):
             h.addWidget(b)
         h.addStretch()
         cv.addLayout(h)
+        self.edit_id: int | None = None
         self.chiffres = {}
         g = QHBoxLayout()
         for k, lib in (("banque", "رصيد البنك (درهم)"), ("caisse", "رصيد الصندوق (درهم)"),
@@ -329,6 +330,9 @@ class PageAssociations(QWidget):
         self.ops.itemSelectionChanged.connect(self._selection_op)
         cv.addWidget(self.ops, 1)
         h = QHBoxLayout()
+        self.b_modif = QPushButton("تعديل العملية المحددة")
+        self.b_modif.setEnabled(False)
+        self.b_modif.clicked.connect(lambda: self.modifier())
         self.b_suppr = QPushButton("حذف العملية المحددة")
         self.b_suppr.setEnabled(False)
         self.b_suppr.clicked.connect(self.supprimer)
@@ -340,6 +344,7 @@ class PageAssociations(QWidget):
         self.l_pieces = QLabel()
         self.l_pieces.setObjectName("sousTitre")
         h.addWidget(self.b_pieces)
+        h.addWidget(self.b_modif)
         h.addWidget(self.b_suppr)
         h.addWidget(self.l_pieces, 1)
         cv.addLayout(h)
@@ -392,12 +397,20 @@ class PageAssociations(QWidget):
         g.addWidget(self.tiers_qualite, 15, 1)
         g.setColumnStretch(1, 1)
         self.grille_op = g
+        self.l_mode = QLabel()
+        self.l_mode.setObjectName("erreur")
+        self.l_mode.hide()
+        fv.addWidget(self.l_mode)
         fv.addLayout(g)
         h = QHBoxLayout()
         self.b_save = QPushButton("تسجيل العملية")
         self.b_save.setObjectName("principal")
         self.b_save.clicked.connect(lambda: self.enregistrer())
+        self.b_annuler = QPushButton("إلغاء التعديل")
+        self.b_annuler.clicked.connect(lambda: self._fin_edition())
+        self.b_annuler.hide()
         h.addWidget(self.b_save)
+        h.addWidget(self.b_annuler)
         h.addStretch()
         fv.addLayout(h)
         fv.addStretch()
@@ -472,6 +485,7 @@ class PageAssociations(QWidget):
         self._changer_exercice()
 
     def _changer_exercice(self) -> None:
+        self._fin_edition(vider=False)
         self.eid = self.exercice.currentData()
         actif = self.eid is not None
         for w in (self.b_export, self.b_rapport, self.b_autres, self.b_registres, self.b_budget, self.b_passation, self.tiers, self.tiers_qualite,
@@ -483,7 +497,7 @@ class PageAssociations(QWidget):
         else:
             message(self.message, "ابدأ بفتح السنة المالية الأولى، مع المنقول من السنة السابقة "
                                   "(من محضر تسليم المهام أو كشف الحساب).")
-        self.b_report.setEnabled(actif and asso.peut_modifier_report(self.f.conn, self.eid))
+        self.b_report.setEnabled(actif)
         e = asso.exercice(self.f.conn, self.eid) if actif else None
         if e:
             auj = date.today().isoformat()
@@ -508,6 +522,7 @@ class PageAssociations(QWidget):
     def afficher_operations(self) -> None:
         self.op_id = None
         self.b_suppr.setEnabled(False)
+        self.b_modif.setEnabled(False)
         self.b_pieces.setEnabled(False)
         self.l_pieces.setText("")
         reg = self.vue.currentData()
@@ -605,21 +620,65 @@ class PageAssociations(QWidget):
             op = asso.Operation(self.eid, _date(self.date, "تاريخ العملية"), self.nature.currentData(),
                                 self.registre.currentData(), self.montant.text(), self.ligne.currentData(),
                                 self.reference.text(), self.detail.text(), tiers=self.tiers.text(),
-                                tiers_qualite=self.tiers_qualite.text())
+                                tiers_qualite=self.tiers_qualite.text(), id=self.edit_id)
             oid = asso.enregistrer(self.f.conn, op)
         except asso.ErreurAssociation as e:
             message(self.message, str(e), True)
             return None
-        for w in (self.montant, self.reference, self.detail, self.tiers, self.tiers_qualite):
-            w.clear()
+        modif = self.edit_id is not None
+        self._fin_edition()
         self._changer_exercice()
-        message(self.message, "سُجلت العملية.")
+        message(self.message, "عُدلت العملية." if modif else "سُجلت العملية.")
         return oid
+
+    def modifier(self) -> bool:
+        """يحمّل العملية المحددة في الاستمارة لتعديلها (المنقول: نافذة «تعديل المنقول»)."""
+        if self.op_id is None:
+            return False
+        o = self.f.conn.execute("SELECT o.*, r.chapitre, r.ligne FROM operation_financiere o LEFT JOIN rubrique r "
+                                "ON r.id=o.rubrique_id WHERE o.id=?", (self.op_id,)).fetchone()
+        if o is None:
+            return False
+        if o["ligne"] == asso.REPORT:
+            return self.modifier_report()
+        self.nature.setCurrentIndex(self.nature.findData(o["nature"]))
+        self.registre.setCurrentIndex(self.registre.findData(o["registre"]))
+        if o["nature"] != "transfert":
+            if self.chapitre.findText(o["chapitre"]) < 0:   # بند لم يعد في الدليل
+                self.chapitre.addItem(o["chapitre"])
+            self.chapitre.setCurrentIndex(self.chapitre.findText(o["chapitre"]))
+            if self.ligne.findData(o["rubrique_id"]) < 0:
+                self.ligne.addItem(o["ligne"], o["rubrique_id"])
+            self.ligne.setCurrentIndex(self.ligne.findData(o["rubrique_id"]))
+        self.date.definir(o["date_op"])
+        self.montant.setText(f"{o['montant']:.2f}")
+        for w, k in ((self.reference, "reference"), (self.detail, "detail"), (self.tiers, "tiers"),
+                     (self.tiers_qualite, "tiers_qualite")):
+            w.setText(o[k] or "")
+        self.edit_id = o["id"]
+        self.b_save.setText("حفظ التعديل")
+        self.b_annuler.show()
+        self.l_mode.setText(f"تعديل العملية رقم {o['numero']}: صحح الخانات ثم «حفظ التعديل».")
+        self.l_mode.show()
+        self.montant.setFocus()
+        return True
+
+    def _fin_edition(self, vider: bool = True) -> None:
+        if getattr(self, "edit_id", None) is None:
+            return
+        self.edit_id = None
+        self.b_save.setText("تسجيل العملية")
+        self.b_annuler.hide()
+        self.l_mode.hide()
+        if vider:
+            for w in (self.montant, self.reference, self.detail, self.tiers, self.tiers_qualite):
+                w.clear()
 
     def _selection_op(self) -> None:
         rows = {i.row() for i in self.ops.selectedIndexes()}
         self.op_id = self.ops.item(rows.pop(), 0).data(Qt.UserRole) if len(rows) == 1 else None
         self.b_suppr.setEnabled(self.op_id is not None)
+        self.b_modif.setEnabled(self.op_id is not None)
         self.menu_pieces.clear()
         types = []
         if self.op_id is not None:
@@ -789,6 +848,9 @@ class PageAssociations(QWidget):
     def modifier_report(self, valeurs: dict | None = None) -> bool:
         """المنقول لأول سنة مالية في التطبيق (valeurs للاختبار، وإلا عبر النافذة)."""
         if self.eid is None:
+            return False
+        if not asso.peut_modifier_report(self.f.conn, self.eid):
+            message(self.message, asso.explication_report(self.f.conn, self.eid), True)
             return False
         if valeurs is None:
             r = asso.report(self.f.conn, self.eid)

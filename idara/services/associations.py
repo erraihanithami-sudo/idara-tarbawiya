@@ -199,6 +199,15 @@ def peut_modifier_report(conn, eid: int) -> bool:
     return _voisin(conn, eid, "precedent") is None
 
 
+def explication_report(conn, eid: int) -> str:
+    """لماذا لا يُعدل منقول سنة موالية يدوياً، وأين يُصحح."""
+    p = _voisin(conn, eid, "precedent")
+    if p is None:
+        return ""
+    return (f"المنقول في هذه السنة هو رصيد السنة المالية {exercice(conn, p)['libelle']} ويُحيَّن آلياً. إذا كان فيه "
+            "خطأ، فصحح عمليات تلك السنة (تعديل العملية أو حذفها) أو منقولها إن كانت أول سنة.")
+
+
 def synchroniser(conn, type_: str = "najah") -> list[str]:
     """يصحح منقول كل سنة من رصيد السابقة (بيانات سُجلت قبل التحيين الآلي). يرجع التنبيهات."""
     ex = sorted(exercices(conn, type_), key=lambda e: e["date_debut"])
@@ -283,8 +292,20 @@ def _premier_negatif(conn, eid: int, sauf: int | None = None,
     return None
 
 
+def _achat_lie(conn, op_id: int) -> str | None:
+    r = conn.execute("SELECT objet FROM achat WHERE operation_id=?", (op_id,)).fetchone()
+    return (r["objet"] or "ملف صرف") if r else None
+
+
 def enregistrer(conn, op: Operation) -> int:
     e = exercice(conn, op.exercice_id)
+    ancien = None
+    if op.id is not None:
+        ancien = conn.execute("SELECT * FROM operation_financiere WHERE id=?", (op.id,)).fetchone()
+        if ancien is None or ancien["exercice_id"] != op.exercice_id:
+            raise ErreurAssociation("العملية غير موجودة في هذه السنة المالية.")
+        if ancien["rubrique_id"] == _rubrique_report(conn, e["type"]):
+            raise ErreurAssociation("المنقول يُعدل بزر «تعديل المنقول».")
     if op.nature not in NATURES:
         raise ErreurAssociation("نوع العملية غير صحيح.")
     if op.registre not in REGISTRES:
@@ -315,6 +336,15 @@ def enregistrer(conn, op: Operation) -> int:
             raise ErreurAssociation("المنقول يُسجل عند فتح السنة المالية أو بزر «تعديل المنقول».")
     if op.nature != "recette" and not (op.reference or "").strip():
         raise ErreurAssociation("مرجع المصروف أو التحويل إجباري (فاتورة، سند الطلب، كشف الحساب...).")
+    if ancien is not None:
+        change = (ancien["date_op"] != op.date_op or ancien["nature"] != op.nature or ancien["registre"] != op.registre
+                  or ancien["rubrique_id"] != op.rubrique_id or abs(ancien["montant"] - montant) > 0.005)
+        if change and conn.execute("SELECT 1 FROM piece_association WHERE operation_id=?", (op.id,)).fetchone():
+            raise ErreurAssociation("صدرت لهذه العملية وثائق مرقمة (وصل أو سند): يمكن تصحيح المرجع والبيان والطرف "
+                                    "المعني فقط. لتصحيح المبلغ أو التاريخ أو البند، سجل عملية معاكسة مع ذكر السبب.")
+        lie = _achat_lie(conn, op.id)
+        if change and lie:
+            raise ErreurAssociation(f"هذه العملية أداء ملف الصرف «{lie}»: يمكن تصحيح المرجع والبيان فقط.")
     neg = _premier_negatif(conn, e["id"], op.id, (op.date_op, _effet(op.nature, op.registre, montant)))
     if neg:
         raise ErreurAssociation(f"رصيد {REGISTRES[neg[0]]} لا يكفي: يصير سالباً بتاريخ {neg[1]}.")
@@ -344,6 +374,9 @@ def supprimer(conn, op_id: int) -> None:
     if conn.execute("SELECT 1 FROM piece_association WHERE operation_id=?", (op_id,)).fetchone():
         raise ErreurAssociation("صدرت لهذه العملية وثائق مرقمة (وصل أو سند): لا تُحذف. "
                                 "صحح الخطأ بعملية معاكسة مع ذكر السبب في البيان.")
+    lie = _achat_lie(conn, op_id)
+    if lie:
+        raise ErreurAssociation(f"هذه العملية أداء ملف الصرف «{lie}»: لا تُحذف من هنا.")
     if r["rubrique_id"] == _rubrique_report(conn, exercice(conn, r["exercice_id"])["type"]):
         raise ErreurAssociation("المنقول لا يُحذف: عدّله بزر «تعديل المنقول» (أول سنة مالية) أو يُحيَّن آلياً.")
     if _premier_negatif(conn, r["exercice_id"], sauf=op_id):

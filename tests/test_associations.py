@@ -146,6 +146,36 @@ def test_report_dans_le_solde_et_mis_a_jour(conn, ex):
     assert asso.report(conn, e2)["banque"] == 52000.5
 
 
+def test_modifier_operation(conn, ex):
+    """تعديل عملية: المبلغ والبند ممكنان ما لم تصدر وثيقة مرقمة؛ المرجع والبيان دائماً."""
+    r = _rub(conn, "معدات وعتاد مكتبي")
+    op = asso.Operation(ex, "2025-11-02", "depense", "banque", 1000, r, "فاتورة 3", "طابعة")
+    oid = asso.enregistrer(conn, op)
+    op.montant, op.detail = 1100, "طابعة ليزر"
+    assert asso.enregistrer(conn, op) == oid
+    assert asso.soldes(conn, ex)["banque"] == 48900 and len(asso.operations(conn, ex)) == 3
+    op.montant = 60000
+    with pytest.raises(asso.ErreurAssociation, match="لا يكفي"):
+        asso.enregistrer(conn, op)
+    op.montant = 1100
+    # بعد إصدار وثيقة مرقمة: النصوص فقط
+    conn.execute("INSERT INTO piece_association(exercice_id, type, operation_id, numero) VALUES (?,?,?,1)",
+                 (ex, "ordre_paiement", oid))
+    conn.commit()
+    op.reference = "فاتورة 3 مكرر"
+    asso.enregistrer(conn, op)
+    op.montant = 1000
+    with pytest.raises(asso.ErreurAssociation, match="عملية معاكسة"):
+        asso.enregistrer(conn, op)
+    # المنقول لا يُعدل من الاستمارة
+    rep = next(o for o in asso.operations(conn, ex) if o["ligne"] == asso.REPORT)
+    with pytest.raises(asso.ErreurAssociation, match="تعديل المنقول"):
+        asso.enregistrer(conn, asso.Operation(ex, "2025-09-01", "recette", "banque", 1, _rub(conn, "منحة المديرية"),
+                                              id=rep["id"]))
+    e2 = asso.ouvrir_exercice(conn, "najah", "2026/2027", "2026-09-01", "2027-08-31")
+    assert "2025/2026" in asso.explication_report(conn, e2) and asso.explication_report(conn, ex) == ""
+
+
 def test_sans_report_a_l_ouverture_repare(conn):
     """سنة فُتحت دون منقولها (خلل سابق): يصححها التحيين من رصيد السنة السابقة."""
     e1 = asso.ouvrir_exercice(conn, "najah", "2025", "2025-01-01", "2025-12-31", report_banque=9000)

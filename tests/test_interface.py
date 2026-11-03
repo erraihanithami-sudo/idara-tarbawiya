@@ -623,8 +623,47 @@ def test_association_formulaire_et_report(app, config_tmp):
     assert p.modifier_report(dict(banque="12 500,00", caisse="250", reference="كشف الحساب"))
     assert p.chiffres["banque"].text() == "12 500.00" and p.chiffres["caisse"].text() == "250.00"
     e2 = p.ouvrir(dict(libelle="2027", debut="2027-01-01", fin="2027-12-31"))
-    assert e2 and p.chiffres["banque"].text() == "12 500.00" and not p.b_report.isEnabled()
-    assert not p.modifier_report(dict(banque="1", caisse="0"))
+    assert e2 and p.chiffres["banque"].text() == "12 500.00"
+    assert not p.modifier_report(dict(banque="1", caisse="0")) and "2026" in p.message.text()
+    f.close()
+
+
+def test_association_modifier_operation(app, config_tmp):
+    """طلب المدير (2026-11-03): تعديل العمليات وحذفها، وتعديل المنقول."""
+    from idara.services import associations as asso
+    from idara.ui.saisie import selectionner
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("جمعية دعم مدرسة النجاح")
+    p = f.page_asso
+    eid = p.ouvrir(dict(libelle="2026", debut="2026-01-01", fin="2026-12-31", report_banque=5000, report_caisse=0))
+    p.nature.setCurrentIndex(p.nature.findData("depense"))
+    p.chapitre.setCurrentIndex(p.chapitre.findText("التجهيزات"))
+    p.date.setText("05/03/2026")
+    p.montant.setText("1200")
+    p.reference.setText("فاتورة 1")
+    p.detail.setText("حاسوب")
+    oid = p.enregistrer()
+    assert oid, p.message.text()
+    ligne = p.ligne.currentData()
+
+    def rangee(cond):
+        return next(k for k in range(p.ops.rowCount()) if cond(p.ops.item(k, 0).data(Qt.UserRole)))
+
+    selectionner(p.ops, rangee(lambda x: x == oid))
+    assert p.b_modif.isEnabled() and p.modifier()
+    assert p.b_save.text() == "حفظ التعديل" and p.montant.text() == "1200.00" and p.detail.text() == "حاسوب"
+    assert p.ligne.currentData() == ligne and p.nature.currentData() == "depense"
+    p.montant.setText("1500")
+    assert p.enregistrer() == oid and p.b_save.text() == "تسجيل العملية"
+    assert len(asso.operations(f.conn, eid)) == 2 and asso.totaux(f.conn, eid)["banque"] == 3500
+    selectionner(p.ops, rangee(lambda x: x == oid))
+    p.modifier()
+    p._fin_edition()
+    assert p.edit_id is None and p.montant.text() == ""
+    assert p.modifier_report(dict(banque="6000", caisse="0"))
+    assert asso.totaux(f.conn, eid)["banque"] == 4500
+    selectionner(p.ops, rangee(lambda x: x == oid))
+    assert p.supprimer() and asso.totaux(f.conn, eid)["banque"] == 6000
     f.close()
 
 
