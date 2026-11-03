@@ -18,9 +18,10 @@ from idara.services import tarl
 from idara.services import vie_scolaire as vs
 from idara.ui.composants import carte, entete
 from idara.ui.formulaires import champ, etiquette
+from idara.ui import theme
 from idara.ui.saisie import ChampDate, cellule, message, tableau
 
-VERT, ROUGE = QColor("#006233"), QColor("#B3261E")
+VERT, ROUGE = QColor(theme.VERT), QColor(theme.ROUGE_TEXTE)
 
 
 def _n(x, suffixe="") -> str:

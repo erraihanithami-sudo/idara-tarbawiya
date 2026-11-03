@@ -166,7 +166,7 @@ class PageEleves(QWidget):
 
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
-        sep.setStyleSheet("color:#EFEBE2;")
+        sep.setStyleSheet("color:#E4E2DD;")
         fv.addWidget(sep)
         t = QLabel("الهوية")
         t.setObjectName("titreCarte")

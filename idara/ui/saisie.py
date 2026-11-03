@@ -6,6 +6,7 @@ from datetime import date
 
 from PySide6.QtCore import QDate, QLocale, QPoint, QRectF, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from idara.ui import theme
 from PySide6.QtWidgets import (QAbstractItemView, QCalendarWidget, QFrame, QHeaderView, QLabel, QLineEdit,
                                QTableWidget, QTableWidgetItem, QVBoxLayout)
 
@@ -15,7 +16,7 @@ def _icone_calendrier() -> QIcon:
     pm.fill(Qt.transparent)
     p = QPainter(pm)
     p.setRenderHint(QPainter.Antialiasing)
-    vert = QColor("#006233")
+    vert = QColor(theme.VERT)
     p.setPen(QPen(vert, 2.4))
     p.drawRoundedRect(QRectF(5, 7, 22, 20), 3, 3)
     p.fillRect(QRectF(5, 7, 22, 6), vert)

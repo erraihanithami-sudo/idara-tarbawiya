@@ -6,18 +6,28 @@ from pathlib import Path
 
 from PySide6.QtGui import QFont, QFontDatabase
 
-VERT = "#006233"         # أخضر العلم: الأزرار الرئيسية والعنصر النشط
-VERT_FONCE = "#00451F"
-VERT_CLAIR = "#E6F0EA"
-ROUGE = "#C1272D"        # أحمر العلم: التنبيهات المهمة فقط
-ROUGE_TEXTE = "#A61F25"
-ROUGE_CLAIR = "#FBF1F1"
-PLATRE = "#F6F4EE"       # خلفية الشاشات
+# لوحة الألوان (اختيار المدير 2026-11-03، من إنفوغرافيا «خارج الفصل... وأولويات التطوير»).
+# الأسماء القديمة محفوظة لأن الواجهة كلها تستعملها. التباين محسوب (WCAG): النص العادي 4.5:1 على الأقل.
+MARINE = "#1F2A44"       # الكحلي: النصوص والعناوين
+SARCELLE = "#0E9688"     # الأخضر المزرق: الأيقونات والتعبئات (3.7:1، لا يُكتب به نص صغير)
+MENTHE = "#5EE6D3"
+VIOLET = "#7C3AED"
+BLEU = "#2563EB"
+ROSE = "#DB2777"
+ORANGE = "#D97706"       # للأيقونات فقط (3.2:1 على الأبيض)
+
+VERT = "#0B7A6F"         # الأزرار الرئيسية والعنصر النشط (الأبيض عليه 5.2:1)
+VERT_FONCE = MARINE      # النص على الخلفيات الفاتحة، وتمرير الفأرة على الأزرار الرئيسية
+VERT_CLAIR = "#DDF1EC"   # خلفية العنصر النشط والتحديد (الكحلي عليها 12:1)
+ROUGE = ROSE             # التنبيهات المهمة فقط
+ROUGE_TEXTE = "#9D174D"  # نص التنبيه (6.7:1 على خلفيته)
+ROUGE_CLAIR = "#FCE8F1"
+PLATRE = "#F6F5F1"       # خلفية الشاشات
 BLANC = "#FFFFFF"
-ENCRE = "#1D2620"        # النصوص
-GRIS = "#5E6660"         # النصوص الثانوية
-LIGNE = "#E3DED2"
-BORDURE_CHAMP = "#CFC8B8"
+ENCRE = MARINE           # النصوص (13:1 على الخلفية)
+GRIS = "#5A6172"         # النصوص الثانوية (5.7:1)
+LIGNE = "#E4E2DD"
+BORDURE_CHAMP = "#C9C6BD"
 
 DOSSIER_POLICES = Path(__file__).resolve().parent.parent / "resources" / "fonts"
 POLICE_PREFEREE = "IBM Plex Sans Arabic"
@@ -73,16 +83,17 @@ QPushButton {{
 QPushButton:hover {{ border-color: {VERT}; }}
 QPushButton#principal {{ background: {VERT}; color: {BLANC}; border: 0; font-weight: 600; }}
 QPushButton#principal:hover {{ background: {VERT_FONCE}; }}
-QPushButton#principal:disabled {{ background: #9DB8A8; }}
+QPushButton#principal:disabled {{ background: #A9CFC9; }}
 QPushButton#nav {{
-    text-align: right; border: 0; border-radius: 8px; padding: 0 14px; min-height: 44px; }}
+    text-align: right; border: 0; border-radius: 10px; padding: 0 12px; min-height: 46px; }}
 QTabWidget#sections::pane {{ border: 0; }}
 QTabWidget#sections > QTabBar {{ background: {PLATRE}; }}
 QTabBar::tab {{ background: transparent; color: {GRIS}; padding: 10px 22px; margin: 0 2px;
     border: 0; border-bottom: 3px solid transparent; font-size: 11pt; }}
 QTabBar::tab:selected {{ color: {VERT_FONCE}; border-bottom: 3px solid {VERT}; font-weight: 600; }}
 QTabBar::tab:hover:!selected {{ color: {ENCRE}; }}
-QPushButton#nav:checked {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; font-weight: 600; }}
+QPushButton#nav:checked {{ background: {VERT_CLAIR}; color: {MARINE}; font-weight: 700;
+    border-right: 4px solid {VERT}; }}
 QPushButton#nav:hover:!checked {{ background: {PLATRE}; }}
 QRadioButton {{ min-height: 36px; }}
 QRadioButton::indicator, QCheckBox::indicator {{ width: 18px; height: 18px; }}

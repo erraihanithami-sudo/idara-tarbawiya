@@ -80,7 +80,7 @@ class PageDocuments(QWidget):
             if i:
                 sep = QFrame()
                 sep.setFrameShape(QFrame.HLine)
-                sep.setStyleSheet("color:#EFEBE2;")
+                sep.setStyleSheet("color:#E4E2DD;")
                 cv.addWidget(sep)
             ligne = LigneModele(self, code)
             self.lignes[code] = ligne

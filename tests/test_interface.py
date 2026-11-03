@@ -893,3 +893,29 @@ def test_page_conseils_etablissement(app, config_tmp, monkeypatch):
     assert p.pv() and p.convocation() and len(ouverts) == 2
     assert ce.suivi(f.conn)[0]["nombre"] == 1
     f.close()
+
+
+def test_icones_des_sections(app, config_tmp):
+    """لكل قسم رئيسي أيقونة خاصة به (طلب المدير 2026-11-03)، والألوان بتباين كاف."""
+    from idara.ui import fenetre as fe, icones, theme
+    noms = [n for n, _ in fe.SECTIONS]
+    assert set(noms) <= set(icones.DESSINS) and set(noms) <= set(icones.COULEURS)
+    images = {n: icones.pixmap(n).toImage() for n in noms}
+    assert all(not img.isNull() and img.pixelColor(24, 24).alpha() >= 0 for img in images.values())
+    assert len({bytes(img.constBits()) for img in images.values()}) == len(noms)  # أيقونات مختلفة
+
+    def lum(h):
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def contraste(a, b):
+        x, y = sorted((lum(a), lum(b)), reverse=True)
+        return (x + 0.05) / (y + 0.05)
+
+    for texte, fond in ((theme.BLANC, theme.VERT), (theme.ENCRE, theme.PLATRE), (theme.GRIS, theme.PLATRE),
+                        (theme.ENCRE, theme.VERT_CLAIR), (theme.ROUGE_TEXTE, theme.ROUGE_CLAIR)):
+        assert contraste(texte, fond) >= 4.5, (texte, fond)
+    f = _fenetre_avec_eleves(config_tmp)
+    assert all(not b.icon().isNull() for b in f.boutons)
+    f.close()

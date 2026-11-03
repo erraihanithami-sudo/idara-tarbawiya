@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QMainWindow, QMessageBox, QPushButton, QScrollArea,
                                QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
@@ -18,7 +18,7 @@ from idara.services import import_eleves as imp
 from idara.services import sauvegarde
 from idara.services.etablissement import ErreurValidation
 from idara.services.textes import date_longue_ar
-from idara.ui import theme
+from idara.ui import icones, theme
 from idara.ui.composants import carte, entete, page_defilante
 from idara.ui.formulaires import FormDirecteur, FormEtablissement, FormIdentite
 from idara.ui.page_documents import PageDocuments
@@ -368,6 +368,8 @@ class FenetrePrincipale(QMainWindow):
         for i, (nom, noms) in enumerate(SECTIONS):
             b = QPushButton(nom if noms else f"{nom}  ·  قريباً")
             b.setObjectName("nav")
+            b.setIcon(icones.icone(nom))
+            b.setIconSize(QSize(24, 24))
             b.setCheckable(True)
             b.setCursor(Qt.PointingHandCursor)
             b.clicked.connect(lambda _=False, i=i: self.aller(i))

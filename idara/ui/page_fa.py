@@ -11,6 +11,7 @@ from idara.services import fa
 from idara.services import textes as tx
 from idara.ui.composants import carte, entete
 from idara.ui.formulaires import etiquette
+from idara.ui import theme
 from idara.ui.saisie import cellule, message, tableau
 
 RESULTATS = {"maintenu": "يبقى", "fa": "فائض", "exempte": "مستثنى", "incomplet": "غير مرتب", "": "—"}
@@ -69,7 +70,7 @@ class CarteMatiere(QWidget):
             for j, val in enumerate(vals):
                 it = cellule(val, l.p.id if j == 0 else None)
                 if l.resultat == "fa":
-                    it.setForeground(QColor("#A61E24"))
+                    it.setForeground(QColor(theme.ROUGE_TEXTE))
                 self.table.setItem(i, j, it)
         self.table.setMinimumHeight(self.table.horizontalHeader().sizeHint().height() + 30
                                     + 40 * max(1, len(lignes)))
