@@ -113,6 +113,16 @@ def test_fenetre_principale_et_edition(app, config_tmp):
         programmes = [n for n, _ in fils if n in f.pages]
         assert ("قريباً" in f.boutons[i].text()) == (not programmes)
     assert f.page_courante() is not None
+    f.aller_a("الرخص")
+    f.aller([t for t, _ in SECTIONS].index("التلاميذ"))
+    assert f.page_courante() == "التلاميذ"
+    f.page_etab.f_etab.nom_ar.setText("اسم معدل")
+    f.page_etab.enregistrer()
+    assert f.page_etab.message.objectName() == "info", f.page_etab.message.text()
+    assert et.lire_etablissement(f.conn).nom_ar == "اسم معدل"
+    assert f.nom_etab.text() == "اسم معدل"
+    f.close()
+    assert len(list((dossier.sauvegardes).glob("*.db"))) == 1
 
 
 def test_navigation_deroulante(app, config_tmp):
@@ -139,16 +149,6 @@ def test_navigation_deroulante(app, config_tmp):
     f.boutons[j].click()
     assert f.page_courante() == "تسليم المهام" and f.boutons[j].isChecked() and not f.est_ouvert(i)
     f.close()
-    f.aller_a("الرخص")
-    f.aller([t for t, _ in SECTIONS].index("التلاميذ"))
-    assert f.page_courante() == "التلاميذ"
-    f.page_etab.f_etab.nom_ar.setText("اسم معدل")
-    f.page_etab.enregistrer()
-    assert f.page_etab.message.objectName() == "info", f.page_etab.message.text()
-    assert et.lire_etablissement(f.conn).nom_ar == "اسم معدل"
-    assert f.nom_etab.text() == "اسم معدل"
-    f.close()
-    assert len(list((dossier.sauvegardes).glob("*.db"))) == 1
 
 
 def test_page_documents(app, config_tmp, monkeypatch):
