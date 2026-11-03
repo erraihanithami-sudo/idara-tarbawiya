@@ -16,7 +16,7 @@ from idara.services import evaluation as ev
 from idara.services import personnel as rh
 from idara.services import tarl
 from idara.services import vie_scolaire as vs
-from idara.ui.composants import carte, entete
+from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui import theme
 from idara.ui.saisie import ChampDate, cellule, message, tableau
@@ -316,7 +316,7 @@ class PageVieScolaire(QWidget):
                         ("حفظ التعديل", lambda: self.enregistrer_club(False)),
                         ("حذف النادي", lambda: self.supprimer_club()),
                         ("لائحة الأعضاء (Word)", lambda: self.liste_club())):
-            b = QPushButton(lib)
+            b = bouton(lib)
             b.clicked.connect(fn)
             h.addWidget(b)
         h.addStretch()
@@ -348,7 +348,7 @@ class PageVieScolaire(QWidget):
         h = QHBoxLayout()
         for lib, fn in (("البرنامج السنوي (Word)", lambda: self.document("programme")),
                         ("حصيلة الأنشطة (Word)", lambda: self.document("bilan"))):
-            b = QPushButton(lib)
+            b = bouton(lib)
             b.setObjectName("principal")
             b.clicked.connect(fn)
             h.addWidget(b)
@@ -384,7 +384,7 @@ class PageVieScolaire(QWidget):
         for lib, fn in (("تسجيل نشاط جديد", lambda: self.enregistrer_activite(True)),
                         ("حفظ التعديل", lambda: self.enregistrer_activite(False)),
                         ("حذف النشاط", lambda: self.supprimer_activite())):
-            b = QPushButton(lib)
+            b = bouton(lib)
             b.clicked.connect(fn)
             h.addWidget(b)
         h.addStretch()
@@ -673,7 +673,7 @@ class PageRiyada(QWidget):
         for lib, fn, prin in (("حفظ الملف", lambda: self.enregistrer_dossier(), False),
                               ("ملف الشارة (Word)", lambda: self.document("dossier"), True),
                               ("لائحة التلاميذ ذوي الصعوبات (Word)", lambda: self.document("difficultes"), True)):
-            b = QPushButton(lib)
+            b = bouton(lib)
             if prin:
                 b.setObjectName("principal")
             b.clicked.connect(fn)

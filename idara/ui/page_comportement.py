@@ -12,7 +12,7 @@ from idara.services import comportement as cp
 from idara.services import documents as dc
 from idara.services import eleves as el
 from idara.services import textes as tx
-from idara.ui.composants import carte, entete
+from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.saisie import ChampDate, cellule, message, tableau
 
@@ -95,7 +95,7 @@ class PageComportement(QWidget):
         self.b_conv = QPushButton("تسجيل واستدعاء ولي الأمر")
         self.b_conv.setObjectName("principal")
         self.b_conv.clicked.connect(lambda: self.enregistrer(True))
-        self.b_suppr = QPushButton("حذف الملاحظة المحددة")
+        self.b_suppr = bouton("حذف الملاحظة المحددة")
         self.b_suppr.clicked.connect(self.supprimer)
         for b in (self.b_conv, self.b_save, self.b_suppr):
             h.addWidget(b)

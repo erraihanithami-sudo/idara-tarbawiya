@@ -14,7 +14,7 @@ from idara.services import conges as cg
 from idara.services import documents as dc
 from idara.services import personnel as rh
 from idara.services import textes as tx
-from idara.ui.composants import carte, entete
+from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.saisie import ChampDate, cellule, message, tableau
 
@@ -80,7 +80,7 @@ class DialogueBordereau(QDialog):
         h = QHBoxLayout()
         b1 = QPushButton("+ سطر")
         b1.clicked.connect(lambda: self.ajouter("", 1))
-        b2 = QPushButton("حذف السطر المحدد")
+        b2 = bouton("حذف السطر المحدد")
         b2.clicked.connect(lambda: self.table.removeRow(self.table.currentRow()))
         h.addWidget(b1)
         h.addWidget(b2)

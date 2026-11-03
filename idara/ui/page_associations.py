@@ -15,7 +15,7 @@ from idara.services import bureautique
 from idara.services import achats as ac
 from idara.services import docs_association as da
 from idara.services import textes as tx
-from idara.ui.composants import carte, entete
+from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.saisie import ChampDate, cellule, message, tableau
 
@@ -333,7 +333,7 @@ class PageAssociations(QWidget):
         self.b_modif = QPushButton("تعديل العملية المحددة")
         self.b_modif.setEnabled(False)
         self.b_modif.clicked.connect(lambda: self.modifier())
-        self.b_suppr = QPushButton("حذف العملية المحددة")
+        self.b_suppr = bouton("حذف العملية المحددة")
         self.b_suppr.setEnabled(False)
         self.b_suppr.clicked.connect(self.supprimer)
         self.b_pieces = QPushButton("وثائق العملية")

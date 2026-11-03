@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QHBoxLay
 
 from idara.services import bureautique
 from idara.services import conseils_etab as ce
-from idara.ui.composants import carte
+from idara.ui.composants import bouton, carte
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.page_pedagogie import _grille, _page
 from idara.ui.saisie import ChampDate, cellule, message, tableau
@@ -68,7 +68,7 @@ class PageConseilsEtab(QWidget):
         for lib, fn in (("تركيبة مقترحة (المرسوم ومعطيات التطبيق)", lambda: self.proposer()),
                         ("سطر إضافي", lambda: self.membres.setRowCount(self.membres.rowCount() + 1)),
                         ("حفظ التركيبة", lambda: self.enregistrer_membres())):
-            b = QPushButton(lib)
+            b = bouton(lib)
             b.clicked.connect(fn)
             h.addWidget(b)
         h.addStretch()
@@ -130,7 +130,7 @@ class PageConseilsEtab(QWidget):
                            ("حذف الاجتماع", lambda: self.supprimer(), False),
                            ("المحضر (Word)", lambda: self.pv(), True),
                            ("استدعاء الأعضاء (Word)", lambda: self.convocation(), True)):
-            b = QPushButton(lib)
+            b = bouton(lib)
             if p:
                 b.setObjectName("principal")
             b.clicked.connect(fn)

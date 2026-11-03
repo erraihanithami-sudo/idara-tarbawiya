@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QLabel, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 
 def carte(titre: str | None = None) -> tuple[QFrame, QVBoxLayout]:
@@ -43,3 +43,13 @@ def entete(titre: str, sous_titre: str = "") -> QWidget:
         s.setWordWrap(True)
         v.addWidget(s)
     return w
+
+
+def bouton(texte: str) -> QPushButton:
+    """زر عادي؛ أزرار الحذف بالأحمر مع علامة الحذف (اقتراح المدير 2026-11-03)."""
+    b = QPushButton(texte)
+    if texte.strip().startswith("حذف"):
+        from idara.ui import icones
+        b.setObjectName("danger")
+        b.setIcon(icones.corbeille())
+    return b

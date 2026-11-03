@@ -14,7 +14,7 @@ from idara.services import achats as ac
 from idara.services import associations as asso
 from idara.services import bureautique
 from idara.services import textes as tx
-from idara.ui.composants import carte, entete
+from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.saisie import ChampDate, cellule, message, tableau
 
@@ -176,7 +176,7 @@ class PageAchats(QWidget):
         self.b_nouveau.setObjectName("principal")
         self.b_nouveau.clicked.connect(lambda: self.nouveau())
         h.addWidget(self.b_nouveau)
-        self.b_suppr = QPushButton("حذف الملف المحدد")
+        self.b_suppr = bouton("حذف الملف المحدد")
         self.b_suppr.clicked.connect(lambda: self.supprimer())
         h.addWidget(self.b_suppr)
         h.addStretch()
@@ -270,7 +270,7 @@ class PageAchats(QWidget):
         b = QPushButton("تسجيل العرض")
         b.clicked.connect(lambda: self.ajouter_offre())
         h.addWidget(b)
-        b = QPushButton("حذف العرض المحدد")
+        b = bouton("حذف العرض المحدد")
         b.clicked.connect(lambda: self.supprimer_offre())
         h.addWidget(b)
         h.addStretch()
