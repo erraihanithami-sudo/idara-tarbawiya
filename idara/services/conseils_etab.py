@@ -304,7 +304,9 @@ def suivi(conn, annee: str | None = None) -> list[dict]:
             if not fin:
                 alertes.append("دورة نهاية السنة (التقرير السنوي العام، حاجيات السنة الموالية) غير مسجلة")
         ec = ecarts_decret(conn, c, a["libelle"])
-        if ec:
+        if not membres_actifs(conn, c, a["libelle"]):
+            alertes.append("التركيبة غير مسجلة")
+        elif ec:
             alertes.append("مقاعد ينص عليها المرسوم غير مسجلة: " + "، ".join(ec))
         res.append({"conseil": c, "libelle": lib, "nombre": len(ss), "minimum": MINIMUM_ANNUEL[c],
                     "derniere": ss[-1]["date_seance"] if ss else None, "alertes": alertes})
