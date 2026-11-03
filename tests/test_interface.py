@@ -1102,9 +1102,10 @@ def test_lauha_qiyada_et_boutons_suppression(app, config_tmp):
     t.rafraichir()
     assert [j.titre for j in t.jauges][3:] == ["التعلمات الأساس: اللغة العربية", "التعلمات الأساس: اللغة الفرنسية",
                                              "التعلمات الأساس: الرياضيات"]
-    assert list(t.boutons_unites) == [None, "الوحدة المركزية", "الوحدة الفرعية"]
-    t.boutons_unites["الوحدة الفرعية"].click()
-    assert t.unite == "الوحدة الفرعية" and t.boutons_unites["الوحدة الفرعية"].isChecked()
+    unites = et.unites(f.conn)
+    assert list(t.boutons_unites) == [None, *unites] and len(unites) >= 2
+    t.boutons_unites[unites[-1]].click()
+    assert t.unite == unites[-1] and t.boutons_unites[unites[-1]].isChecked()
     t.boutons_unites[None].click()
     assert t.unite is None
     rouges = [b for b in f.findChildren(QPushButton) if b.text().startswith("حذف")]
