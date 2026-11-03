@@ -600,7 +600,7 @@ def test_page_conseils(app, config_tmp, monkeypatch):
     ouverts = []
     monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
     f = _fenetre_avec_eleves(config_tmp)
-    f.aller_a("التقييم")
+    f.aller_a("مجالس الأقسام")
     p = f.page_conseils
     assert f.page_courante() == "مجالس الأقسام" and not p.b_pv.isEnabled()
     fic = classeur_resultats(config_tmp / "r.xlsx", {
