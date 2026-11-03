@@ -159,6 +159,11 @@ class PageConges(QWidget):
         self.alertes.setObjectName("alerte")
         self.alertes.setWordWrap(True)
         racine.addWidget(self.alertes)
+        self.l_radaa = QLabel()
+        self.l_radaa.setObjectName("info")
+        self.l_radaa.setWordWrap(True)
+        self.l_radaa.hide()
+        racine.addWidget(self.l_radaa)
         self.message = QLabel()
         self.message.setWordWrap(True)
         self.message.hide()
@@ -210,6 +215,23 @@ class PageConges(QWidget):
                               ("تمديد لرخصة سابقة", self.prolongation), ("تاريخ الطلب", self.date_demande),
                               ("تاريخ البداية *", self.debut), ("المدة *", self.duree)]))
         fv.addWidget(self.fin)
+        # رخصة الرضاعة: ساعة يومياً إلى بلوغ الطفل 24 شهراً (الفصل 46، القانون 30.22)
+        self.zone_radaa = QWidget()
+        zr = QVBoxLayout(self.zone_radaa)
+        zr.setContentsMargins(0, 0, 0, 0)
+        self.naissance = ChampDate()
+        self.naissance.textChanged.connect(lambda _: self._proposer_radaa())
+        self.horaire = champ("مثال: 11:00 - 12:00", ltr=True)
+        zr.addLayout(_grille([("تاريخ ازدياد الطفل (أو الكفالة) *", self.naissance),
+                              ("الساعة المخصصة يومياً", self.horaire)]))
+        n = QLabel("ساعة واحدة في اليوم، من انتهاء رخصة الولادة أو الكفالة إلى أن يبلغ الطفل 24 شهراً "
+                   "(الفصل 46 من النظام الأساسي العام للوظيفة العمومية، كما غُيّر بالقانون 30.22). "
+                   "تُقترح البداية والمدة آلياً من تاريخ الازدياد ومن رخصة الولادة المسجلة.")
+        n.setObjectName("sousTitre")
+        n.setWordWrap(True)
+        zr.addWidget(n)
+        self.zone_radaa.hide()
+        fv.addWidget(self.zone_radaa)
         fv.addLayout(_grille([("السبب", self.motif), ("عنوان الإقامة خلال الرخصة", self.adresse),
                               ("رأي المدير", self.avis), ("الإجراءات المتخذة في سير الدراسة", self.mesures),
                               ("المرفقات", self.pieces)]))
@@ -293,6 +315,11 @@ class PageConges(QWidget):
             f"{r['prenom_ar']} {r['nom_ar']} (انتهت {tx.date_chiffres(r['date_fin'])})" for r in attendues)
             if attendues else "")
         self.alertes.setVisible(bool(attendues))
+        radaa = cg.allaitements_en_cours(conn)
+        self.l_radaa.setText("رخص رضاعة جارية: " + "، ".join(
+            f"{r['prenom_ar']} {r['nom_ar']} ({r['horaire_allaitement'] or 'الساعة غير محددة'}، "
+            f"إلى {tx.date_chiffres(r['date_fin'])})" for r in radaa) if radaa else "")
+        self.l_radaa.setVisible(bool(radaa))
         lignes = cg.lister(conn)
         aujourdhui = date.today().isoformat()
         self.liste.setRowCount(len(lignes))
@@ -312,8 +339,24 @@ class PageConges(QWidget):
     # ---------- الملف ----------
 
     def _maj_type(self) -> None:
-        if not self.motif.text() or self.motif.text() in ("مرض", "الولادة"):
+        if not self.motif.text() or self.motif.text() in ("مرض", "الولادة", "الرضاعة"):
             self.motif.setText(cg.motif_defaut(self.type.currentText()))
+        self.zone_radaa.setVisible(self.type.currentText() == cg.RADAA)
+        self._proposer_radaa()
+
+    def _proposer_radaa(self) -> None:
+        """البداية والمدة المقترحتان لرخصة الرضاعة (رخصة جديدة فقط)."""
+        if self.type.currentText() != cg.RADAA or self.cid is not None:
+            return
+        try:
+            n = self.naissance.iso()
+        except ValueError:
+            return
+        if not n:
+            return
+        debut, fin = cg.periode_allaitement(self.f.conn, self.personnel.currentData(), n)
+        self.debut.definir(debut)
+        self.duree.setValue(max(1, (date.fromisoformat(fin) - date.fromisoformat(debut)).days + 1))
 
     def _maj_prolongations(self, choix: int | None = None) -> None:
         self.prolongation.clear()
@@ -343,7 +386,8 @@ class PageConges(QWidget):
         self.titre.setText("رخصة جديدة")
         self.personnel.setEnabled(True)
         for w in (self.motif, self.adresse, self.avis, self.mesures, self.pieces, self.medecin, self.specialite,
-                  self.deposant, self.deposant_cin, self.rem_cert, self.debut, self.recu_le):
+                  self.deposant, self.deposant_cin, self.rem_cert, self.debut, self.recu_le, self.naissance,
+                  self.horaire):
             w.clear()
         self.date_demande.definir(date.today().isoformat())
         self.duree.setValue(1)
@@ -370,14 +414,17 @@ class PageConges(QWidget):
                      (self.deposant_cin, c.certificat_remis_par_cin), (self.rem_cert, c.remarques_certificat)):
             w.setText(v or "")
         self.recu_le.definir(c.certificat_recu_le or None)
+        self.naissance.definir(c.date_naissance_enfant or None)
+        self.horaire.setText(c.horaire_allaitement or "")
         self.duree_cert.setValue(int(c.certificat_duree_jours or 0))
         p = rh.lire(self.f.conn, c.personnel_id)
         self.titre.setText(f"{p.prenom_ar} {p.nom_ar} · {self.type.currentText()}")
         self.zone_docs.setEnabled(True)
-        self.b_remp.setEnabled(p.categorie in ("enseignant", "educatrice"))
+        radaa = cg.est_allaitement(self.f.conn, c.type_conge_id)   # ساعة يومية: لا تعويض ولا استئناف
+        self.b_remp.setEnabled(p.categorie in ("enseignant", "educatrice") and not radaa)
         self.b_recu.setEnabled(bool(c.medecin))
         deja = self.f.conn.execute("SELECT 1 FROM reprise_travail WHERE conge_id=?", (cid,)).fetchone()
-        self.b_reprise.setEnabled(not deja and not c.prolongation_de)
+        self.b_reprise.setEnabled(not deja and not c.prolongation_de and not radaa)
         docs = cg.documents(self.f.conn, cid)
         self.docs.setRowCount(len(docs))
         for i, d in enumerate(docs):
@@ -388,6 +435,7 @@ class PageConges(QWidget):
     def lire_formulaire(self) -> cg.Conge:
         try:
             debut, demande, recu = self.debut.iso(), self.date_demande.iso(), self.recu_le.iso()
+            naissance = self.naissance.iso() if self.type.currentText() == cg.RADAA else ""
         except ValueError:
             raise cg.ErreurConge("أحد التواريخ غير صحيح.") from None
         return cg.Conge(personnel_id=self.personnel.currentData(), type_conge_id=self.type.currentData(),
@@ -398,7 +446,8 @@ class PageConges(QWidget):
                         specialite=self.specialite.text(), certificat_recu_le=recu,
                         certificat_remis_par=self.deposant.text(), certificat_remis_par_cin=self.deposant_cin.text(),
                         certificat_duree_jours=self.duree_cert.value() or None,
-                        remarques_certificat=self.rem_cert.text(), id=self.cid)
+                        remarques_certificat=self.rem_cert.text(), date_naissance_enfant=naissance,
+                        horaire_allaitement=self.horaire.text(), id=self.cid)
 
     def enregistrer(self) -> int | None:
         try:

@@ -218,3 +218,35 @@ def test_parametres_destinataire(base, dossier):
         cg.definir_parametres(base, {"bureau_conges": " "})
     with pytest.raises(cg.ErreurConge):
         cg.definir_parametres(base, {"inconnu": "x"})
+
+
+def test_rukhsat_radaa(base):
+    """رخصة الرضاعة (طلب المدير 2026-11-03؛ الفصل 46 كما غُيّر بالقانون 30.22): ساعة يومياً من انتهاء
+    رخصة الولادة إلى بلوغ الطفل 24 شهراً، لا تتداخل مع الرخص الأخرى ولا تنتظر محضر استئناف."""
+    pid = _prof(base)
+    wid = _conge(base, pid, type_conge_id=_type(base, "الولادة"), date_debut="2025-03-01", duree_jours=98,
+                 motif="الولادة")
+    assert cg.lire(base, wid).date_naissance_enfant == ""
+    debut, fin = cg.periode_allaitement(base, pid, "2025-03-01")
+    assert (debut, fin) == ("2025-06-07", "2027-02-28")
+    rid = _type(base, "الرضاعة")
+    nb = (date.fromisoformat(fin) - date.fromisoformat(debut)).days + 1
+    with pytest.raises(cg.ErreurConge, match="ازدياد الطفل"):
+        _conge(base, pid, type_conge_id=rid, date_debut=debut, duree_jours=nb)
+    with pytest.raises(cg.ErreurConge, match="24 شهراً"):
+        _conge(base, pid, type_conge_id=rid, date_debut=debut, duree_jours=nb + 1, date_naissance_enfant="2025-03-01")
+    cid = _conge(base, pid, type_conge_id=rid, date_debut=debut, duree_jours=nb, date_naissance_enfant="2025-03-01",
+                 horaire_allaitement="11:00 - 12:00", medecin="", motif="")
+    c = cg.lire(base, cid)
+    assert c.date_fin == fin and c.horaire_allaitement == "11:00 - 12:00"
+    assert cg.motif_defaut(cg.RADAA) == "الرضاعة"
+    # رخصة مرض أثناء فترة الرضاعة مقبولة؛ ولا رضاعتان متداخلتان
+    _conge(base, pid, date_debut="2026-01-05", duree_jours=3)
+    with pytest.raises(cg.ErreurConge, match="تتداخل"):
+        _conge(base, pid, type_conge_id=rid, date_debut="2026-02-01", duree_jours=5, date_naissance_enfant="2025-03-01")
+    assert [r["id"] for r in cg.allaitements_en_cours(base, date(2026, 11, 3))] == [cid]
+    assert cid not in [r["id"] for r in cg.rentrees_attendues(base, date(2027, 6, 1))]
+    # خاصة بالموظفات
+    m_id = rh.enregistrer(base, rh.Personnel(nom_ar="الحارس", prenom_ar="علي", sexe="M", categorie="gardien"))
+    with pytest.raises(cg.ErreurConge, match="الموظفات"):
+        _conge(base, m_id, type_conge_id=rid, date_debut=debut, duree_jours=5, date_naissance_enfant="2025-03-01")

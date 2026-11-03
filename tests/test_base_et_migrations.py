@@ -26,7 +26,7 @@ def test_base_neuve_au_dernier_niveau(conn):
 def test_donnees_de_reference(conn):
     assert conn.execute("SELECT COUNT(*) FROM niveau").fetchone()[0] == 8
     assert conn.execute("SELECT COUNT(*) FROM cas_reprise").fetchone()[0] == 10
-    assert conn.execute("SELECT COUNT(*) FROM type_conge").fetchone()[0] == 5
+    assert conn.execute("SELECT COUNT(*) FROM type_conge").fetchone()[0] == 6
 
 
 def test_cles_etrangeres_actives(conn):

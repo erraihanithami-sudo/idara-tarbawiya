@@ -135,6 +135,44 @@ def cas_reprise(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute("SELECT id, libelle_ar FROM cas_reprise ORDER BY id").fetchall()
 
 
+RADAA = "رخصة الرضاعة"
+MOIS_RADAA = 24   # الفصل 46 (القانون 30.22): إلى أن يبلغ الطفل 24 شهراً
+
+
+def est_allaitement(conn, type_conge_id) -> bool:
+    r = conn.execute("SELECT libelle_ar FROM type_conge WHERE id=?", (type_conge_id,)).fetchone()
+    return bool(r) and r[0] == RADAA
+
+
+def _plus_mois(d: date, mois: int) -> date:
+    a, m = divmod(d.month - 1 + mois, 12)
+    an, mo = d.year + a, m + 1
+    import calendar
+    return date(an, mo, min(d.day, calendar.monthrange(an, mo)[1]))
+
+
+def periode_allaitement(conn, personnel_id: int | None, naissance: str) -> tuple[str, str]:
+    """بداية رخصة الرضاعة (اليوم الموالي لنهاية آخر رخصة ولادة بعد الازدياد، وإلا يوم الازدياد)
+    ونهايتها (اليوم السابق لبلوغ الطفل 24 شهراً)."""
+    n = date.fromisoformat(naissance)
+    debut = n
+    if personnel_id:
+        r = conn.execute("SELECT MAX(c.date_fin) FROM conge c JOIN type_conge t ON t.id=c.type_conge_id "
+                         "WHERE c.personnel_id=? AND t.libelle_ar LIKE '%الولادة%' AND c.date_fin>=?",
+                         (personnel_id, (n - timedelta(days=300)).isoformat())).fetchone()
+        if r and r[0]:
+            debut = max(n, date.fromisoformat(r[0]) + timedelta(days=1))
+    return debut.isoformat(), (_plus_mois(n, MOIS_RADAA) - timedelta(days=1)).isoformat()
+
+
+def allaitements_en_cours(conn, le: date | None = None) -> list[sqlite3.Row]:
+    le = (le or date.today()).isoformat()
+    return conn.execute(
+        "SELECT c.*, p.prenom_ar, p.nom_ar FROM conge c JOIN type_conge t ON t.id=c.type_conge_id "
+        "JOIN personnel p ON p.id=c.personnel_id WHERE t.libelle_ar=? AND c.date_debut<=? AND c.date_fin>=? "
+        "ORDER BY c.date_fin", (RADAA, le, le)).fetchall()
+
+
 def _est_maladie(libelle: str) -> bool:
     return "مرض" in libelle
 
@@ -144,6 +182,8 @@ def motif_defaut(libelle_type: str) -> str:
         return "مرض"
     if "الولادة" in libelle_type:
         return "الولادة"
+    if libelle_type == RADAA:
+        return "الرضاعة"
     return ""
 
 
@@ -169,6 +209,9 @@ class Conge:
     certificat_duree_jours: int | str | None = None
     remarques_certificat: str = ""
     demande_remplacement: bool = False
+    # رخصة الرضاعة
+    date_naissance_enfant: str = ""
+    horaire_allaitement: str = ""
     id: int | None = None
     erreurs: list[str] = field(default_factory=list)
 
@@ -178,7 +221,7 @@ class Conge:
 
     def valider(self) -> None:
         for k in ("motif", "adresse_conge", "avis_directeur", "mesures_prises", "pieces", "medecin",
-                  "specialite", "certificat_remis_par", "remarques_certificat"):
+                  "specialite", "certificat_remis_par", "remarques_certificat", "horaire_allaitement"):
             setattr(self, k, " ".join((getattr(self, k) or "").split()))
         self.certificat_remis_par_cin = (self.certificat_remis_par_cin or "").replace(" ", "").upper()
         if not self.personnel_id:
@@ -186,7 +229,8 @@ class Conge:
         if not self.type_conge_id:
             raise ErreurConge("اختر نوع الرخصة.")
         for k, lib in (("date_debut", "تاريخ بداية الرخصة"), ("date_demande", "تاريخ الطلب"),
-                       ("certificat_recu_le", "تاريخ تسلم الشهادة الطبية")):
+                       ("certificat_recu_le", "تاريخ تسلم الشهادة الطبية"),
+                       ("date_naissance_enfant", "تاريخ ازدياد الطفل")):
             v = getattr(self, k)
             if not v and k == "date_debut":
                 raise ErreurConge(f"{lib} إجباري.")
@@ -250,6 +294,24 @@ def enregistrer(conn: sqlite3.Connection, c: Conge) -> int:
         raise ErreurConge("الموظف غير عامل حالياً.")
     if not conn.execute("SELECT 1 FROM type_conge WHERE id=?", (c.type_conge_id,)).fetchone():
         raise ErreurConge("نوع الرخصة غير معروف.")
+    radaa = est_allaitement(conn, c.type_conge_id)
+    if radaa:
+        if p.sexe != "F":
+            raise ErreurConge("رخصة الرضاعة خاصة بالموظفات.")
+        if not c.date_naissance_enfant:
+            raise ErreurConge("تاريخ ازدياد الطفل (أو تاريخ الكفالة) إجباري لرخصة الرضاعة.")
+        if c.date_naissance_enfant > date.today().isoformat():
+            raise ErreurConge("تاريخ ازدياد الطفل في المستقبل.")
+        if c.date_debut < c.date_naissance_enfant:
+            raise ErreurConge("رخصة الرضاعة تبدأ بعد ازدياد الطفل (عند انتهاء رخصة الولادة).")
+        _, limite = periode_allaitement(conn, None, c.date_naissance_enfant)
+        if c.date_fin > limite:
+            raise ErreurConge(f"رخصة الرضاعة تنتهي عند بلوغ الطفل {MOIS_RADAA} شهراً "
+                              f"({tx.date_chiffres(limite)}) حسب الفصل 46 من النظام الأساسي العام.")
+        c.prolongation_de = None
+    else:
+        c.date_naissance_enfant = ""
+        c.horaire_allaitement = ""
     if c.prolongation_de:
         parent = conn.execute("SELECT * FROM conge WHERE id=?", (c.prolongation_de,)).fetchone()
         if parent is None or parent["personnel_id"] != c.personnel_id or parent["id"] == c.id:
@@ -257,17 +319,19 @@ def enregistrer(conn: sqlite3.Connection, c: Conge) -> int:
         if c.date_debut <= parent["date_debut"]:
             raise ErreurConge("التمديد يبدأ بعد بداية الرخصة الأصلية.")
     fin = c.date_fin
+    # الرضاعة ساعة يومية لا تغيب: لا تتداخل إلا مع رضاعة أخرى
     chevauche = conn.execute(
         "SELECT t.libelle_ar, c.date_debut, c.date_fin FROM conge c JOIN type_conge t ON t.id=c.type_conge_id "
-        "WHERE c.personnel_id=? AND c.id IS NOT ? AND c.date_debut<=? AND c.date_fin>=?",
-        (c.personnel_id, c.id, fin, c.date_debut)).fetchone()
+        "WHERE c.personnel_id=? AND c.id IS NOT ? AND c.date_debut<=? AND c.date_fin>=? AND "
+        + ("t.libelle_ar=?" if radaa else "t.libelle_ar<>?"),
+        (c.personnel_id, c.id, fin, c.date_debut, RADAA)).fetchone()
     if chevauche:
         raise ErreurConge(f"تتداخل مع {chevauche[0]} من {tx.date_chiffres(chevauche[1])} "
                           f"إلى {tx.date_chiffres(chevauche[2])}.")
     cols = ("personnel_id", "type_conge_id", "prolongation_de", "date_debut", "duree_jours", "adresse_conge",
             "avis_directeur", "mesures_prises", "medecin", "specialite", "certificat_recu_le",
             "certificat_remis_par", "certificat_remis_par_cin", "certificat_duree_jours", "motif", "pieces",
-            "remarques_certificat", "date_demande")
+            "remarques_certificat", "date_demande", "date_naissance_enfant", "horaire_allaitement")
     vals = [getattr(c, k) if getattr(c, k) != "" else None for k in cols]
     with conn:
         if c.id is None:
@@ -295,7 +359,7 @@ def rentrees_attendues(conn: sqlite3.Connection, le: date | None = None) -> list
                 return True
             cid = parents.get(cid)
         return False
-    return [r for r in lignes if r["date_fin"] < le.isoformat() and not chaine_close(r["id"])
+    return [r for r in lignes if r["date_fin"] < le.isoformat() and not chaine_close(r["id"]) and r["type"] != RADAA
             and not any(p == r["id"] for p in parents.values())]
 
 

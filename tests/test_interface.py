@@ -130,8 +130,9 @@ def test_navigation_deroulante(app, config_tmp):
     from idara.ui.fenetre import SECTIONS
     f = _fenetre_avec_eleves(config_tmp)
     titres = [t for t, _ in SECTIONS]
-    assert titres[:7] == ["القيادة والتدبير", "التلاميذ", "التدبير التربوي", "التدبير المالي والمادي", "التقييم",
-                          "مشروع المؤسسة", "تسليم المهام"]
+    assert titres[:8] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي",
+                          "التدبير المالي والمادي", "التقييم", "مشروع المؤسسة", "تسليم المهام"]
+    assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص"]
     assert [l for _, l in SECTIONS[0][1]] == ["معلومات عامة", "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة"]
     assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
     i = titres.index("التدبير المالي والمادي")
@@ -404,6 +405,31 @@ def test_page_fa(app, config_tmp):
     assert "الفائض: الأحدث التجريبي" in c.etat.text()
     assert c.table.item(1, 7).text() == "فائض" and c.table.item(0, 0).text() == "1"
     assert p.cartes["فرنسية"].table.rowCount() == 0
+    f.close()
+
+
+def test_page_conges_radaa(app, config_tmp):
+    """رخصة الرضاعة في الاستمارة: تاريخ الازدياد يقترح الفترة، ولا تعويض ولا استئناف."""
+    from datetime import date as _d
+    from idara.services import conges as cg
+    from idara.services import personnel as rh
+    f = _fenetre_avec_eleves(config_tmp)
+    pid = rh.enregistrer(f.conn, rh.Personnel(nom_ar="التجريبية", prenom_ar="سلمى", sexe="F", categorie="enseignant"))
+    f.aller_a("الرخص")
+    p = f.page_conges
+    p.personnel.setCurrentIndex(p.personnel.findData(pid))
+    assert p.zone_radaa.isHidden()
+    p.type.setCurrentIndex(p.type.findText(cg.RADAA))
+    assert not p.zone_radaa.isHidden() and p.motif.text() == "الرضاعة"
+    p.naissance.setText("01/03/2025")
+    assert p.debut.iso() == "2025-03-01"
+    assert p.duree.value() == (_d(2027, 2, 28) - _d(2025, 3, 1)).days + 1
+    p.horaire.setText("11:00 - 12:00")
+    cid = p.enregistrer()
+    assert cid, p.message.text()
+    assert not p.b_reprise.isEnabled() and not p.b_remp.isEnabled()
+    assert "رخص رضاعة جارية" in p.l_radaa.text() and "11:00 - 12:00" in p.l_radaa.text()
+    assert "سلمى" not in p.alertes.text()
     f.close()
 
 
