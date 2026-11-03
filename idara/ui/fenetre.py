@@ -47,7 +47,13 @@ class Jauge(QWidget):
     def __init__(self, titre: str, taux: float | None, note: str = "", couleur: str = theme.SARCELLE):
         super().__init__()
         self.titre, self.taux, self.note, self.couleur = titre, taux, note, couleur
-        self.setMinimumSize(170, 210)
+        self.setMinimumSize(150, 215)
+        from PySide6.QtWidgets import QSizePolicy
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    def sizeHint(self):
+        from PySide6.QtCore import QSize
+        return QSize(180, 215)
 
     def paintEvent(self, _ev) -> None:
         from PySide6.QtCore import QRectF
@@ -249,6 +255,9 @@ class PageTableauBord(QWidget):
                 cv.addLayout(ligne)
             self.v.addWidget(c)
         self.v.addStretch()
+        # المحتوى أطول من النافذة: حد أدنى للارتفاع حتى لا تُضغط البطاقات (المؤشرات ومعطيات المؤسسة) داخل التمرير
+        self.v.activate()
+        self.contenu.setMinimumHeight(self.v.totalMinimumSize().height())
 
 
 class PageEtablissement(QWidget):
