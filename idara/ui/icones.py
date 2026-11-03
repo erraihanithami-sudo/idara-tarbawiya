@@ -172,3 +172,20 @@ def pixmap(section: str, taille: int = 24, echelle: float = 2.0) -> QPixmap:
 
 def icone(section: str, taille: int = 24) -> QIcon:
     return QIcon(pixmap(section, taille))
+
+
+def chevron(ouvert: bool, couleur: str = theme.GRIS, taille: int = 14, echelle: float = 2.0) -> QPixmap:
+    """علامة فتح القسم: نحو الأسفل (مفتوح) أو نحو اليسار (مطوي، اتجاه المحتوى في RTL). تُرسم لأن بعض الخطوط
+    لا تتضمن رموز الأسهم."""
+    n = int(taille * echelle)
+    pm = QPixmap(n, n)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    p.scale(n / 14, n / 14)
+    p.setPen(QPen(QColor(couleur), 1.8, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+    pts = [(3.5, 5), (7, 9), (10.5, 5)] if ouvert else [(9, 3.5), (5, 7), (9, 10.5)]
+    p.drawPolyline(QPolygonF([QPointF(x, y) for x, y in pts]))
+    p.end()
+    pm.setDevicePixelRatio(echelle)
+    return pm

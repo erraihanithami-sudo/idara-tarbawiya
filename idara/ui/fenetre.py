@@ -323,7 +323,10 @@ class BoutonNav(QPushButton):
         self.l_texte = QLabel(libelle)
         self.l_texte.setAlignment(Qt.AlignRight | Qt.AlignAbsolute | Qt.AlignVCenter)
         self.l_texte.setWordWrap(True)
-        self.l_fleche = QLabel("‹" if deroulant else "")
+        self.l_fleche = QLabel()
+        self.l_fleche.setFixedSize(QSize(14, 14))
+        if deroulant:
+            self.l_fleche.setPixmap(icones.chevron(False))
         self.l_fleche.setVisible(deroulant)
         for w in (self.l_icone, self.l_texte, self.l_fleche):
             w.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -338,10 +341,10 @@ class BoutonNav(QPushButton):
         self.actif = actif
         couleur = theme.VERT if actif and self.deroulant else theme.MARINE
         self.l_texte.setStyleSheet(f"color:{couleur}; font-weight:{600 if actif else 400};")
-        self.l_fleche.setStyleSheet(f"color:{theme.GRIS}; font-size:14pt; font-weight:600;")
 
     def ouvrir(self, ouvert: bool) -> None:
-        self.l_fleche.setText("⌄" if ouvert else "‹")
+        if self.deroulant:
+            self.l_fleche.setPixmap(icones.chevron(ouvert))
 
     def text(self) -> str:  # noqa: D401
         return self.l_texte.text()
