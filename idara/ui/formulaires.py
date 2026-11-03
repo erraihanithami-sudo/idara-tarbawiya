@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QDate, Qt
-from PySide6.QtWidgets import (QButtonGroup, QDateEdit, QFileDialog, QGridLayout,
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QDateEdit, QFileDialog, QGridLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton,
                                QVBoxLayout, QWidget)
 
@@ -85,6 +85,8 @@ class FormEtablissement(QWidget):
         ligne.addWidget(self.r_groupe)
         ligne.addStretch()
         v.addLayout(ligne)
+        self.pionniere = QCheckBox("مؤسسة رائدة (لوحة القيادة: نسبة المتحكمين في التعلمات الأساس)")
+        v.addWidget(self.pionniere)
 
         self.bloc_unites = QWidget()
         bu = QVBoxLayout(self.bloc_unites)
@@ -104,6 +106,7 @@ class FormEtablissement(QWidget):
         e.commune_ar = self.commune_ar.text()
         e.direction_ar, e.academie_ar = self.direction_ar.text(), self.academie_ar.text()
         e.type_etab = "groupe" if self.r_groupe.isChecked() else "independant"
+        e.est_pionniere = "1" if self.pionniere.isChecked() else ""
         return e
 
     def liste_unites(self) -> list[str]:
@@ -120,6 +123,7 @@ class FormEtablissement(QWidget):
         self.academie_ar.setText(e.academie_ar)
         (self.r_groupe if e.type_etab == "groupe" else self.r_independant).setChecked(True)
         self.bloc_unites.setVisible(e.type_etab == "groupe")
+        self.pionniere.setChecked(bool(e.est_pionniere))
         self.unites.setText("، ".join(unites or []))
 
 

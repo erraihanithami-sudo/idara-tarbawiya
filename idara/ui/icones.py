@@ -189,3 +189,24 @@ def chevron(ouvert: bool, couleur: str = theme.GRIS, taille: int = 14, echelle: 
     p.end()
     pm.setDevicePixelRatio(echelle)
     return pm
+
+
+def corbeille(taille: int = 18, echelle: float = 2.0) -> QIcon:
+    """علامة الحذف: سلة بالأحمر."""
+    n = int(taille * echelle)
+    pm = QPixmap(n, n)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    p.scale(n / 24, n / 24)
+    c = QColor(theme.ROUGE_TEXTE)
+    _rr(p, 4, 5, 16, 2.4, 1.2, c.name())
+    _rr(p, 9, 2.5, 6, 3, 1.2, c.name())
+    p.setBrush(c)
+    p.drawPolygon(QPolygonF([QPointF(5.5, 8.5), QPointF(18.5, 8.5), QPointF(17.2, 21.5), QPointF(6.8, 21.5)]))
+    p.setPen(QPen(QColor(theme.BLANC), 1.6, Qt.SolidLine, Qt.RoundCap))
+    for x in (9.5, 12, 14.5):
+        p.drawLine(QPointF(x, 11.5), QPointF(x, 18.5))
+    p.end()
+    pm.setDevicePixelRatio(echelle)
+    return QIcon(pm)

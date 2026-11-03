@@ -85,6 +85,9 @@ QPushButton:hover {{ border-color: {VERT}; }}
 QPushButton#principal {{ background: {VERT}; color: {BLANC}; border: 0; font-weight: 600; }}
 QPushButton#principal:hover {{ background: {VERT_FONCE}; }}
 QPushButton#principal:disabled {{ background: #A9CFC9; }}
+QPushButton#danger {{ color: {ROUGE_TEXTE}; border: 1.5px solid {ROSE}; background: {ROUGE_CLAIR}; font-weight: 600; }}
+QPushButton#danger:hover {{ background: {ROSE}; color: {BLANC}; }}
+QPushButton#danger:disabled {{ color: #C9A3B5; border-color: #E8C6D5; background: {BLANC}; }}
 QPushButton#nav {{ border: 0; border-radius: 10px; min-height: 46px; }}
 QPushButton#nav QLabel {{ background: transparent; }}
 QTabWidget#sections::pane {{ border: 0; }}

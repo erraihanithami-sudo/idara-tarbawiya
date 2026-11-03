@@ -39,6 +39,7 @@ class Etablissement:
     logo_path: str = ""
     filigrane_path: str = ""
     pied_page: str = ""
+    est_pionniere: str = ""   # «1»: مؤسسة رائدة
 
     def valider(self) -> None:
         self.nettoyer()

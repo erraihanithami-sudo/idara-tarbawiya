@@ -16,6 +16,7 @@ from idara.services import annee as annee_srv
 from idara.services import etablissement as etab_srv
 from idara.services import import_eleves as imp
 from idara.services import sauvegarde
+from idara.services import tableau_bord as tb_srv
 from idara.services.etablissement import ErreurValidation
 from idara.services.textes import date_longue_ar
 from idara.ui import icones, theme
@@ -40,14 +41,116 @@ from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
 
 
+class Jauge(QWidget):
+    """مؤشر دائري: النسبة في الوسط، والعنوان والملاحظة تحته (رسم بالكود)."""
+
+    def __init__(self, titre: str, taux: float | None, note: str = "", couleur: str = theme.SARCELLE):
+        super().__init__()
+        self.titre, self.taux, self.note, self.couleur = titre, taux, note, couleur
+        self.setMinimumSize(170, 210)
+
+    def paintEvent(self, _ev) -> None:
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QColor, QFont, QPainter, QPen
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        d = min(self.width() - 20, 130)
+        r = QRectF((self.width() - d) / 2, 8, d, d)
+        p.setPen(QPen(QColor(theme.LIGNE), 14, Qt.SolidLine, Qt.FlatCap))
+        p.drawArc(r, 0, 360 * 16)
+        if self.taux is not None:
+            p.setPen(QPen(QColor(self.couleur), 14, Qt.SolidLine, Qt.RoundCap))
+            p.drawArc(r, 90 * 16, -int(min(self.taux, 100) / 100 * 360 * 16))
+        p.setPen(QColor(theme.MARINE))
+        f = QFont(self.font())
+        f.setPointSize(16)
+        f.setBold(True)
+        p.setFont(f)
+        p.drawText(r, Qt.AlignCenter, "—" if self.taux is None else f"\u2066{self.taux:g}%\u2069")
+        f.setPointSize(10)
+        p.setFont(f)
+        y = int(r.bottom()) + 8
+        p.drawText(QRectF(0, y, self.width(), 22), Qt.AlignHCenter | Qt.AlignTop, self.titre)
+        f.setBold(False)
+        f.setPointSize(9)
+        p.setFont(f)
+        p.setPen(QColor(theme.GRIS))
+        p.drawText(QRectF(4, y + 22, self.width() - 8, 44), Qt.AlignHCenter | Qt.AlignTop | Qt.TextWordWrap, self.note)
+        p.end()
+
+
 class PageTableauBord(QWidget):
     def __init__(self, fenetre: "FenetrePrincipale"):
         super().__init__()
         self.f = fenetre
+        self.unite: str | None = None   # المجموعة المدرسية: وحدة واحدة أو المؤسسة كاملة
         self.externe = QVBoxLayout(self)
         self.externe.setContentsMargins(0, 0, 0, 0)
         self.contenu = None
         self.rafraichir()
+
+    def _carte_groupe(self, etab, unites: list[str]) -> None:
+        """المجموعة المدرسية: معطيات المؤسسة كاملة وزر لكل وحدة مدرسية."""
+        c, cv = carte("المؤسسة")
+        infos = [("المؤسسة", etab.nom_ar), ("الرمز", etab.code_etab or "—"), ("النوع", "مجموعة مدرسية"),
+                 ("الجماعة", etab.commune_ar or "—"), ("المديرية الإقليمية", etab.direction_ar or "—"),
+                 ("الأكاديمية", etab.academie_ar or "—"), ("الريادة", "مؤسسة رائدة" if etab.est_pionniere else "—"),
+                 ("الوحدات المدرسية", str(len(unites)))]
+        g = QGridLayout()
+        g.setHorizontalSpacing(24)
+        for k, (lib, val) in enumerate(infos):
+            e = QLabel(lib)
+            e.setObjectName("etiquette")
+            v = QLabel(val)
+            v.setStyleSheet("font-weight:600;")
+            g.addWidget(e, (k // 4) * 2, k % 4)
+            g.addWidget(v, (k // 4) * 2 + 1, k % 4)
+        cv.addLayout(g)
+        if unites:
+            h = QHBoxLayout()
+            self.boutons_unites = {}
+            for nom in [None, *unites]:
+                b = QPushButton("المؤسسة كاملة" if nom is None else nom)
+                b.setCheckable(True)
+                b.setChecked(nom == self.unite)
+                if nom == self.unite:
+                    b.setObjectName("principal")
+                b.clicked.connect(lambda _=False, nom=nom: self.choisir_unite(nom))
+                self.boutons_unites[nom] = b
+                h.addWidget(b)
+            h.addStretch()
+            cv.addLayout(h)
+        self.v.addWidget(c)
+
+    def choisir_unite(self, unite: str | None) -> None:
+        self.unite = unite
+        self.rafraichir()
+
+    def _jauges(self, ind: dict) -> None:
+        """ملخص مبياني: الغياب، الهدر المدرسي، الأنشطة الموازية، والتعلمات الأساس (رائدة) أو المعدل (غيرها)."""
+        c, cv = carte("ملخص المؤشرات" + (f" · {self.unite}" if self.unite else ""))
+        h = QHBoxLayout()
+        h.setSpacing(8)
+        hd = ind["hadar"]
+        jauges = [Jauge("الغياب", None, "يُحسب عند برمجة تتبع الغياب", theme.ORANGE),
+                  Jauge("الهدر المدرسي", hd["taux"], f"منقطعون {hd['interrompus']} · مفصولون {hd['exclus']}", theme.ROSE),
+                  Jauge("الأنشطة الموازية", ind["activites"]["taux"],
+                        f"{ind['activites']['participants']} تلميذاً في الأندية", theme.VIOLET)]
+        if ind["pionniere"]:
+            for m in ind["maitrise"].values():
+                jauges.append(Jauge(f"التعلمات الأساس: {m['matiere']}", m["taux"],
+                                    f"{m['maitrise']}/{m['total']} · {m['epreuve']}" if m["total"]
+                                    else "لا نتائج رائز بعد", theme.SARCELLE))
+        else:
+            r = ind["reussite"]
+            jauges.append(Jauge("الحاصلون على المعدل", r["taux"],
+                                f"{r['admis']}/{r['total']} · {r['source']}" if r["total"] else "لا نتائج مستوردة بعد",
+                                theme.SARCELLE))
+        self.jauges = jauges
+        for j in jauges:
+            h.addWidget(j, 1)
+        cv.addLayout(h)
+        self.v.addWidget(c)
 
     def rafraichir(self) -> None:
         if self.contenu is not None:
@@ -64,13 +167,14 @@ class PageTableauBord(QWidget):
         a = annee_srv.annee_courante(conn)
         self.v.addWidget(entete("لوحة القيادة",
                                 f"السنة الدراسية {a['libelle'] if a else '—'} · {date_longue_ar(date.today())}"))
-        n_eleves = conn.execute(
-            "SELECT COUNT(*) FROM inscription WHERE annee_id=? AND statut IN ('inscrit','arrive')",
-            (a["id"] if a else -1,)).fetchone()[0]
-        n_classes = conn.execute("SELECT COUNT(*) FROM classe WHERE annee_id=?",
-                                 (a["id"] if a else -1,)).fetchone()[0]
-        n_pers = conn.execute(
-            "SELECT COUNT(*) FROM personnel WHERE statut='actif' AND categorie<>'directeur'").fetchone()[0]
+        etab = etab_srv.lire_etablissement(conn)
+        unites = etab_srv.unites(conn) if etab and etab.type_etab == "groupe" else []
+        if self.unite not in unites:
+            self.unite = None
+        if etab and etab.type_etab == "groupe":
+            self._carte_groupe(etab, unites)
+        ind = tb_srv.indicateurs(conn, self.unite)
+        n_eleves, n_classes, n_pers = ind["eleves"], len(ind["classes"]), ind["personnel"]
         sv = sauvegarde.lister_sauvegardes(self.f.dossier)
         derniere = sv[-1].name[len(sauvegarde.PREFIXE):len(sauvegarde.PREFIXE) + 8] if sv else ""
         derniere = f"{derniere[6:8]}/{derniere[4:6]}/{derniere[:4]}" if derniere else "لا توجد بعد"
@@ -78,7 +182,7 @@ class PageTableauBord(QWidget):
         grille = QGridLayout()
         grille.setSpacing(16)
         for i, (lib, val, note) in enumerate([
-                ("عدد التلاميذ", str(n_eleves), "يتابعون دراستهم هذه السنة"),
+                ("عدد التلاميذ", str(n_eleves), f"يتابعون دراستهم · ذكور {ind['garcons']} · إناث {ind['filles']}"),
                 ("الأقسام", str(n_classes), ""),
                 ("الموظفون", str(n_pers), "دون المدير"),
                 ("آخر نسخة احتياطية", derniere, f"{len(sv)} نسخة محفوظة")]):
@@ -96,11 +200,9 @@ class PageTableauBord(QWidget):
             grille.addWidget(c, 0, i)
         self.v.addLayout(grille)
 
+        self._jauges(ind)
         # التوزيع حسب القسم
-        repartition = conn.execute(
-            "SELECT c.code, COUNT(i.id) AS n FROM classe c LEFT JOIN inscription i ON i.classe_id=c.id "
-            "AND i.statut IN ('inscrit','arrive') WHERE c.annee_id=? GROUP BY c.id ORDER BY c.code",
-            (a["id"] if a else -1,)).fetchall()
+        repartition = ind["classes"]
         if repartition:
             c, cv = carte("التوزيع حسب القسم")
             maxi = max(r["n"] for r in repartition) or 1
@@ -242,7 +344,7 @@ class PageAVenir(QWidget):
 # الموارد البشرية أضافها المدير بعد ذلك (2026-11-03). المراسلات والإعدادات لم تردا في ترتيبه، فأُبقيتا بعده
 # حتى لا تضيع وظائفهما.
 SECTIONS = [
-    ("القيادة والتدبير", [("لوحة القيادة", "معلومات عامة"), ("أداء المؤسسة", "الأداء العام للمؤسسة"),
+    ("القيادة والتدبير", [("لوحة القيادة", "لوحة القيادة"), ("أداء المؤسسة", "الأداء العام للمؤسسة"),
                           ("تتبع الغياب", "تتبع الغياب"), ("مجالس المؤسسة", "مجالس المؤسسة")]),
     ("التلاميذ", [("التلاميذ", "وثائق التلاميذ"), ("حركية التلاميذ", "حركية التلاميذ"),
                   ("تتبع السلوك", "تتبع سلوكات التلاميذ"), ("أولياء الأمور", "معلومات أولياء الأمور"),
@@ -435,10 +537,20 @@ class FenetrePrincipale(QMainWindow):
                     w = page_defilante(PageAVenir(lib, *A_VENIR[nom]))
                 self.emplacement[nom] = self.pile.addWidget(w)
                 self.section_de[nom] = i
+        self._boutons_suppression()
         h.addWidget(self._barre_laterale())
         h.addWidget(self.pile, 1)
         self.setCentralWidget(centre)
         self.aller(0)
+
+    def _boutons_suppression(self) -> None:
+        """أزرار الحذف بالأحمر مع علامة الحذف (اقتراح المدير 2026-11-03)."""
+        for b in self.findChildren(QPushButton):
+            if b.text().strip().startswith("حذف"):
+                b.setObjectName("danger")
+                b.setIcon(icones.corbeille())
+                b.style().unpolish(b)
+                b.style().polish(b)
 
     def _barre_laterale(self) -> QWidget:
         barre = QFrame()

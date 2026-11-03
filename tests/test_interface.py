@@ -133,7 +133,7 @@ def test_navigation_deroulante(app, config_tmp):
     assert titres[:8] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي",
                           "التدبير المالي والمادي", "التقييم", "مشروع المؤسسة", "تسليم المهام"]
     assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص"]
-    assert [l for _, l in SECTIONS[0][1]] == ["معلومات عامة", "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة"]
+    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة"]
     assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
     i = titres.index("التدبير المالي والمادي")
     f.boutons[i].click()
@@ -1080,4 +1080,30 @@ def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
     assert d.generer_classe(), d.message.text()
     d.niveau.setCurrentIndex(d.niveau.findData("6AP"))
     assert d.generer_niveau(), d.message.text()
+    f.close()
+
+
+def test_lauha_qiyada_et_boutons_suppression(app, config_tmp):
+    """اقتراح المدير (2026-11-03): لوحة القيادة بمؤشرات مبيانية، وزر لكل وحدة مدرسية، وأزرار حذف حمراء."""
+    from PySide6.QtWidgets import QPushButton
+    from idara.services import etablissement as et
+    f = _fenetre_avec_eleves(config_tmp)
+    t = f.tableau
+    titres = [j.titre for j in t.jauges]
+    assert titres[:3] == ["الغياب", "الهدر المدرسي", "الأنشطة الموازية"] and titres[3] == "الحاصلون على المعدل"
+    assert t.jauges[0].taux is None and t.jauges[1].taux == 0
+    e = et.lire_etablissement(f.conn)
+    e.est_pionniere, e.type_etab = "1", "groupe"
+    et.enregistrer_etablissement(f.conn, e)
+    et.definir_unites(f.conn, ["الوحدة المركزية", "الوحدة الفرعية"])
+    t.rafraichir()
+    assert [j.titre for j in t.jauges][3:] == ["التعلمات الأساس: اللغة العربية", "التعلمات الأساس: اللغة الفرنسية",
+                                             "التعلمات الأساس: الرياضيات"]
+    assert list(t.boutons_unites) == [None, "الوحدة المركزية", "الوحدة الفرعية"]
+    t.boutons_unites["الوحدة الفرعية"].click()
+    assert t.unite == "الوحدة الفرعية" and t.boutons_unites["الوحدة الفرعية"].isChecked()
+    t.boutons_unites[None].click()
+    assert t.unite is None
+    rouges = [b for b in f.findChildren(QPushButton) if b.text().startswith("حذف")]
+    assert rouges and all(b.objectName() == "danger" and not b.icon().isNull() for b in rouges)
     f.close()
