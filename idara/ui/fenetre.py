@@ -550,7 +550,7 @@ class FenetrePrincipale(QMainWindow):
             self.aller(titres.index(nom))
             return
         i = self.section_de[nom]
-        if self.sous[i] and not self.est_ouvert(i):
+        if not self.est_ouvert(i):   # يفتح فروع القسم (إن وُجدت) ويطوي الأقسام الأخرى
             self.basculer(i, True)
         self.boutons_pages[nom].setChecked(True)
         for k, b in enumerate(self.boutons):
