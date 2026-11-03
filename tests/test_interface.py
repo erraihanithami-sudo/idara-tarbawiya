@@ -1023,3 +1023,61 @@ def test_page_tanzim_tarbawi(app, config_tmp, monkeypatch):
     chemin = p.generer()
     assert chemin and chemin.exists() and ouverts == [chemin]
     f.close()
+
+
+def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
+    """ملفا المدير (2026-11-03): الامتحان (المحلي والإقليمي) ومحاضر نهاية الأسدوس، تحت «التقييم»."""
+    from PySide6.QtWidgets import QTableWidgetItem
+    from idara.services import bureautique
+    from idara.services import evaluation as ev
+    from idara.services import examens as exs
+    from idara.services import personnel as rh
+    from idara.ui.fenetre import SECTIONS
+    from tests.fabrique_resultats import classeur_resultats
+    from tests.test_examens import _liste_direction
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    noms = [n for n, _ in dict(SECTIONS)["التقييم"]]
+    assert noms == ["المراقبة المستمرة", "الامتحان", "استثمار النتائج", "مجالس الأقسام", "محاضر نهاية الأسدوس"]
+    for i in range(1, 4):
+        rh.enregistrer(f.conn, rh.Personnel(nom_ar="التجريبي", prenom_ar=f"أستاذ{i}", sexe="M", categorie="enseignant",
+                                            ppr=f"400000{i}"))
+    f.aller_a("الامتحان")
+    p = f.page_examen
+    assert f.page_courante() == "الامتحان" and not p.b_local.isHidden() and "جدولة المواد" in p.l_manquants.text()
+    p.premier.setValue(11)
+    assert p.preparer_local() and p.cands.rowCount() >= 1 and p.cands.item(0, 0).text() == "11"
+    p.mats.cellWidget(0, 0).setEditText("اللغة العربية")
+    p.mats.setItem(0, 1, QTableWidgetItem("10/06/2027"))
+    p.mats.setItem(0, 2, QTableWidgetItem("08:30"))
+    p.mats.setItem(0, 3, QTableWidgetItem("10:00"))
+    assert p.enregistrer_matieres(), p.message.text()
+    assert len(exs.matieres(f.conn, p.eid)) == 1
+    p.c_roles[exs.ROLES[0]][0].setCurrentIndex(1)
+    assert p.enregistrer_roles(), p.message.text()
+    p.par_salle.setValue(1)
+    assert p.distribuer(), p.message.text()
+    assert p.surv.columnCount() == 2 and any(p.surv.item(i, 1).text() for i in range(p.surv.rowCount()))
+    assert p.l_manquants.isHidden(), p.l_manquants.text()
+    assert p.generer("listes") and p.generer("convocations_profs") and len(ouverts) == 2
+    # الإقليمي: أرقام المديرية
+    p.type.setCurrentIndex(p.type.findData("provincial"))
+    assert p.b_local.isHidden() and not p.b_prov.isHidden()
+    assert p.importer_provincial(_liste_direction(tmp_path / "d.xlsx")), p.message.text()
+    assert p.cands.item(0, 0).text() == "7903" and "7903–7905" in p.l_cands.text()
+    # محاضر نهاية الأسدوس
+    fic = classeur_resultats(tmp_path / "r.xlsx", {"6APG-1": [("X000000005", "الاختبار آدم", [7.0] * 8)]},
+                             niveau="السادس ابتدائي عام", semestres={"X000000005": (8.41, 7.95)},
+                             examens={"X000000005": (8.72, 6.05)})
+    ev.importer(f.conn, [fic])
+    f.aller_a("محاضر نهاية الأسدوس")
+    d = f.page_deliberations
+    d.periode.setCurrentIndex(d.periode.findData("S2"))
+    d.classe.setCurrentIndex(d.classe.findText("6APG-1"))
+    assert d.table.rowCount() == 1 and d.table.item(0, 2).text() == "7.78" and d.table.item(0, 5).text() == "ينتقل"
+    d.table.setItem(0, 7, QTableWidgetItem("التعليم الإعدادي"))
+    assert d.generer_classe(), d.message.text()
+    d.niveau.setCurrentIndex(d.niveau.findData("6AP"))
+    assert d.generer_niveau(), d.message.text()
+    f.close()

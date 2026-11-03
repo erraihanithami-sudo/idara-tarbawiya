@@ -35,6 +35,7 @@ from idara.ui.page_achats import PageAchats
 from idara.ui.page_conseils_etab import PageConseilsEtab
 from idara.ui.page_pedagogie import PagePerformance, PageRiyada, PageTarl, PageVieScolaire
 from idara.ui.page_tanzim import PageTanzim
+from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
 
@@ -254,7 +255,8 @@ SECTIONS = [
                                 ("الصرف", "الصرف: سند الطلب والاتفاقية"), ("الجمعية الرياضية", "الجمعية الرياضية"),
                                 ("جمعية تنمية التعاون المدرسي", "جمعية تنمية التعاون المدرسي")]),
     ("التقييم", [("المراقبة المستمرة", "المراقبة المستمرة"), ("الامتحان", "الامتحان"),
-                 ("استثمار النتائج", "استثمار النتائج"), ("مجالس الأقسام", "المحاضر: مجالس الأقسام")]),
+                 ("استثمار النتائج", "استثمار النتائج"), ("مجالس الأقسام", "المحاضر: مجالس الأقسام"),
+                 ("محاضر نهاية الأسدوس", "المحاضر: نهاية الأسدوس")]),
     ("مشروع المؤسسة", [("مشروع المؤسسة", "مشروع المؤسسة")]),
     ("تسليم المهام", [("تسليم المهام", "تسليم المهام")]),
     ("المراسلات", [("سجل الصادر", "سجل الصادر")]),
@@ -408,6 +410,8 @@ class FenetrePrincipale(QMainWindow):
         self.page_vie = PageVieScolaire(self)
         self.page_riyada = PageRiyada(self)
         self.page_tanzim = PageTanzim(self)
+        self.page_deliberations = PageDeliberations(self)
+        self.page_examen = PageExamen(self)
         self.page_rh = PagePersonnel(self)
         self.page_conges = PageConges(self)
         self.page_fa = PageFa(self)
@@ -416,7 +420,8 @@ class FenetrePrincipale(QMainWindow):
         self.pages = {"لوحة القيادة": self.tableau, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
-                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "التنظيم التربوي": self.page_tanzim, "الاستيراد من مسار": self.page_import,
+                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "التنظيم التربوي": self.page_tanzim, "محاضر نهاية الأسدوس": self.page_deliberations,
+                      "الامتحان": self.page_examen, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs}
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة

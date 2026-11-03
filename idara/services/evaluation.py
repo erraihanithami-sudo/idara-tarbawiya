@@ -3,7 +3,8 @@
 قاعدة متحقق منها على نتائج المدير (2025/2026، المستوى الرابع، 59 تلميذاً، مطابقة لمحضره):
 - المعدل السنوي = المتوسط الحسابي لمعدلات المواد في ملف مسار (كما في بيان النتائج: 8,15).
 - الحاصل على المعدل: 5/10 فما فوق.
-- إن وُجد «المعدل السنوي» مملوءاً في الملف يُعتمد كما هو. السادس (الامتحانات الإشهادية) لا يُحسب دونه.
+- إن وُجد «المعدل السنوي» مملوءاً في الملف يُعتمد كما هو. السادس: 50% متوسط الدورتين + 25% المحلي + 25% الإقليمي
+  (ملف المدير «محاضر نهاية الأسدوس»)، ولا يُحسب إن نقص أحدها.
 - النسبة المئوية تُقطع إلى رقمين بعد الفاصلة كما في محاضر المدير (18/19 = 94.73%).
 """
 
@@ -52,6 +53,8 @@ class LigneResultat:
     moyenne_massar: float | None
     s1: float | None = None   # معدل الدورة الأولى
     s2: float | None = None   # معدل الدورة الثانية
+    local: float | None = None   # م.إ.م المحلي (السادس)
+    prov: float | None = None    # م.إ.م الإقليمي (السادس)
 
 
 @dataclass
@@ -104,6 +107,9 @@ def lire_fichier(chemin: Path) -> FichierResultats:
         i_annuel = tete.index("المعدلالسنوي") if "المعدلالسنوي" in tete else None
         i_s1 = next((j for j, h in enumerate(tete) if h in ("الدورةالاولى", "الدورةالأولى")), None)
         i_s2 = tete.index("الدورةالثانية") if "الدورةالثانية" in tete else None
+        n_loc, n_prov = normaliser("م.إم المحلي"), normaliser("م.إم الإقليمي")
+        i_loc = tete.index(n_loc) if n_loc in tete else None
+        i_prov = tete.index(n_prov) if n_prov in tete else None
         val = lambda r, i: _nombre(r[i]) if i is not None and i < len(r) else None  # noqa: E731
         n_avant = len(res.lignes)
         for r in rows[entete + 1:]:
@@ -117,7 +123,7 @@ def lire_fichier(chemin: Path) -> FichierResultats:
             moy = {k: v for k, v in moy.items() if v is not None}
             annuel = _nombre(r[i_annuel]) if i_annuel is not None and i_annuel < len(r) else None
             res.lignes.append(LigneResultat(code, " ".join(str(r[i_nom] or "").split()), classe, moy, annuel,
-                                            val(r, i_s1), val(r, i_s2)))
+                                            val(r, i_s1), val(r, i_s2), val(r, i_loc), val(r, i_prov)))
         if len(res.lignes) > n_avant:
             res.classes.append(classe)
     if not res.lignes:
@@ -154,7 +160,13 @@ def moyenne_annuelle(l: LigneResultat, niveau: str | None) -> tuple[float | None
         return l.moyenne_massar, "massar"
     if l.s1 is not None and l.s2 is None:
         return None, None  # ملف منتصف السنة (الدورة الأولى فقط): لا معدل سنوي
-    if niveau == "6AP" or not l.moyennes:
+    if niveau == "6AP":
+        # ملف المدير «محاضر نهاية الأسدوس» (متحقق منه): 50% متوسط المراقبة المستمرة للدورتين + 25% الامتحان
+        # الموحد المحلي + 25% الإقليمي
+        if None in (l.s1, l.s2, l.local, l.prov):
+            return None, None
+        return round(0.25 * (l.s1 + l.s2) + 0.25 * l.local + 0.25 * l.prov + 1e-9, 2), "calcul"
+    if not l.moyennes:
         return None, None
     return round(sum(l.moyennes.values()) / len(l.moyennes), 2), "calcul"
 
@@ -194,15 +206,17 @@ def importer(conn: sqlite3.Connection, chemins: list[Path]) -> RapportImport:
                     inconnus.append(f"{l.nom} ({l.code})")
                 conn.execute(
                     "INSERT INTO resultat(annee_id, code_massar, eleve_id, nom, classe, niveau, moyennes, moyenne, "
-                    "source_moyenne, moyenne_s1, moyenne_s2) VALUES (?,?,?,?,?,?,?,?,?,?,?) "
+                    "source_moyenne, moyenne_s1, moyenne_s2, exam_local, exam_prov) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
                     "ON CONFLICT(annee_id, code_massar) DO UPDATE SET "
                     "eleve_id=excluded.eleve_id, nom=excluded.nom, classe=excluded.classe, niveau=excluded.niveau, "
                     "moyennes=excluded.moyennes, moyenne=excluded.moyenne, source_moyenne=excluded.source_moyenne, "
                     "moyenne_s1=COALESCE(excluded.moyenne_s1, resultat.moyenne_s1), "
                     "moyenne_s2=COALESCE(excluded.moyenne_s2, resultat.moyenne_s2), "
+                    "exam_local=COALESCE(excluded.exam_local, resultat.exam_local), "
+                    "exam_prov=COALESCE(excluded.exam_prov, resultat.exam_prov), "
                     "importe_le=datetime('now','localtime')",
                     (aid, l.code, e[0] if e else None, l.nom, l.classe, niv,
-                     json.dumps(l.moyennes, ensure_ascii=False), moy, src, l.s1, l.s2))
+                     json.dumps(l.moyennes, ensure_ascii=False), moy, src, l.s1, l.s2, l.local, l.prov))
         conn.execute("INSERT INTO journal(action, cible, details) VALUES ('import','resultats',?)",
                      (f"{annee}: {sum(len(f.lignes) for f in fichiers)} تلميذاً",))
     return RapportImport(annee, sum(len(f.lignes) for f in fichiers), classes, sans_niveau, sans_moyenne, inconnus,
