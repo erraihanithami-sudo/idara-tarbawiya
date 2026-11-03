@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QButtonGroup, QComboBox, QDateEdit, QDialog, QDia
                                QPushButton, QRadioButton, QVBoxLayout, QWidget)
 
 from idara.services import bureautique
+from idara.services import calendrier as cal
 from idara.services import documents as dc
 from idara.services import eleves as el
 from idara.services import textes as tx
@@ -29,7 +30,7 @@ def _pydate(q: QDate) -> date:
 class DialogueVacances(QDialog):
     """فترة العطلة التي تشملها الشهادة، وتاريخ التحرير."""
 
-    def __init__(self, nom: str, parent=None):
+    def __init__(self, nom: str, parent=None, vacances: list | None = None):
         super().__init__(parent)
         self.setWindowTitle("شهادة العطلة")
         self.setLayoutDirection(Qt.RightToLeft)
@@ -43,6 +44,17 @@ class DialogueVacances(QDialog):
             w.setLayoutDirection(Qt.LeftToRight)
             w.setDisplayFormat("dd/MM/yyyy")
             w.setDate(_qdate(d))
+        # اقتراح العطل من المقرر الوزاري المرفق بالبرنامج (قرار مؤجل منذ 2026-11-01، أُنجز 2026-11-03)
+        self.choix = QComboBox()
+        self.choix.addItem("— إدخال يدوي —", None)
+        for s in vacances or []:
+            self.choix.addItem(f"{s.titre} ({s.periode})", (s.debut, s.fin))
+        self.choix.currentIndexChanged.connect(self._choisir)
+        if vacances:
+            f.addRow("عطلة من المقرر", self.choix)
+            prochaine = next((i for i, s in enumerate(vacances, start=1) if s.fin >= aujourdhui), None)
+            if prochaine:
+                self.choix.setCurrentIndex(prochaine)
         f.addRow("بداية العطلة *", self.du)
         f.addRow("نهاية العطلة *", self.au)
         f.addRow("تاريخ التحرير", self.le)
@@ -57,6 +69,12 @@ class DialogueVacances(QDialog):
         b.accepted.connect(self._ok)
         b.rejected.connect(self.reject)
         v.addWidget(b)
+
+    def _choisir(self, _=None) -> None:
+        d = self.choix.currentData()
+        if d:
+            self.du.setDate(_qdate(d[0]))
+            self.au.setDate(_qdate(d[1]))
 
     def valeurs(self) -> tuple[date, date, date]:
         return _pydate(self.du.date()), _pydate(self.au.date()), _pydate(self.le.date())
@@ -314,7 +332,11 @@ class PageEleves(QWidget):
         self.afficher(self.eleve_id) if self.eleve_id else None
 
     def dialogue_vacances(self) -> None:
-        d = DialogueVacances(self.titre.text(), self)
+        try:
+            vac = cal.vacances(self.f.conn)
+        except cal.ErreurCalendrier:
+            vac = []
+        d = DialogueVacances(self.titre.text(), self, vac)
         if d.exec() == QDialog.Accepted:
             self.vacances(*d.valeurs())
 

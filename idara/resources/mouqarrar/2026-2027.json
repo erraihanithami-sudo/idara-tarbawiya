@@ -1,0 +1,726 @@
+{
+ "format": 1,
+ "annee": "2026/2027",
+ "mouqarrar": {
+  "numero": "047.26",
+  "date": "2026-07-03",
+  "titre": "مقرر وزير التربية الوطنية والتعليم الأولي والرياضة بشأن تنظيم السنة الدراسية 2026/2027",
+  "shiaar": "من أجل مدرسة ذات جودة للجميع"
+ },
+ "perimetre": "السلك الابتدائي والتعليم الأولي ومواعيد الأطر بالمؤسسة. مستخرج يدوياً من نسخة المقرر الممسوحة ومراجَع.",
+ "stations": [
+  {
+   "cle": "debut_annee",
+   "titre": "انطلاق السنة الدراسية والتحاق هيئة الإدارة التربوية وتوقيع محاضر الدخول",
+   "type": "rentree",
+   "debut": "2026-09-01",
+   "fin": "2026-09-01",
+   "public": [
+    "administration"
+   ],
+   "rappel_jours": 10,
+   "reference": "المادتان 2 و4",
+   "lien": "الموارد البشرية"
+  },
+  {
+   "cle": "entree_ens",
+   "titre": "التحاق هيئة التدريس وتوقيع محاضر الدخول (مستجدات السنة، مشروع المؤسسة المندمج، الملف التربوي)",
+   "type": "rentree",
+   "debut": "2026-09-02",
+   "fin": "2026-09-02",
+   "public": [
+    "administration",
+    "enseignants"
+   ],
+   "rappel_jours": 10,
+   "reference": "المادة 4",
+   "lien": "الموارد البشرية"
+  },
+  {
+   "cle": "eleves_ps_12",
+   "titre": "التحاق أطفال التعليم الأولي وتلاميذ المستويين الأول والثاني",
+   "type": "rentree",
+   "debut": "2026-09-03",
+   "fin": "2026-09-03",
+   "public": [
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "المادة 5",
+   "niveaux": [
+    "PS1",
+    "PS2",
+    "1AP",
+    "2AP"
+   ]
+  },
+  {
+   "cle": "eleves_34",
+   "titre": "التحاق تلاميذ المستويين الثالث والرابع",
+   "type": "rentree",
+   "debut": "2026-09-04",
+   "fin": "2026-09-04",
+   "public": [
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "المادة 5",
+   "niveaux": [
+    "3AP",
+    "4AP"
+   ]
+  },
+  {
+   "cle": "eleves_56",
+   "titre": "التحاق تلاميذ المستويين الخامس والسادس",
+   "type": "rentree",
+   "debut": "2026-09-05",
+   "fin": "2026-09-05",
+   "public": [
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "المادة 5",
+   "niveaux": [
+    "5AP",
+    "6AP"
+   ],
+   "note": "إطلاع التلاميذ على النظام الداخلي، النظام الداخلي للقسم، تقديم الأندية التربوية، أدوار خلايا اليقظة والإنصات والوساطة."
+  },
+  {
+   "cle": "debut_etudes",
+   "titre": "الانطلاق الفعلي والإلزامي للدراسة",
+   "type": "rentree",
+   "debut": "2026-09-07",
+   "fin": "2026-09-07",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "المادة 6"
+  },
+  {
+   "cle": "ens_non_formel",
+   "titre": "انطلاق الدراسة بأقسام التربية غير النظامية وأقسام الفرصة الثانية",
+   "type": "rentree",
+   "debut": "2026-10-05",
+   "fin": "2026-10-05",
+   "public": [
+    "administration"
+   ],
+   "rappel_jours": 7,
+   "reference": "المادة 6"
+  },
+  {
+   "cle": "pause1",
+   "titre": "الفترة البينية الأولى",
+   "type": "conge",
+   "debut": "2026-10-18",
+   "fin": "2026-10-25",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "aid_wahda",
+   "titre": "عيد الوحدة",
+   "type": "fete",
+   "debut": "2026-10-31",
+   "fin": "2026-10-31",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "massira",
+   "titre": "ذكرى المسيرة الخضراء",
+   "type": "fete",
+   "debut": "2026-11-06",
+   "fin": "2026-11-06",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "istiqlal",
+   "titre": "عيد الاستقلال",
+   "type": "fete",
+   "debut": "2026-11-18",
+   "fin": "2026-11-18",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "kafaa",
+   "titre": "امتحانات الكفاءة المهنية (دورة 2026)",
+   "type": "personnel",
+   "debut": "2026-12-05",
+   "fin": "2026-12-05",
+   "public": [
+    "enseignants"
+   ],
+   "rappel_jours": 30,
+   "reference": "المادة 11",
+   "lien": "الموارد البشرية"
+  },
+  {
+   "cle": "pause2",
+   "titre": "الفترة البينية الثانية",
+   "type": "conge",
+   "debut": "2026-12-06",
+   "fin": "2026-12-13",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "nouvel_an",
+   "titre": "فاتح السنة الميلادية",
+   "type": "fete",
+   "debut": "2027-01-01",
+   "fin": "2027-01-01",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "s1_derniers_ctrl",
+   "titre": "الأسدوس الأول: إجراء آخر فروض المراقبة المستمرة",
+   "type": "evaluation",
+   "debut": "2027-01-04",
+   "fin": "2027-01-09",
+   "public": [
+    "administration",
+    "enseignants"
+   ],
+   "rappel_jours": 14,
+   "reference": "الملحق 2",
+   "lien": "المراقبة المستمرة"
+  },
+  {
+   "cle": "wathiqa",
+   "titre": "ذكرى تقديم وثيقة الاستقلال",
+   "type": "fete",
+   "debut": "2027-01-11",
+   "fin": "2027-01-11",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "amazigh",
+   "titre": "فاتح السنة الأمازيغية",
+   "type": "fete",
+   "debut": "2027-01-14",
+   "fin": "2027-01-14",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "s1_saisie",
+   "titre": "الأسدوس الأول: انتهاء مسك نقط آخر فروض المراقبة المستمرة",
+   "type": "evaluation",
+   "debut": "2027-01-16",
+   "fin": "2027-01-16",
+   "public": [
+    "administration",
+    "enseignants"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 2",
+   "lien": "المراقبة المستمرة"
+  },
+  {
+   "cle": "exam_local",
+   "titre": "الامتحان الموحد المحلي لنيل شهادة الدروس الابتدائية",
+   "type": "examen",
+   "debut": "2027-01-18",
+   "fin": "2027-01-19",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 21,
+   "reference": "الملحق 2",
+   "niveaux": [
+    "6AP"
+   ],
+   "lien": "الامتحان"
+  },
+  {
+   "cle": "exam_local_saisie",
+   "titre": "انتهاء مسك نقط الامتحان الموحد المحلي",
+   "type": "examen",
+   "debut": "2027-01-20",
+   "fin": "2027-01-20",
+   "public": [
+    "administration",
+    "enseignants"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 2",
+   "niveaux": [
+    "6AP"
+   ],
+   "lien": "الامتحان"
+  },
+  {
+   "cle": "s1_bulletins_massar",
+   "titre": "الأسدوس الأول: استصدار بيانات النقط عبر منظومة مسار",
+   "type": "resultats",
+   "debut": "2027-01-21",
+   "fin": "2027-01-21",
+   "public": [
+    "administration"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 2",
+   "lien": "الاستيراد من مسار",
+   "note": "ابتداء من هذا التاريخ."
+  },
+  {
+   "cle": "s1_conseils",
+   "titre": "الأسدوس الأول: عقد مجالس الأقسام",
+   "type": "conseil",
+   "debut": "2027-01-21",
+   "fin": "2027-01-22",
+   "public": [
+    "administration",
+    "enseignants"
+   ],
+   "rappel_jours": 10,
+   "reference": "الملحق 2",
+   "lien": "محاضر نهاية الأسدوس"
+  },
+  {
+   "cle": "s1_distribution",
+   "titre": "الأسدوس الأول: توزيع بيانات النقط",
+   "type": "resultats",
+   "debut": "2027-01-23",
+   "fin": "2027-01-23",
+   "public": [
+    "administration",
+    "enseignants",
+    "parents"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 2"
+  },
+  {
+   "cle": "mi_annee",
+   "titre": "عطلة منتصف السنة الدراسية",
+   "type": "conge",
+   "debut": "2027-01-24",
+   "fin": "2027-01-31",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "sensibilisation",
+   "titre": "التحسيس بإلزامية التعليم والتسجيل بالسنة الأولى ابتدائي والسنة الأولى من التعليم الأولي",
+   "type": "inscription",
+   "debut": "2027-03-01",
+   "fin": "2027-03-31",
+   "public": [
+    "administration",
+    "parents"
+   ],
+   "rappel_jours": 14,
+   "reference": "المادة 12",
+   "precision": "mois",
+   "note": "ابتداء من شهر مارس 2027."
+  },
+  {
+   "cle": "aid_fitr",
+   "titre": "عيد الفطر (من 29 رمضان إلى 2 شوال 1448، 3 أو 4 أيام)",
+   "type": "fete",
+   "debut": "2027-03-08",
+   "fin": "2027-03-11",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1",
+   "precision": "hijri",
+   "note": "تاريخ تقديري: يُحدَّد حسب ثبوت رؤية الهلال."
+  },
+  {
+   "cle": "pause3",
+   "titre": "الفترة البينية الثالثة",
+   "type": "conge",
+   "debut": "2027-03-21",
+   "fin": "2027-03-28",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "inscription_massar",
+   "titre": "التسجيل الرقمي للتلاميذ الجدد بالابتدائي عبر «مسار» (آخر أجل 30 أبريل)",
+   "type": "inscription",
+   "debut": "2027-04-01",
+   "fin": "2027-04-30",
+   "public": [
+    "administration",
+    "parents"
+   ],
+   "rappel_jours": 14,
+   "reference": "المادة 12",
+   "niveaux": [
+    "1AP"
+   ]
+  },
+  {
+   "cle": "kangourou",
+   "titre": "مسابقة كنغر الدولية في الرياضيات (المستويات الثاني والرابع والسادس)",
+   "type": "concours",
+   "debut": "2027-04-01",
+   "fin": "2027-04-30",
+   "public": [
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 3",
+   "niveaux": [
+    "2AP",
+    "4AP",
+    "6AP"
+   ],
+   "precision": "mois",
+   "note": "التاريخ الدقيق في المذكرة التنظيمية الخاصة."
+  },
+  {
+   "cle": "tahaddi_qiraa",
+   "titre": "تحدي القراءة العربي",
+   "type": "concours",
+   "debut": "2027-04-01",
+   "fin": "2027-05-31",
+   "public": [
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 3",
+   "lien": "الأندية والأنشطة",
+   "precision": "mois"
+  },
+  {
+   "cle": "aid_choghl",
+   "titre": "عيد الشغل",
+   "type": "fete",
+   "debut": "2027-05-01",
+   "fin": "2027-05-01",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "qiraa_nationale",
+   "titre": "المسابقة الوطنية للقراءة (التلاميذ والأساتذة)",
+   "type": "concours",
+   "debut": "2027-05-01",
+   "fin": "2027-07-31",
+   "public": [
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 3",
+   "lien": "الأندية والأنشطة",
+   "precision": "mois"
+  },
+  {
+   "cle": "pause4",
+   "titre": "الفترة البينية الرابعة",
+   "type": "conge",
+   "debut": "2027-05-09",
+   "fin": "2027-05-16",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1"
+  },
+  {
+   "cle": "aid_adha",
+   "titre": "عيد الأضحى (من 9 إلى 11 ذي الحجة 1448)",
+   "type": "fete",
+   "debut": "2027-05-15",
+   "fin": "2027-05-17",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1",
+   "precision": "hijri",
+   "note": "تاريخ تقديري: يُحدَّد حسب ثبوت رؤية الهلال."
+  },
+  {
+   "cle": "moharram",
+   "titre": "فاتح محرم 1449",
+   "type": "fete",
+   "debut": "2027-06-06",
+   "fin": "2027-06-06",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 1",
+   "precision": "hijri",
+   "note": "تاريخ تقديري: يُحدَّد حسب ثبوت رؤية الهلال."
+  },
+  {
+   "cle": "s2_derniers_ctrl",
+   "titre": "الأسدوس الثاني: إجراء آخر فروض المراقبة المستمرة",
+   "type": "evaluation",
+   "debut": "2027-06-14",
+   "fin": "2027-06-19",
+   "public": [
+    "administration",
+    "enseignants"
+   ],
+   "rappel_jours": 14,
+   "reference": "الملحق 2",
+   "lien": "المراقبة المستمرة"
+  },
+  {
+   "cle": "prep_prov",
+   "titre": "الإعداد الجماعي للامتحان الموحد الإقليمي",
+   "type": "examen",
+   "debut": "2027-06-21",
+   "fin": "2027-06-24",
+   "public": [
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 2",
+   "niveaux": [
+    "6AP"
+   ],
+   "lien": "الامتحان"
+  },
+  {
+   "cle": "s2_saisie",
+   "titre": "الأسدوس الثاني: انتهاء مسك نقط آخر فروض المراقبة المستمرة",
+   "type": "evaluation",
+   "debut": "2027-06-22",
+   "fin": "2027-06-22",
+   "public": [
+    "administration",
+    "enseignants"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 2",
+   "lien": "المراقبة المستمرة"
+  },
+  {
+   "cle": "exam_prov",
+   "titre": "الامتحان الموحد الإقليمي لنيل شهادة الدروس الابتدائية",
+   "type": "examen",
+   "debut": "2027-06-25",
+   "fin": "2027-06-26",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 21,
+   "reference": "الملحق 2",
+   "niveaux": [
+    "6AP"
+   ],
+   "lien": "الامتحان"
+  },
+  {
+   "cle": "fin_etudes",
+   "titre": "انتهاء الدراسة بالسلك الابتدائي",
+   "type": "fin",
+   "debut": "2027-06-26",
+   "fin": "2027-06-26",
+   "public": [
+    "administration",
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "المادة 8",
+   "note": "الفترة من آخر فروض المراقبة المستمرة إلى انتهاء الدراسة مخصصة للأنشطة الموازية وحصص الدعم والمعالجة."
+  },
+  {
+   "cle": "exam_prov_saisie",
+   "titre": "انتهاء مسك نقط الامتحان الموحد الإقليمي",
+   "type": "examen",
+   "debut": "2027-06-30",
+   "fin": "2027-06-30",
+   "public": [
+    "administration"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 2",
+   "niveaux": [
+    "6AP"
+   ],
+   "lien": "الامتحان"
+  },
+  {
+   "cle": "s2_bulletins_massar",
+   "titre": "الأسدوس الثاني: استصدار بيانات النقط عبر منظومة مسار",
+   "type": "resultats",
+   "debut": "2027-07-01",
+   "fin": "2027-07-01",
+   "public": [
+    "administration"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 2",
+   "lien": "الاستيراد من مسار",
+   "note": "ابتداء من هذا التاريخ."
+  },
+  {
+   "cle": "s2_conseils",
+   "titre": "الأسدوس الثاني: عقد مجالس الأقسام",
+   "type": "conseil",
+   "debut": "2027-07-01",
+   "fin": "2027-07-02",
+   "public": [
+    "administration",
+    "enseignants"
+   ],
+   "rappel_jours": 10,
+   "reference": "الملحق 2",
+   "lien": "محاضر نهاية الأسدوس"
+  },
+  {
+   "cle": "reinscription",
+   "titre": "إعادة تسجيل التلاميذ",
+   "type": "inscription",
+   "debut": "2027-07-01",
+   "fin": "2027-07-10",
+   "public": [
+    "administration",
+    "parents"
+   ],
+   "rappel_jours": 7,
+   "reference": "المادة 12"
+  },
+  {
+   "cle": "baraim",
+   "titre": "نهائي أولمبياد البراعم الوطنية (تلامذة السادس)",
+   "type": "concours",
+   "debut": "2027-07-01",
+   "fin": "2027-07-31",
+   "public": [
+    "enseignants",
+    "eleves"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 3",
+   "niveaux": [
+    "6AP"
+   ],
+   "precision": "mois"
+  },
+  {
+   "cle": "s2_distribution",
+   "titre": "الأسدوس الثاني: توزيع بيانات النقط",
+   "type": "resultats",
+   "debut": "2027-07-03",
+   "fin": "2027-07-03",
+   "public": [
+    "administration",
+    "enseignants",
+    "parents"
+   ],
+   "rappel_jours": 7,
+   "reference": "الملحق 2"
+  },
+  {
+   "cle": "sortie_ens",
+   "titre": "توقيع محاضر الخروج لهيئة التدريس",
+   "type": "fin",
+   "debut": "2027-07-10",
+   "fin": "2027-07-10",
+   "public": [
+    "administration",
+    "enseignants"
+   ],
+   "rappel_jours": 10,
+   "reference": "المادة 13",
+   "lien": "الموارد البشرية",
+   "note": "يُستثنى المكلفون بمهام تتجاوز هذا التاريخ."
+  },
+  {
+   "cle": "sortie_admin",
+   "titre": "توقيع محاضر الخروج لهيئة الإدارة التربوية والموظفين بالمؤسسة",
+   "type": "fin",
+   "debut": "2027-07-31",
+   "fin": "2027-07-31",
+   "public": [
+    "administration"
+   ],
+   "rappel_jours": 14,
+   "reference": "المادة 13",
+   "note": "بعد إتمام عمليات نهاية السنة والتحضير للدخول الموالي (استعمالات الزمن، جداول الحصص، لوائح الأقسام، مشروع المؤسسة المندمج)، مع ضمان المداومة الصيفية."
+  }
+ ]
+}

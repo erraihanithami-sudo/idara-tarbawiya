@@ -133,7 +133,8 @@ def test_navigation_deroulante(app, config_tmp):
     assert titres[:8] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي",
                           "التدبير المالي والمادي", "التقييم", "مشروع المؤسسة", "تسليم المهام"]
     assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص"]
-    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة"]
+    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "برنامج العمل السنوي والتذكيرات", "الأداء العام للمؤسسة",
+                                         "تتبع الغياب", "مجالس المؤسسة"]
     assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
     i = titres.index("التدبير المالي والمادي")
     f.boutons[i].click()
@@ -333,6 +334,7 @@ def test_page_personnel(app, config_tmp):
     p.nouveau()
     p.c["nom_ar"].setText("الأستاذة")
     assert p.enregistrer() is None and "إجبارية" in p.message.text()
+    assert "لم يُحفظ" in p.message_bas.text() and not p.message_bas.isHidden()   # بجانب زر الحفظ أيضاً
     p.c["prenom_ar"].setText("فاطمة")
     p.r_f.setChecked(True)
     p.categorie.setCurrentIndex(p.categorie.findData("enseignant"))
@@ -1144,4 +1146,39 @@ def test_personnel_import_xml(app, config_tmp):
         irh.comparer(f.conn, irh.lire_xml(xml_rh())), p)
     assert [d.table.item(i, 2).text() for i in range(3)] == ["دون تغيير", "دون تغيير", "لا يُستورد"]
     assert d.choisies() == []
+    f.close()
+
+
+
+def test_programme_annuel_et_rappels(app, config_tmp, monkeypatch):
+    from datetime import date
+    from idara.services import bureautique
+    from idara.services import calendrier as cal
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("لوحة القيادة")
+    f.tableau.rafraichir()
+    assert isinstance(f.tableau.lignes_rappels, list)
+    f.aller_a("برنامج العمل")
+    p = f.page_calendrier
+    assert "047.26" in p.l_mouqarrar.text()
+    assert p.t_stations.rowCount() == len(cal.stations_ministerielles("2026/2027"))
+    p.f_source.setCurrentIndex(p.f_source.findData("l"))
+    assert p.t_stations.rowCount() == 0
+    p.titre.setText("اجتماع مجلس التدبير")
+    p.debut.setText("07/10/2026")
+    assert p.enregistrer(True) is not None, p.message.text()
+    assert p.t_stations.rowCount() == 1
+    p.t_stations.selectRow(0)
+    assert p.sid is not None and p.titre.text() == "اجتماع مجلس التدبير" and p.b_suppr.objectName() == "danger"
+    p.titre.setText("")
+    assert p.enregistrer(False) is None and "إجباري" in p.message.text()
+    p.f_source.setCurrentIndex(0)
+    p.afficher_rappels(date(2027, 1, 20))
+    etats = [p.t_rappels.item(i, 0).text() for i in range(p.t_rappels.rowCount())]
+    assert "جارية" in etats and "قادمة" in etats
+    p.t_rappels.selectRow(0)
+    assert p.marquer_selection(p.t_rappels, True) == 1
+    assert sum(1 for s in cal.stations(f.conn) if s.fait_le) == 1
+    assert p.generer() is not None and "برنامج العمل السنوي" in p.message.text()
     f.close()

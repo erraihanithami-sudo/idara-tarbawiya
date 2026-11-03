@@ -13,6 +13,7 @@ from idara import NOM_APPLICATION, __version__
 from idara.data.db import ouvrir_base
 from idara.data.dossier import DossierDonnees
 from idara.services import annee as annee_srv
+from idara.services import calendrier as cal_srv
 from idara.services import etablissement as etab_srv
 from idara.services import import_eleves as imp
 from idara.services import sauvegarde
@@ -36,6 +37,7 @@ from idara.ui.page_achats import PageAchats
 from idara.ui.page_conseils_etab import PageConseilsEtab
 from idara.ui.page_pedagogie import PagePerformance, PageRiyada, PageTarl, PageVieScolaire
 from idara.ui.page_tanzim import PageTanzim
+from idara.ui.page_calendrier import PageCalendrier
 from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
@@ -158,6 +160,42 @@ class PageTableauBord(QWidget):
         cv.addLayout(h)
         self.v.addWidget(c)
 
+    def _rappels(self) -> None:
+        """التذكيرات بمحطات المقرر الوزاري والمؤسسة (اقتراح المدير 2026-11-03)."""
+        try:
+            r = cal_srv.rappels(self.f.conn)
+        except cal_srv.ErreurCalendrier:
+            r = {"en_cours": [], "a_venir": [], "en_retard": []}
+        lignes = ([("فاتت", s) for s in r["en_retard"]] + [("جارية", s) for s in r["en_cours"]] +
+                  [("قادمة", s) for s in r["a_venir"]])
+        self.lignes_rappels = lignes
+        c, cv = carte("التذكيرات")
+        if not lignes:
+            l = QLabel("لا محطات قريبة. كل محطات السنة في «برنامج العمل السنوي».")
+            l.setObjectName("etiquette")
+            cv.addWidget(l)
+        for etat, s in lignes[:6]:
+            ligne = QHBoxLayout()
+            e = QLabel(etat)
+            e.setObjectName("alerte" if etat == "فاتت" else "etiquette")
+            e.setMinimumWidth(60)
+            l = QLabel(f"{s.titre} · {s.periode}")
+            l.setWordWrap(True)
+            ligne.addWidget(e)
+            ligne.addWidget(l, 1)
+            if s.lien and s.lien in getattr(self.f, "emplacement", {}):
+                b = QPushButton("فتح")
+                b.clicked.connect(lambda _=False, c=s.lien: self.f.aller_a(c))
+                ligne.addWidget(b)
+            cv.addLayout(ligne)
+        h = QHBoxLayout()
+        b = QPushButton("برنامج العمل السنوي" + (f" (+{len(lignes) - 6})" if len(lignes) > 6 else ""))
+        b.clicked.connect(lambda: self.f.aller_a("برنامج العمل"))
+        h.addWidget(b)
+        h.addStretch()
+        cv.addLayout(h)
+        self.v.addWidget(c)
+
     def rafraichir(self) -> None:
         if self.contenu is not None:
             self.externe.removeWidget(self.contenu)
@@ -206,6 +244,7 @@ class PageTableauBord(QWidget):
             grille.addWidget(c, 0, i)
         self.v.addLayout(grille)
 
+        self._rappels()
         self._jauges(ind)
         # التوزيع حسب القسم
         repartition = ind["classes"]
@@ -353,7 +392,8 @@ class PageAVenir(QWidget):
 # الموارد البشرية أضافها المدير بعد ذلك (2026-11-03). المراسلات والإعدادات لم تردا في ترتيبه، فأُبقيتا بعده
 # حتى لا تضيع وظائفهما.
 SECTIONS = [
-    ("القيادة والتدبير", [("لوحة القيادة", "لوحة القيادة"), ("أداء المؤسسة", "الأداء العام للمؤسسة"),
+    ("القيادة والتدبير", [("لوحة القيادة", "لوحة القيادة"), ("برنامج العمل", "برنامج العمل السنوي والتذكيرات"),
+                          ("أداء المؤسسة", "الأداء العام للمؤسسة"),
                           ("تتبع الغياب", "تتبع الغياب"), ("مجالس المؤسسة", "مجالس المؤسسة")]),
     ("التلاميذ", [("التلاميذ", "وثائق التلاميذ"), ("حركية التلاميذ", "حركية التلاميذ"),
                   ("تتبع السلوك", "تتبع سلوكات التلاميذ"), ("أولياء الأمور", "معلومات أولياء الأمور"),
@@ -528,7 +568,8 @@ class FenetrePrincipale(QMainWindow):
         self.page_fa = PageFa(self)
         self.page_sortants = PageSortants(self)
         self.page_docs = PageDocuments(self)
-        self.pages = {"لوحة القيادة": self.tableau, "التلاميذ": self.page_eleves,
+        self.page_calendrier = PageCalendrier(self)
+        self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
                       "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "التنظيم التربوي": self.page_tanzim, "محاضر نهاية الأسدوس": self.page_deliberations,
