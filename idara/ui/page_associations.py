@@ -85,6 +85,34 @@ class DialogueExercice(QDialog):
         return d
 
 
+class DialogueReport(QDialog):
+    """تعديل المنقول من السنة السابقة (أول سنة مالية في التطبيق)."""
+
+    def __init__(self, parent, banque: float, caisse: float):
+        super().__init__(parent)
+        self.setWindowTitle("المنقول من السنة المالية السابقة")
+        self.setLayoutDirection(Qt.RightToLeft)
+        v = QVBoxLayout(self)
+        f = QFormLayout()
+        self.banque, self.caisse = champ("0.00", ltr=True), champ("0.00", ltr=True)
+        self.banque.setText(f"{banque:.2f}")
+        self.caisse.setText(f"{caisse:.2f}")
+        self.reference = champ("محضر تسليم المهام، كشف الحساب...")
+        f.addRow("المنقول — البنك", self.banque)
+        f.addRow("المنقول — الصندوق", self.caisse)
+        f.addRow("المرجع", self.reference)
+        v.addLayout(f)
+        b = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        b.button(QDialogButtonBox.Ok).setText("حفظ")
+        b.button(QDialogButtonBox.Cancel).setText("إلغاء")
+        b.accepted.connect(self.accept)
+        b.rejected.connect(self.reject)
+        v.addWidget(b)
+
+    def valeurs(self) -> dict:
+        return dict(banque=self.banque.text(), caisse=self.caisse.text(), reference=self.reference.text())
+
+
 class DialoguePassation(QDialog):
     """محضر تسليم المهام المالية (الملحق 25 من الدليل المسطري)."""
 
@@ -238,7 +266,11 @@ class PageAssociations(QWidget):
         self.b_rapport.clicked.connect(lambda: self.rapport())
         self.b_passation = QPushButton("محضر تسليم المهام المالية")
         self.b_passation.clicked.connect(lambda: self.passation())
+        self.b_report = QPushButton("تعديل المنقول")
+        self.b_report.setToolTip("المنقول من السنة السابقة (محضر تسليم المهام أو كشف الحساب): لأول سنة مالية في التطبيق")
+        self.b_report.clicked.connect(lambda: self.modifier_report())
         h.addWidget(self.b_ouvrir)
+        h.addWidget(self.b_report)
         h.addStretch()
         cv.addLayout(h)
         h = QHBoxLayout()   # وثائق الدليل المسطري في سطر مستقل حتى لا تتجاوز الصفحة عرضها
@@ -354,11 +386,12 @@ class PageAssociations(QWidget):
             if lab is not None:
                 g.addWidget(lab, i * 2, 0, 1, 2)
             g.addWidget(w, i * 2 + 1, 0, 1, 2)
-        g.addWidget(etiquette("الطرف المعني", self.tiers), 12, 0)
-        g.addWidget(self.tiers, 13, 0)
-        g.addWidget(etiquette("صفته", self.tiers_qualite), 12, 1)
-        g.addWidget(self.tiers_qualite, 13, 1)
+        g.addWidget(etiquette("الطرف المعني", self.tiers), 14, 0)
+        g.addWidget(self.tiers, 15, 0)
+        g.addWidget(etiquette("صفته", self.tiers_qualite), 14, 1)
+        g.addWidget(self.tiers_qualite, 15, 1)
         g.setColumnStretch(1, 1)
+        self.grille_op = g
         fv.addLayout(g)
         h = QHBoxLayout()
         self.b_save = QPushButton("تسجيل العملية")
@@ -427,6 +460,7 @@ class PageAssociations(QWidget):
     # ---------- chargement ----------
 
     def rafraichir(self) -> None:
+        self._alertes_report = asso.synchroniser(self.f.conn, TYPE)
         courant = self.eid
         self.exercice.blockSignals(True)
         self.exercice.clear()
@@ -449,6 +483,7 @@ class PageAssociations(QWidget):
         else:
             message(self.message, "ابدأ بفتح السنة المالية الأولى، مع المنقول من السنة السابقة "
                                   "(من محضر تسليم المهام أو كشف الحساب).")
+        self.b_report.setEnabled(actif and asso.peut_modifier_report(self.f.conn, self.eid))
         e = asso.exercice(self.f.conn, self.eid) if actif else None
         if e:
             auj = date.today().isoformat()
@@ -466,8 +501,8 @@ class PageAssociations(QWidget):
         t = asso.totaux(self.f.conn, self.eid)
         for k, n in self.chiffres.items():
             n.setText(dh(t[k]))
-        al = asso.depassements(self.f.conn, self.eid)
-        self.alertes.setText("تنبيه — تجاوز المتوقع:\n" + "\n".join(al))
+        al = getattr(self, "_alertes_report", []) + asso.depassements(self.f.conn, self.eid)
+        self.alertes.setText("تنبيه:\n" + "\n".join(al))
         self.alertes.setVisible(bool(al))
 
     def afficher_operations(self) -> None:
@@ -750,6 +785,25 @@ class PageAssociations(QWidget):
         return r
 
     # ---------- السنة المالية والتصدير ----------
+
+    def modifier_report(self, valeurs: dict | None = None) -> bool:
+        """المنقول لأول سنة مالية في التطبيق (valeurs للاختبار، وإلا عبر النافذة)."""
+        if self.eid is None:
+            return False
+        if valeurs is None:
+            r = asso.report(self.f.conn, self.eid)
+            d = DialogueReport(self, r["banque"], r["caisse"])
+            if d.exec() != QDialog.Accepted:
+                return False
+            valeurs = d.valeurs()
+        try:
+            asso.modifier_report(self.f.conn, self.eid, **valeurs)
+        except asso.ErreurAssociation as e:
+            message(self.message, str(e), True)
+            return False
+        self.rafraichir()
+        message(self.message, "سُجل المنقول، وأُدرج في رصيدي البنك والصندوق.")
+        return True
 
     def ouvrir(self, valeurs: dict | None = None) -> int | None:
         """يفتح سنة مالية (valeurs للاختبار، وإلا عبر النافذة)."""

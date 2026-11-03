@@ -17,10 +17,13 @@ def _gestion(base):  # noqa: F811
 
 def test_composition_et_ecarts(base):  # noqa: F811
     p = ce.proposition(base, "gestion")
-    assert p[0] == ("أحمد المدير", "رئيس المجلس", "") and p[-1][1] == "ممثل المجلس الجماعي"
+    assert p[0] == ("أحمد المدير", "رئيس المجلس", "") and len(p) == 7  # الأعضاء الاختياريون لا يضافون إلا بالخانة
+    p = ce.proposition(base, "gestion", avec_optionnels=True)
+    assert [x[1] for x in p[-3:]] == ce.optionnels("gestion")
     assert [x[1] for x in ce.proposition(base, "enseignement")][:2] == ["مدير المؤسسة", "مدير المؤسسة"]
     ce.enregistrer_membres(base, "gestion", [("المدير", "رئيس المجلس"), ("أ", "ممثل القسم الأول")])
-    assert "ممثل المجلس الجماعي" in ce.ecarts_decret(base, "gestion")
+    ec = ce.ecarts_decret(base, "gestion")
+    assert "ممثل القسم الثاني" in ec and "ممثل المجلس الجماعي" not in ec
     with pytest.raises(ce.ErreurConseil, match="الاسم والصفة"):
         ce.enregistrer_membres(base, "pedagogique", [("", "رئيس المجلس"), ("س", "")])
     with pytest.raises(ce.ErreurConseil, match="حدد المادة"):

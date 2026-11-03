@@ -87,22 +87,129 @@ def ouvrir_exercice(conn, type_: str, libelle: str, debut: str, fin: str,
         raise ErreurAssociation(f"تتداخل مع السنة المالية {chevauche[0]}.")
     precedent = conn.execute("SELECT id FROM exercice WHERE association_id=? AND date_fin<? ORDER BY date_fin DESC "
                              "LIMIT 1", (a["id"], debut)).fetchone()
-    if precedent and report_banque is None and report_caisse is None:
+    if precedent:
+        # المنقول = رصيد السنة السابقة دائماً (ويُحيَّن آلياً إذا عُدلت عملياتها)
         s = soldes(conn, precedent[0])
-        report_banque, report_caisse, reference = s["banque"], s["caisse"], reference or "رصيد السنة المالية السابقة"
+        report_banque, report_caisse, reference = s["banque"], s["caisse"], "رصيد السنة المالية السابقة"
+    montants = {"banque": _montant_report(report_banque), "caisse": _montant_report(report_caisse)}
+    _rubrique_report(conn, type_)
     try:
-        with conn:
+        with conn:  # السنة والمنقول معاً: لا تُفتح سنة دون منقولها
             eid = conn.execute("INSERT INTO exercice(association_id, libelle, date_debut, date_fin) VALUES (?,?,?,?)",
                                (a["id"], libelle, debut, fin)).lastrowid
+            _ecrire_report(conn, eid, montants, reference)
+            _propager(conn, eid)
     except sqlite3.IntegrityError:
         raise ErreurAssociation("سنة مالية بنفس الاسم موجودة.") from None
-    rid = _rubrique_report(conn, type_)
-    for reg, m in (("banque", report_banque), ("caisse", report_caisse)):
-        if m and m > 0:
-            enregistrer(conn, Operation(eid, debut, "recette", reg, round(m, 2), rid,
-                                        reference or "محضر تسليم المهام / كشف الحساب",
-                                        f"المنقول — {REGISTRES[reg]}"))
     return eid
+
+
+def _montant_report(v) -> float:
+    try:
+        m = round(float(str(v or 0).replace(",", ".").replace(" ", "").replace(" ", "")), 2)
+    except ValueError:
+        raise ErreurAssociation("مبلغ المنقول غير صحيح.") from None
+    if m < 0:
+        raise ErreurAssociation("مبلغ المنقول لا يكون سالباً.")
+    return m
+
+
+def _voisin(conn, eid: int, sens: str) -> int | None:
+    e = exercice(conn, eid)
+    if sens == "precedent":
+        sql = "SELECT id FROM exercice WHERE association_id=? AND date_fin<? ORDER BY date_fin DESC LIMIT 1"
+        arg = e["date_debut"]
+    else:
+        sql = "SELECT id FROM exercice WHERE association_id=? AND date_debut>? ORDER BY date_debut LIMIT 1"
+        arg = e["date_fin"]
+    r = conn.execute(sql, (e["association_id"], arg)).fetchone()
+    return r[0] if r else None
+
+
+def report(conn, eid: int) -> dict[str, float]:
+    """المنقول المسجل في بداية السنة المالية، لكل سجل."""
+    rid = _rubrique_report(conn, exercice(conn, eid)["type"])
+    s = {"banque": 0.0, "caisse": 0.0}
+    for r in conn.execute("SELECT registre, SUM(montant) FROM operation_financiere WHERE exercice_id=? AND "
+                          "rubrique_id=? GROUP BY registre", (eid, rid)):
+        s[r[0]] = round(r[1], 2)
+    return s
+
+
+def _ecrire_report(conn, eid: int, montants: dict[str, float], reference: str = "") -> bool:
+    """يكتب عمليات المنقول (داخل معاملة مفتوحة، دون حفظ). يرجع True إذا تغير شيء."""
+    e = exercice(conn, eid)
+    rid = _rubrique_report(conn, e["type"])
+    change = False
+    for reg in REGISTRES:
+        m = round(montants.get(reg) or 0, 2)
+        ops = conn.execute("SELECT id, montant FROM operation_financiere WHERE exercice_id=? AND rubrique_id=? AND "
+                           "registre=? ORDER BY numero", (eid, rid, reg)).fetchall()
+        if len(ops) == 1 and abs(ops[0]["montant"] - m) < 0.005:
+            continue
+        if not ops and m <= 0:
+            continue
+        change = True
+        garder = ops[0]["id"] if ops and m > 0 else None
+        for o in ops:
+            if o["id"] == garder:
+                continue
+            if conn.execute("SELECT 1 FROM piece_association WHERE operation_id=?", (o["id"],)).fetchone():
+                raise ErreurAssociation("صدر وصل لعملية المنقول: لا يمكن تعديلها.")
+            conn.execute("DELETE FROM operation_financiere WHERE id=?", (o["id"],))
+        ref = (reference or "").strip() or "محضر تسليم المهام / كشف الحساب"
+        if garder:
+            conn.execute("UPDATE operation_financiere SET montant=?, date_op=?, reference=? WHERE id=?",
+                         (m, e["date_debut"], ref, garder))
+        elif m > 0:
+            num = conn.execute("SELECT COALESCE(MAX(numero),0)+1 FROM operation_financiere WHERE exercice_id=?",
+                               (eid,)).fetchone()[0]
+            conn.execute("INSERT INTO operation_financiere(exercice_id, numero, date_op, nature, registre, rubrique_id,"
+                         " montant, reference, detail) VALUES (?,?,?,?,?,?,?,?,?)",
+                         (eid, num, e["date_debut"], "recette", reg, rid, m, ref, f"المنقول — {REGISTRES[reg]}"))
+    if change:
+        neg = _premier_negatif(conn, eid)
+        if neg:
+            raise ErreurAssociation(f"بهذا المنقول يصير رصيد {REGISTRES[neg[0]]} سالباً بتاريخ {neg[1]} "
+                                    f"(السنة المالية {e['libelle']}).")
+        conn.execute("INSERT INTO journal(action, cible, cible_id, details) VALUES ('report','exercice',?,?)",
+                     (eid, f"البنك {montants.get('banque') or 0} — الصندوق {montants.get('caisse') or 0}"))
+    return change
+
+
+def _propager(conn, eid: int) -> None:
+    """ينقل رصيد كل سنة إلى منقول السنة الموالية (داخل المعاملة المفتوحة)."""
+    suivant = _voisin(conn, eid, "suivant")
+    while suivant is not None:
+        _ecrire_report(conn, suivant, soldes(conn, eid), "رصيد السنة المالية السابقة")
+        eid, suivant = suivant, _voisin(conn, suivant, "suivant")
+
+
+def modifier_report(conn, eid: int, banque, caisse, reference: str = "") -> None:
+    """تعديل المنقول يدوياً: لأول سنة مالية في التطبيق فقط (الموالية تأخذ رصيد السابقة)."""
+    if _voisin(conn, eid, "precedent") is not None:
+        raise ErreurAssociation("المنقول في هذه السنة هو رصيد السنة المالية السابقة، ويُحيَّن آلياً.")
+    m = {"banque": _montant_report(banque), "caisse": _montant_report(caisse)}
+    with conn:
+        _ecrire_report(conn, eid, m, reference)
+        _propager(conn, eid)
+
+
+def peut_modifier_report(conn, eid: int) -> bool:
+    return _voisin(conn, eid, "precedent") is None
+
+
+def synchroniser(conn, type_: str = "najah") -> list[str]:
+    """يصحح منقول كل سنة من رصيد السابقة (بيانات سُجلت قبل التحيين الآلي). يرجع التنبيهات."""
+    ex = sorted(exercices(conn, type_), key=lambda e: e["date_debut"])
+    if not ex:
+        return []
+    try:
+        with conn:
+            _propager(conn, ex[0]["id"])
+    except ErreurAssociation as err:
+        return [str(err)]
+    return []
 
 
 def exercice(conn, eid: int) -> sqlite3.Row:
@@ -197,13 +304,15 @@ def enregistrer(conn, op: Operation) -> int:
     if op.nature == "transfert":
         op.rubrique_id = None
     else:
-        r = conn.execute("SELECT sens, actif FROM rubrique WHERE id=?", (op.rubrique_id,)).fetchone()
+        r = conn.execute("SELECT sens, actif, ligne FROM rubrique WHERE id=?", (op.rubrique_id,)).fetchone()
         if r is None:
             raise ErreurAssociation("اختر البند.")
         if not r["actif"] and op.id is None:
             raise ErreurAssociation("هذا البند لم يعد وارداً في الدليل المسطري (الملحق 1).")
         if r["sens"] != op.nature:
             raise ErreurAssociation("البند لا يناسب نوع العملية.")
+        if r["ligne"] == REPORT:
+            raise ErreurAssociation("المنقول يُسجل عند فتح السنة المالية أو بزر «تعديل المنقول».")
     if op.nature != "recette" and not (op.reference or "").strip():
         raise ErreurAssociation("مرجع المصروف أو التحويل إجباري (فاتورة، سند الطلب، كشف الحساب...).")
     neg = _premier_negatif(conn, e["id"], op.id, (op.date_op, _effet(op.nature, op.registre, montant)))
@@ -224,6 +333,7 @@ def enregistrer(conn, op: Operation) -> int:
                          "reference=?, detail=?, observation=?, tiers=?, tiers_qualite=? WHERE id=?", (*vals, op.id))
         conn.execute("INSERT INTO journal(action, cible, cible_id, details) VALUES ('operation','association',?,?)",
                      (op.id, f"{NATURES[op.nature]} {montant} {REGISTRES[op.registre]}"))
+        _propager(conn, e["id"])
     return op.id
 
 
@@ -234,10 +344,13 @@ def supprimer(conn, op_id: int) -> None:
     if conn.execute("SELECT 1 FROM piece_association WHERE operation_id=?", (op_id,)).fetchone():
         raise ErreurAssociation("صدرت لهذه العملية وثائق مرقمة (وصل أو سند): لا تُحذف. "
                                 "صحح الخطأ بعملية معاكسة مع ذكر السبب في البيان.")
+    if r["rubrique_id"] == _rubrique_report(conn, exercice(conn, r["exercice_id"])["type"]):
+        raise ErreurAssociation("المنقول لا يُحذف: عدّله بزر «تعديل المنقول» (أول سنة مالية) أو يُحيَّن آلياً.")
     if _premier_negatif(conn, r["exercice_id"], sauf=op_id):
         raise ErreurAssociation("حذف هذا المدخول يجعل الرصيد سالباً بعده: احذف المصاريف المرتبطة أولاً.")
     with conn:
         conn.execute("DELETE FROM operation_financiere WHERE id=?", (op_id,))
+        _propager(conn, r["exercice_id"])
 
 
 def operations(conn, eid: int, registre: str | None = None) -> list[sqlite3.Row]:

@@ -147,7 +147,16 @@ def membres_actifs(conn, conseil: str, annee: str | None = None) -> list[sqlite3
     return [m for m in membres(conn, conseil, annee) if m["ordre"] >= 0]
 
 
-def proposition(conn, conseil: str) -> list[tuple[str, str, str]]:
+# أعضاء مجلس التدبير الذين يبقى حضورهم اختيارياً في الممارسة (قرار المدير 2026-11-03): يُضافون بخانة
+OPTIONNELS = {"gestion": ["ممثل الأطر الإدارية والتقنية", "رئيس جمعية آباء وأولياء التلاميذ",
+                          "ممثل المجلس الجماعي"]}
+
+
+def optionnels(conseil: str) -> list[str]:
+    return OPTIONNELS.get(conseil, [])
+
+
+def proposition(conn, conseil: str, avec_optionnels: bool = False) -> list[tuple[str, str, str]]:
     """تركيبة مقترحة حسب المرسوم، من معطيات التطبيق: المدير، أساتذة كل مستوى (إسناد الأقسام)، والمقاعد الأخرى
     بصفتها فقط ليُكتب الاسم."""
     a = _annee(conn)
@@ -172,20 +181,17 @@ def proposition(conn, conseil: str) -> list[tuple[str, str, str]]:
             res.append((profs[0][0] if profs else "", f"ممثل القسم {o}", ""))
     if conseil == "enseignement":
         res = [(directeur, "مدير المؤسسة", g) for g in GROUPES_ENSEIGNEMENT] + res[1:]
-    if conseil == "gestion":
-        res += [("", "ممثل الأطر الإدارية والتقنية", ""), ("", "رئيس جمعية آباء وأولياء التلاميذ", ""),
-                ("", "ممثل المجلس الجماعي", "")]
+    if avec_optionnels:
+        res += [("", q, "") for q in optionnels(conseil)]
     if conseil == "pedagogique":
         res.append(("", "رئيس جمعية آباء وأولياء التلاميذ", ""))
     return res
 
 
 def ecarts_decret(conn, conseil: str, annee: str | None = None) -> list[str]:
-    """مقاعد ينص عليها المرسوم وليست في التركيبة المسجلة (تنبيه، لا منع)."""
+    """مقاعد ينص عليها المرسوم وليست في التركيبة المسجلة (تنبيه، لا منع). الأعضاء الاختياريون لا ينبَّه إليهم."""
     q = {m["qualite"] for m in membres_actifs(conn, conseil, annee)}
-    attendus = {"gestion": [f"ممثل القسم {o}" for o in NIVEAUX] + ["ممثل الأطر الإدارية والتقنية",
-                                                                  "رئيس جمعية آباء وأولياء التلاميذ",
-                                                                  "ممثل المجلس الجماعي"],
+    attendus = {"gestion": [f"ممثل القسم {o}" for o in NIVEAUX],
                 "pedagogique": [f"ممثل القسم {o}" for o in NIVEAUX] + ["رئيس جمعية آباء وأولياء التلاميذ"],
                 "enseignement": []}[conseil]
     return [x for x in attendus if x not in q]

@@ -59,6 +59,10 @@ class PageConseilsEtab(QWidget):
         self.membres.setEditTriggers(QAbstractItemView.AllEditTriggers)
         self.membres.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.membres.setMinimumHeight(330)
+        self.c_optionnels = QCheckBox("إضافة الأعضاء الاختياريين: ممثل الأطر الإدارية والتقنية، رئيس جمعية آباء "
+                                      "وأولياء التلاميذ، ممثل المجلس الجماعي")
+        self.c_optionnels.toggled.connect(lambda c: self._basculer_optionnels(c))
+        v.addWidget(self.c_optionnels)
         v.addWidget(self.membres)
         h = QHBoxLayout()
         for lib, fn in (("تركيبة مقترحة (المرسوم ومعطيات التطبيق)", lambda: self.proposer()),
@@ -159,6 +163,11 @@ class PageConseilsEtab(QWidget):
         cs = self.conseil.currentData()
         ms = ce.membres_actifs(self.f.conn, cs)
         self._remplir_membres([(m["nom"], m["qualite"], m["groupe"] or "") for m in ms])
+        opt = ce.optionnels(cs)
+        self.c_optionnels.setVisible(bool(opt))
+        self.c_optionnels.blockSignals(True)
+        self.c_optionnels.setChecked(any(m["qualite"] in opt for m in ms))
+        self.c_optionnels.blockSignals(False)
         ec = ce.ecarts_decret(self.f.conn, cs) if ms else []
         self.l_ecarts.setText("مقاعد ينص عليها المرسوم وغير مسجلة: " + "، ".join(ec) if ec else "")
         self.l_ecarts.setVisible(bool(ec))
@@ -222,13 +231,25 @@ class PageConseilsEtab(QWidget):
             message(self.message, succes)
         return True if r is None else r
 
+    def _lignes(self) -> list[tuple[str, str, str]]:
+        return [tuple((self.membres.item(i, j).text() if self.membres.item(i, j) else "") for j in range(3))
+                for i in range(self.membres.rowCount())]
+
+    def _basculer_optionnels(self, coche: bool) -> None:
+        """يضيف أسطر الأعضاء الاختياريين إلى التركيبة المعروضة أو يحذفها (ثم «حفظ التركيبة»)."""
+        opt = ce.optionnels(self.conseil.currentData())
+        lignes = [l for l in self._lignes() if any(l) and l[1] not in opt]
+        if coche:
+            lignes += [("", q, "") for q in opt]
+        self._remplir_membres(lignes)
+
     def proposer(self) -> None:
-        self._remplir_membres(ce.proposition(self.f.conn, self.conseil.currentData()))
+        self._remplir_membres(ce.proposition(self.f.conn, self.conseil.currentData(),
+                                             self.c_optionnels.isChecked()))
         message(self.message, "تركيبة مقترحة: أكمل الأسماء الناقصة ثم احفظ.")
 
     def enregistrer_membres(self):
-        lignes = [tuple((self.membres.item(i, j).text() if self.membres.item(i, j) else "") for j in range(3))
-                  for i in range(self.membres.rowCount())]
+        lignes = self._lignes()
         return self._faire(lambda: ce.enregistrer_membres(self.f.conn, self.conseil.currentData(), lignes),
                            "حُفظت التركيبة.")
 

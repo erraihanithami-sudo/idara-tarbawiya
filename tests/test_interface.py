@@ -603,6 +603,31 @@ def test_page_association_najah(app, config_tmp, monkeypatch, tmp_path):
     f.close()
 
 
+def test_association_formulaire_et_report(app, config_tmp):
+    """ملاحظتا المدير (2026-11-03): «الطرف المعني» كان فوق «البيان»؛ والمنقول غائب عن رصيد البنك."""
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("جمعية دعم مدرسة النجاح")
+    p = f.page_asso
+    p.resize(1300, 900)
+    p.show()
+    app.processEvents()
+    g = p.grille_op
+    pos = {}
+    for w in (p.detail, p.tiers, p.tiers_qualite, p.reference):
+        i = g.indexOf(w)
+        if i >= 0:
+            pos[w] = g.getItemPosition(i)[0]
+    assert len(set(pos.values())) >= 3 and pos[p.tiers] > pos[p.detail]
+    eid = p.ouvrir(dict(libelle="2026", debut="2026-01-01", fin="2026-12-31"))
+    assert eid and p.chiffres["banque"].text() == "0.00" and p.b_report.isEnabled()
+    assert p.modifier_report(dict(banque="12 500,00", caisse="250", reference="كشف الحساب"))
+    assert p.chiffres["banque"].text() == "12 500.00" and p.chiffres["caisse"].text() == "250.00"
+    e2 = p.ouvrir(dict(libelle="2027", debut="2027-01-01", fin="2027-12-31"))
+    assert e2 and p.chiffres["banque"].text() == "12 500.00" and not p.b_report.isEnabled()
+    assert not p.modifier_report(dict(banque="1", caisse="0"))
+    f.close()
+
+
 def test_association_documents_du_guide(app, config_tmp, monkeypatch):
     from idara.services import associations as asso
     from idara.services import bureautique
@@ -806,7 +831,10 @@ def test_page_conseils_etablissement(app, config_tmp, monkeypatch):
     p = f.page_conseils_etab
     assert f.page_courante() == "مجالس المؤسسة" and p.suivi.rowCount() == 3
     p.proposer()
-    assert p.membres.item(0, 1).text() == "رئيس المجلس"
+    assert p.membres.item(0, 1).text() == "رئيس المجلس" and p.c_optionnels.isVisibleTo(p)
+    assert not any(p.membres.item(i, 1) and p.membres.item(i, 1).text() == "ممثل المجلس الجماعي"
+                   for i in range(p.membres.rowCount()))
+    p.c_optionnels.setChecked(True)  # الأعضاء الاختياريون بخانة
     for i in range(1, p.membres.rowCount()):
         it = p.membres.item(i, 0)
         if it is not None and not it.text():

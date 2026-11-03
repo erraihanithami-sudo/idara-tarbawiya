@@ -113,6 +113,53 @@ def test_nouvel_exercice_reprend_les_soldes(conn, ex):
     assert all(o["ligne"] == asso.REPORT for o in asso.operations(conn, e2))
 
 
+def test_report_dans_le_solde_et_mis_a_jour(conn, ex):
+    """ملاحظة المدير (2026-11-03): المنقول يدخل في رصيد البنك، ويُحيَّن إذا عُدلت السنة السابقة."""
+    t = asso.totaux(conn, ex)
+    assert (t["banque"], t["caisse"]) == (50000, 300)
+    e2 = asso.ouvrir_exercice(conn, "najah", "2026/2027", "2026-09-01", "2027-08-31")
+    assert asso.report(conn, e2) == {"banque": 50000, "caisse": 300}
+    # عملية متأخرة في السنة السابقة: يُحيَّن منقول الموالية
+    r = _rub(conn, "معدات وعتاد مكتبي")
+    oid = asso.enregistrer(conn, asso.Operation(ex, "2026-03-02", "depense", "banque", 1200, r, "فاتورة 7"))
+    assert asso.report(conn, e2)["banque"] == 48800 and asso.totaux(conn, e2)["banque"] == 48800
+    asso.supprimer(conn, oid)
+    assert asso.report(conn, e2)["banque"] == 50000
+    # المنقول لا يُدخل ولا يُحذف كعملية عادية، ولا يُعدل يدوياً إلا في أول سنة
+    rid = _rub(conn, asso.REPORT)
+    with pytest.raises(asso.ErreurAssociation, match="تعديل المنقول"):
+        asso.enregistrer(conn, asso.Operation(e2, "2026-09-02", "recette", "banque", 10, rid))
+    op = next(o for o in asso.operations(conn, e2) if o["registre"] == "banque")
+    with pytest.raises(asso.ErreurAssociation, match="لا يُحذف"):
+        asso.supprimer(conn, op["id"])
+    assert not asso.peut_modifier_report(conn, e2)
+    with pytest.raises(asso.ErreurAssociation, match="آلياً"):
+        asso.modifier_report(conn, e2, 1, 1)
+    # تعديل منقول أول سنة ينتقل إلى الموالية
+    asso.modifier_report(conn, ex, "52 000,50", 0, "كشف الحساب")
+    assert asso.report(conn, ex) == {"banque": 52000.5, "caisse": 0}
+    assert asso.report(conn, e2) == {"banque": 52000.5, "caisse": 0}
+    # مصروف في السنة الموالية لا يسمح بتخفيض المنقول تحته
+    asso.enregistrer(conn, asso.Operation(e2, "2026-09-10", "depense", "banque", 52000, r, "فاتورة 8"))
+    with pytest.raises(asso.ErreurAssociation, match="سالباً"):
+        asso.modifier_report(conn, ex, 100, 0)
+    assert asso.report(conn, e2)["banque"] == 52000.5
+
+
+def test_sans_report_a_l_ouverture_repare(conn):
+    """سنة فُتحت دون منقولها (خلل سابق): يصححها التحيين من رصيد السنة السابقة."""
+    e1 = asso.ouvrir_exercice(conn, "najah", "2025", "2025-01-01", "2025-12-31", report_banque=9000)
+    e2 = asso.ouvrir_exercice(conn, "najah", "2026", "2026-01-01", "2026-12-31")
+    conn.execute("DELETE FROM operation_financiere WHERE exercice_id=?", (e2,))
+    conn.commit()
+    assert asso.totaux(conn, e2)["banque"] == 0
+    assert asso.synchroniser(conn) == []
+    assert asso.totaux(conn, e2)["banque"] == 9000 and asso.report(conn, e1)["banque"] == 9000
+    # سنة موالية تبدأ في المستقبل: تُفتح بمنقولها (كان يُرفض تاريخه فيفتح دونه)
+    e3 = asso.ouvrir_exercice(conn, "najah", "2027", "2027-01-01", "2027-12-31")
+    assert asso.report(conn, e3)["banque"] == 9000
+
+
 def test_association_et_export(conn, ex, tmp_path):
     asso.modifier_association(conn, "najah", "0123 4567", "الرئيس", "أمين المال", "2024-10-01")
     assert asso.association(conn)["rib"] == "01234567"
