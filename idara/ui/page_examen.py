@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFileDialog, QHBoxLayout, QLabel, QPushButton,
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QPushButton,
                                QSpinBox, QTableWidgetItem, QWidget)
 
 from idara.services import bureautique
@@ -62,7 +62,7 @@ class PageDeliberations(QWidget):
         aide.setWordWrap(True)
         v.addWidget(aide)
         self.table = tableau(["الاسم", "الرمز", "المعدل", "الميزة", "الرتبة", "القرار", "إنذار/توبيخ", "التوجيه"],
-                             etirer=0)
+                             etirer=7)
         self.table.setMinimumHeight(360)
         v.addWidget(self.table)
         h = QHBoxLayout()
@@ -191,9 +191,8 @@ class PageExamen(QWidget):
         self.capacite.setRange(1, 60)
         v.addLayout(_grille([("النوع", self.type), ("الدورة", self.session), ("مركز الامتحان", self.centre),
                              ("رمز المركز", self.code_centre)]))
-        self.l_premier = QLabel("الرقم الأول")
-        v.addLayout(_grille([("اسم الامتحان", self.intitule), ("الرقم الأول (المحلي)", self.premier),
-                             ("عدد المترشحين في القاعة", self.capacite)], etirer=0))
+        v.addLayout(_grille([("اسم الامتحان", self.intitule)], etirer=0))
+        v.addLayout(_grille([("الرقم الأول (المحلي)", self.premier), ("عدد المترشحين في القاعة", self.capacite)]))
         b = QPushButton("حفظ معطيات الامتحان")
         b.clicked.connect(lambda: self.enregistrer())
         v.addWidget(b)
@@ -264,6 +263,7 @@ class PageExamen(QWidget):
         aide.setWordWrap(True)
         v.addWidget(aide)
         self.surv = tableau(["الأستاذ(ة)"], etirer=0)
+        self.surv.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)   # مواد كثيرة: تمرير داخل الجدول لا الصفحة
         self.surv.setEditTriggers(QAbstractItemView.AllEditTriggers)
         self.surv.setMinimumHeight(240)
         v.addWidget(self.surv)
@@ -288,16 +288,18 @@ class PageExamen(QWidget):
             t = QLabel(lib)
             t.setObjectName("etiquette")
             v.addWidget(t)
-            h = QHBoxLayout()
+            grille = QGridLayout()   # ثلاثة أزرار في كل سطر حتى لا تتجاوز الصفحة عرضها
+            grille.setHorizontalSpacing(8)
+            k = 0
             for code, (nom, gg) in de.DOCUMENTS.items():
                 if gg != g:
                     continue
                 b = QPushButton(nom)
                 b.clicked.connect(lambda _=False, code=code: self.generer(code))
                 self.boutons_docs[code] = b
-                h.addWidget(b)
-            h.addStretch()
-            v.addLayout(h)
+                grille.addWidget(b, k // 3, k % 3)
+                k += 1
+            v.addLayout(grille)
         racine.addWidget(c)
         racine.addStretch()
 
