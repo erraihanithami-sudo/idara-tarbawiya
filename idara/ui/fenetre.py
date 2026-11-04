@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtWidgets import (QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import (QButtonGroup, QFileDialog, QFrame, QInputDialog, QGridLayout, QHBoxLayout,
                                QLabel, QMainWindow, QMessageBox, QPushButton, QScrollArea,
                                QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
 
@@ -23,6 +24,7 @@ from idara.services.textes import date_longue_ar
 from idara.ui import icones, theme
 from idara.ui.composants import carte, entete, page_defilante
 from idara.ui.formulaires import FormDirecteur, FormEtablissement, FormIdentite
+from idara.ui.saisie import message
 from idara.ui.page_documents import PageDocuments
 from idara.ui.page_import import PageImport
 from idara.ui.page_eleves import PageEleves
@@ -324,6 +326,24 @@ class PageEtablissement(QWidget):
         h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
+        # تصفير البرنامج (طلب المدير 2026-11-04)
+        c, cv = carte("تصفير البرنامج")
+        l = QLabel("يحذف كل ما أُدخل في البرنامج: معطيات المؤسسة والمدير، التلاميذ، الموظفون، الرخص، الجمعيات، "
+                   "المجالس، النتائج، المحطات المحلية، القوالب المعدّلة والهوية البصرية، والوثائق المولَّدة. "
+                   "يعود البرنامج بعدها إلى مساعد الإعداد الأول.\n"
+                   "قبل الحذف تُحفظ نسخة كاملة في مجلد النسخ الاحتياطية، ويمكن استرجاعها من مساعد الإعداد "
+                   "(«استيراد نسخة»).")
+        l.setWordWrap(True)
+        cv.addWidget(l)
+        hb = QHBoxLayout()
+        self.b_reinit = QPushButton("تصفير البرنامج…")
+        self.b_reinit.setObjectName("danger")
+        self.b_reinit.setIcon(icones.corbeille())
+        self.b_reinit.clicked.connect(lambda: self.f.reinitialiser())
+        hb.addWidget(self.b_reinit)
+        hb.addStretch()
+        cv.addLayout(hb)
+        v.addWidget(c)
         v.addStretch()
         self.charger()
 
@@ -533,6 +553,8 @@ class BoutonSous(QPushButton):
 
 
 class FenetrePrincipale(QMainWindow):
+    reinitialisation = Signal(object)   # مسار النسخة المأخوذة قبل التصفير
+
     def __init__(self, dossier: DossierDonnees):
         super().__init__()
         self.dossier = dossier
@@ -749,7 +771,34 @@ class FenetrePrincipale(QMainWindow):
             return
         QMessageBox.information(self, "تم النسخ", f"حُفظت النسخة في:\n{f}")
 
+    def reinitialiser(self, mot: str | None = None) -> Path | None:
+        """تصفير البرنامج بعد تأكيد مكتوب. mot (للاختبار) يعوّض نافذة التأكيد."""
+        if mot is None:
+            mot, ok = QInputDialog.getText(
+                self, "تصفير البرنامج",
+                "سيُحذف كل ما أُدخل في البرنامج، وتُحفظ قبل ذلك نسخة كاملة في مجلد النسخ الاحتياطية.\n"
+                f"للتأكيد اكتب كلمة: {sauvegarde.MOT_CONFIRMATION}")
+            if not ok:
+                return None
+        if mot.strip() != sauvegarde.MOT_CONFIRMATION:
+            message(self.page_etab.message, "لم يُكتب التأكيد كما هو مطلوب؛ لم يُحذف شيء.", True)
+            return None
+        self.conn.close()
+        try:
+            securite = sauvegarde.reinitialiser(self.dossier)
+        except Exception as e:  # noqa: BLE001
+            self.conn = ouvrir_base(self.dossier.base)
+            QMessageBox.critical(self, "تصفير البرنامج", f"تعذر التصفير، ولم يُحذف شيء: {e}")
+            return None
+        self.reinitialise = True
+        self.reinitialisation.emit(securite)
+        self.close()
+        return securite
+
     def closeEvent(self, ev) -> None:
+        if getattr(self, "reinitialise", False):   # القاعدة حُذفت: لا نسخ ولا اتصال
+            super().closeEvent(ev)
+            return
         try:
             sauvegarde.sauvegarde_quotidienne(self.dossier)
         except Exception:  # noqa: BLE001 — لا نمنع الإغلاق بسبب النسخ

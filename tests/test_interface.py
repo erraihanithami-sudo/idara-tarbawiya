@@ -1183,3 +1183,17 @@ def test_programme_annuel_et_rappels(app, config_tmp, monkeypatch):
     assert sum(1 for s in cal.stations(f.conn) if s.fait_le) == 1
     assert p.generer() is not None and "برنامج العمل السنوي" in p.message.text()
     f.close()
+
+
+def test_reinitialisation_depuis_les_parametres(app, config_tmp):
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("إعداد المؤسسة")
+    b = f.page_etab.b_reinit
+    assert b.objectName() == "danger" and not b.icon().isNull()
+    assert f.reinitialiser("نعم") is None and "لم يُحذف" in f.page_etab.message.text()
+    assert f.dossier.base.exists()
+    recu = []
+    f.reinitialisation.connect(recu.append)
+    copie = f.reinitialiser("تصفير")
+    assert copie is not None and copie.exists() and recu == [copie]
+    assert not f.dossier.base.exists() and f.reinitialise

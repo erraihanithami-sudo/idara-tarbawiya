@@ -123,3 +123,30 @@ def test_archive_malveillante_refusee(tmp_path, dossier, conn):
     with pytest.raises(sv.ErreurSauvegarde):
         sv.importer_export(dossier, piege)
     assert not (tmp_path / "hors_dossier.txt").exists()
+
+
+def test_reinitialisation_efface_tout_et_garde_une_copie(dossier, conn):
+    """تصفير البرنامج (طلب المدير 2026-11-04): كل المعطيات تُحذف، والنسخة الكاملة المأخوذة قبله تسترجعها."""
+    from idara.data.db import ouvrir_base
+    from idara.services import etablissement as et
+    et.appliquer_configuration_initiale(conn, dossier, et.ConfigurationInitiale(
+        etablissement=et.Etablissement(nom_ar="مدرسة تجريبية", direction_ar="م", academie_ar="أ"),
+        directeur=et.Directeur(nom_ar="المدير", prenom_ar="أحمد", sexe="M", ppr="1000000"),
+        annee="2026/2027", unites=[]))
+    (dossier.archives / "وثيقة.docx").write_bytes(b"x")
+    (dossier.modeles / "identite").mkdir(parents=True, exist_ok=True)
+    (dossier.modeles / "identite" / "logo.png").write_bytes(b"x")
+    ancienne = sv.creer_sauvegarde(dossier)
+    conn.close()
+    copie = sv.reinitialiser(dossier)
+    assert copie.exists() and copie.parent == dossier.sauvegardes and ancienne.exists()
+    assert not dossier.base.exists() and not any(dossier.archives.iterdir()) and not any(dossier.modeles.iterdir())
+    c = ouvrir_base(dossier.base)   # قاعدة جديدة فارغة: يعود مساعد الإعداد
+    assert not et.configuration_complete(c) and c.execute("SELECT COUNT(*) FROM personnel").fetchone()[0] == 0
+    c.close()
+    with zipfile.ZipFile(copie) as z:
+        assert {"data.db", "archives/وثيقة.docx", "modeles/identite/logo.png"} <= set(z.namelist())
+    sv.importer_export(dossier, copie)
+    c = ouvrir_base(dossier.base)
+    assert et.configuration_complete(c)
+    c.close()

@@ -100,8 +100,16 @@ def main() -> int:
 
     fenetres = {}
 
+    def ouvrir_assistant(_=None) -> None:
+        a = AssistantPremierLancement()
+        a.resize(1200, 780)
+        a.termine.connect(ouvrir_principale)
+        fenetres["assistant"] = a
+        a.show()
+
     def ouvrir_principale(dossier: DossierDonnees) -> None:
         f = FenetrePrincipale(dossier)
+        f.reinitialisation.connect(ouvrir_assistant)   # بعد التصفير: مساعد الإعداد الأول
         fenetres["principale"] = f
         f.showMaximized()
         if "assistant" in fenetres:
@@ -111,11 +119,7 @@ def main() -> int:
     if dossier:
         ouvrir_principale(dossier)
     else:
-        a = AssistantPremierLancement()
-        a.resize(1200, 780)
-        a.termine.connect(ouvrir_principale)
-        fenetres["assistant"] = a
-        a.show()
+        ouvrir_assistant()
     return app.exec()
 
 

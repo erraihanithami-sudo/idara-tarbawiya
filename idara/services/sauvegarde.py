@@ -158,3 +158,30 @@ def importer_export(dossier: DossierDonnees, archive: Path) -> Path | None:
                 cible.mkdir()
         verifier_base(dossier.base)
     return securite
+
+
+MOT_CONFIRMATION = "تصفير"
+
+
+def reinitialiser(dossier: DossierDonnees) -> Path:
+    """تصفير البرنامج (طلب المدير 2026-11-04): يحذف كل ما أدخله المستعمل (القاعدة: التلاميذ، الموظفون، الرخص،
+    الجمعيات...، والقوالب المعدّلة والهوية البصرية والوثائق المولَّدة والمرفقات)، فيعود البرنامج إلى حالة التثبيت
+    الأول. قبل ذلك يُؤخذ تصدير كامل في مجلد النسخ الاحتياطية، يُسترجع عند الحاجة من مساعد الإعداد
+    («استيراد نسخة»). مجلد النسخ الاحتياطية لا يُحذف. يجب إغلاق الاتصال بالقاعدة قبل الاستدعاء."""
+    dossier.preparer()
+    securite = None
+    if dossier.base.exists():
+        securite = exporter(dossier, dossier.sauvegardes / f"{PREFIXE}{_horodatage()}_avant_reinitialisation.zip")
+        with zipfile.ZipFile(securite) as z:   # لا حذف قبل التأكد من سلامة النسخة
+            if NOM_BASE not in z.namelist() or z.testzip() is not None:
+                raise ErreurSauvegarde("تعذر التحقق من النسخة الاحتياطية؛ لم يُحذف شيء.")
+    for suffixe in ("", "-wal", "-shm", "-journal"):
+        f = dossier.racine / f"{NOM_BASE}{suffixe}"
+        if f.exists():
+            f.unlink()
+    for nom in DOSSIERS_EXPORTES:
+        rep = dossier.racine / nom
+        if rep.exists():
+            shutil.rmtree(rep)
+    dossier.preparer()
+    return securite
