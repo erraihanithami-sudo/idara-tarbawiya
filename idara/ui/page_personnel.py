@@ -591,10 +591,9 @@ class PagePersonnel(QWidget):
         try:
             p = self.lire_formulaire()
             p.valider()   # الحقول الأساسية أولاً (النسب، الاسم، النوع...)
+            # معطيات التنظيم التربوي (قرار المدير 2026-11-03) تُطلب بتنبيه ولا تمنع الحفظ (تصحيح 2026-11-04):
+            # ملف XML لا يتضمن التفتيش، فكان كل تعديل لأستاذ مستورد (الساعات، الوحدة...) يُرفض كله.
             m = rh.obligatoires_manquants(p)
-            if m:   # قرار المدير 2026-11-03: معطيات التنظيم التربوي مطلوبة عند ملء ملف الأستاذ(ة)
-                raise rh.ErreurPersonnel("معطيات مطلوبة لملف الأستاذ(ة) (التنظيم التربوي): " + "، ".join(m)
-                                         + ". إن لم يخضع(تخضع) للتفتيش بعد، أشّر على الخانة الخاصة بذلك.")
             pid = rh.enregistrer(self.f.conn, p)
         except rh.ErreurPersonnel as e:
             message(self.message, str(e), True)
@@ -608,8 +607,14 @@ class PagePersonnel(QWidget):
             self.liste.blockSignals(True)
             selectionner(self.liste, ligne)
             self.liste.blockSignals(False)
-        message(self.message, "حُفظ ملف الموظف.")
-        message(self.message_bas, "حُفظ ملف الموظف.")
+        if m:
+            txt = ("حُفظ ملف الموظف. ينقصه لوثيقة التنظيم التربوي: " + "، ".join(m) +
+                   ". إن لم يخضع(تخضع) للتفتيش بعد، أشّر على الخانة الخاصة بذلك.")
+            message(self.message, txt, True)
+            message(self.message_bas, txt, True)
+        else:
+            message(self.message, "حُفظ ملف الموظف.")
+            message(self.message_bas, "حُفظ ملف الموظف.")
         return pid
 
     def supprimer(self, confirmer: bool = True) -> bool:

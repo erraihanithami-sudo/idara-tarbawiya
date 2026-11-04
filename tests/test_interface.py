@@ -355,7 +355,10 @@ def test_page_personnel(app, config_tmp):
     assert not p.c["nb_eleves"].isEnabled() and "2 تلميذاً" in p.calcul.text()
     # قرار المدير (2026-11-03): معطيات التنظيم التربوي مطلوبة لملف الأستاذ(ة)
     assert not p.bloc_tanzim.isHidden() and p.bloc_repos.isHidden()
-    assert p.enregistrer() is None and "تاريخ الدرجة" in p.message.text() and "آخر نقطة تفتيش" in p.message.text()
+    # تصحيح 2026-11-04: النقص لا يمنع الحفظ (أستاذ مستورد من XML دون تفتيش)، بل يُنبَّه إليه بجانب الزر
+    pid0 = p.enregistrer()
+    assert pid0 is not None and "حُفظ" in p.message_bas.text() and "تاريخ الدرجة" in p.message_bas.text()
+    assert "آخر نقطة تفتيش" in p.message.text()
     p.grade.setCurrentIndex(p.grade.findData("الدرجة الأولى"))
     p.d_tanzim["date_grade"].setText("01/01/2020")
     p.echelon.setCurrentIndex(p.echelon.findData("7"))
@@ -1146,6 +1149,21 @@ def test_personnel_import_xml(app, config_tmp):
         irh.comparer(f.conn, irh.lire_xml(xml_rh())), p)
     assert [d.table.item(i, 2).text() for i in range(3)] == ["دون تغيير", "دون تغيير", "لا يُستورد"]
     assert d.choisies() == []
+    # ملاحظة المدير 2026-11-04: أستاذ مستورد (دون معطيات التفتيش) تُحفظ وحدته وساعاته
+    from idara.services import etablissement as et
+    from idara.services import personnel as rh
+    pid = rh.lister(f.conn, "9000001")[0].id
+    p.afficher(pid)
+    unite = et.unites(f.conn)[-1]
+    p.unite.setCurrentIndex(p.unite.findData(unite))
+    p.c["heures_hebdo"].setText("30")
+    assert p.enregistrer() == pid, p.message_bas.text()
+    assert "آخر نقطة تفتيش" in p.message_bas.text()
+    q = rh.lire(f.conn, pid)
+    assert (q.unite, q.heures_hebdo) == (unite, 30)
+    assert p.importer_xml(xml_rh(), valider=True) == {"ajoutes": 0, "maj": 0}
+    q = rh.lire(f.conn, pid)
+    assert (q.unite, q.heures_hebdo) == (unite, 30)
     f.close()
 
 
