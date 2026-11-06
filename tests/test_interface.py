@@ -1230,7 +1230,7 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     # البحث
     assert f.filtrer_nav("رخص") == ["الرخص"] and not f.boutons[i].isHidden()
     assert all(b.isHidden() for k, b in enumerate(f.boutons) if k != i)
-    assert "محاضر نهاية الأسدوس" in f.filtrer_nav("محضر") and "مجالس الأقسام" in f.filtrer_nav("محاضر")
+    assert {"محاضر نهاية الأسدوس", "مجالس الأقسام"} <= set(f.filtrer_nav("محضر"))
     assert f.filtrer_nav("كلمة غير موجودة") == [] and not f.aucun_resultat.isHidden()
     f.recherche.setText("الامتحان")
     f.ouvrir_premier_resultat()
