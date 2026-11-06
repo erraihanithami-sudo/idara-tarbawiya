@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QFileDialog, QFrame, QInputDialog, QGridLayout,
+from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFileDialog, QFrame, QInputDialog, QGridLayout,
                                QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea,
                                QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
 
@@ -884,8 +884,9 @@ class FenetrePrincipale(QMainWindow):
     # ---------- المظهر ----------
     def appliquer_theme(self, nom: str) -> None:
         """يغيّر مظهر البرنامج فوراً ويحفظه في إعدادات الجهاز (اقتراح المدير 2026-11-06)."""
-        app = QApplication.instance()
-        app.setStyleSheet(theme.appliquer(nom))
+        # على النافذة الرئيسية فقط (نوافذها الفرعية ترثه): إعادة تنسيق التطبيق كله تمر على كل نافذة في الذاكرة
+        feuille = theme.appliquer(nom)
+        self.setStyleSheet(feuille)
         config_srv.ecrire_config(theme=theme.THEME_ACTUEL)
         courante = self.page_courante()
         ancienne = self.barre

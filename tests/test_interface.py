@@ -1242,13 +1242,13 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     assert c.count() == 3
     c.setCurrentIndex(c.findData("marine"))
     assert theme.THEME_ACTUEL == "marine" and config_srv.lire_config()["theme"] == "marine"
-    assert theme.NAV_FOND in app.styleSheet() and f.page_courante() == "إعداد المؤسسة"
-    assert f.barre.isVisible() or True
+    assert theme.NAV_FOND in f.styleSheet() and f.page_courante() == "إعداد المؤسسة"
     assert f.filtrer_nav("رخص") == ["الرخص"]
     f.filtrer_nav("")
     c.setCurrentIndex(c.findData("violet"))
     assert theme.THEME_ACTUEL == "violet"
     c.setCurrentIndex(c.findData("classique"))
+    assert theme.THEME_ACTUEL == "classique"
     # الدليل
     f.aller_a("دليل الاستخدام")
     g = f.page_guide
