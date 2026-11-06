@@ -104,6 +104,11 @@ QHeaderView::section {{ background: {PLATRE}; color: {MARINE}; font-weight: 600;
 QTableWidget::item:selected, QListWidget::item:selected {{ background: {VERT_CLAIR}; color: {MARINE}; }}
 QPlainTextEdit:focus, QTextEdit:focus {{ border: 2px solid {VERT}; }}
 QTabWidget#sections > QTabBar {{ border-bottom: 1px solid {BORDURE_CARTE}; }}
+QScrollArea#defilNav QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
+QScrollArea#defilNav QScrollBar::handle:vertical {{ background: {NAV_TEXTE2}; border-radius: 4px; min-height: 30px; }}
+QScrollArea#defilNav QScrollBar::add-line:vertical, QScrollArea#defilNav QScrollBar::sub-line:vertical {{ height: 0; }}
+QScrollArea#defilNav QScrollBar::add-page:vertical, QScrollArea#defilNav QScrollBar::sub-page:vertical {{
+    background: transparent; }}
 #navTitre {{ color: {NAV_TEXTE}; font-weight: 700; font-size: 12.5pt; background: transparent; }}
 #navSous {{ color: {NAV_TEXTE2}; font-size: 9pt; background: transparent; }}
 #badge {{ background: {BADGE_FOND}; color: {BADGE_TEXTE}; border-radius: 9px; padding: 1px 8px;

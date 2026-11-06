@@ -43,8 +43,11 @@ class PageStatistiques(QWidget):
     def _vider(self) -> None:
         while self.zone.count():
             it = self.zone.takeAt(0)
-            if it.widget():
-                it.widget().deleteLater()
+            w = it.widget()
+            if w:   # يُخفى ويُفصل فوراً: الحذف المؤجل وحده يترك البطاقات القديمة ظاهرة تحت الجديدة
+                w.hide()
+                w.setParent(None)
+                w.deleteLater()
 
     def rafraichir(self, garder: bool = False) -> None:
         unites = etab_srv.unites(self.f.conn)
@@ -64,6 +67,9 @@ class PageStatistiques(QWidget):
         self.zone.addWidget(self._analyse(u))
         self.zone.addWidget(self._niveaux(u))
         self.zone.addWidget(self._tarl(u))
+        # داخل منطقة التمرير: الارتفاع الأدنى يُحدَّث بعد إعادة البناء، وإلا تتراكب البطاقات
+        self.layout().activate()
+        self.setMinimumHeight(self.layout().totalMinimumSize().height())
 
     # ---------- تحليل التلاميذ ----------
     def _analyse(self, u) -> QWidget:
