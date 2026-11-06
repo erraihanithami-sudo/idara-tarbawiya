@@ -170,6 +170,34 @@ def pixmap(section: str, taille: int = 24, echelle: float = 2.0) -> QPixmap:
     return pm
 
 
+def tuile(section: str, taille: int = 38, echelle: float = 2.0, sombre: bool | None = None) -> QPixmap:
+    """الأيقونة داخل مربع مستدير بلون القسم (مظهر الشريط الجانبي، اقتراح المدير 2026-11-06). على الشريط
+    الغامق تُرسم الأيقونة بالأبيض ولون القسم الفاتح."""
+    sombre = theme.NAV_SOMBRE if sombre is None else sombre
+    n = int(taille * echelle)
+    pm = QPixmap(n, n)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    p.scale(n / 38, n / 38)
+    c = QColor(COULEURS.get(section, theme.SARCELLE))
+    fond = QColor(c)
+    fond.setAlpha(70 if sombre else 38)
+    bord = QColor(c.lighter(150) if sombre else c)
+    bord.setAlpha(230)
+    p.setPen(QPen(bord, 1.4))
+    p.setBrush(fond)
+    p.drawRoundedRect(QRectF(1.5, 1.5, 35, 35), 9, 9)
+    p.translate(8, 8)
+    p.scale(22 / 24, 22 / 24)
+    accent = c.lighter(160).name() if sombre else c.name()
+    principal = "#F2F6FF" if sombre else theme.MARINE
+    DESSINS.get(section, _tableau)(p, accent, principal)
+    p.end()
+    pm.setDevicePixelRatio(echelle)
+    return pm
+
+
 def icone(section: str, taille: int = 24) -> QIcon:
     return QIcon(pixmap(section, taille))
 

@@ -49,7 +49,7 @@ def creer_application(argv=None) -> QApplication:
     app.setApplicationName(NOM_APPLICATION)
     app.setLayoutDirection(Qt.RightToLeft)
     app.setFont(theme.charger_police())
-    app.setStyleSheet(theme.FEUILLE_STYLE)
+    app.setStyleSheet(theme.appliquer(config_srv.lire_config().get("theme", "classique")))   # المظهر المختار
     return app
 
 

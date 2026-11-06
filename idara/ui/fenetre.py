@@ -6,8 +6,8 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtWidgets import (QButtonGroup, QFileDialog, QFrame, QInputDialog, QGridLayout, QHBoxLayout,
-                               QLabel, QMainWindow, QMessageBox, QPushButton, QScrollArea,
+from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QFileDialog, QFrame, QInputDialog, QGridLayout,
+                               QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea,
                                QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
 
 from idara import NOM_APPLICATION, __version__
@@ -15,6 +15,7 @@ from idara.data.db import ouvrir_base
 from idara.data.dossier import DossierDonnees
 from idara.services import annee as annee_srv
 from idara.services import calendrier as cal_srv
+from idara.services import config as config_srv
 from idara.services import etablissement as etab_srv
 from idara.services import import_eleves as imp
 from idara.services import sauvegarde
@@ -40,6 +41,8 @@ from idara.ui.page_conseils_etab import PageConseilsEtab
 from idara.ui.page_pedagogie import PagePerformance, PageRiyada, PageTarl, PageVieScolaire
 from idara.ui.page_tanzim import PageTanzim
 from idara.ui.page_calendrier import PageCalendrier
+from idara.ui.page_guide import PageGuide
+from idara.ui.page_statistiques import PageStatistiques
 from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
@@ -225,25 +228,20 @@ class PageTableauBord(QWidget):
         derniere = sv[-1].name[len(sauvegarde.PREFIXE):len(sauvegarde.PREFIXE) + 8] if sv else ""
         derniere = f"{derniere[6:8]}/{derniere[4:6]}/{derniere[:4]}" if derniere else "لا توجد بعد"
 
+        # بطاقات الأرقام: أيقونة وخط جانبي بلون المؤشر (اقتراح المدير 2026-11-06)
+        from idara.ui.graphiques import Tuile
         grille = QGridLayout()
         grille.setSpacing(16)
-        for i, (lib, val, note) in enumerate([
-                ("عدد التلاميذ", str(n_eleves), f"يتابعون دراستهم · ذكور {ind['garcons']} · إناث {ind['filles']}"),
-                ("الأقسام", str(n_classes), ""),
-                ("الموظفون", str(n_pers), "دون المدير"),
-                ("آخر نسخة احتياطية", derniere, f"{len(sv)} نسخة محفوظة")]):
-            c, cv = carte()
-            e = QLabel(lib)
-            e.setObjectName("etiquette")
-            ch = QLabel(val)
-            ch.setObjectName("chiffre")
-            cv.addWidget(e)
-            cv.addWidget(ch)
-            if note:
-                nl = QLabel(note)
-                nl.setObjectName("etiquette")
-                cv.addWidget(nl)
-            grille.addWidget(c, 0, i)
+        self.tuiles = []
+        for i, (lib, val, note, coul, sec) in enumerate([
+                ("التلاميذ يتابعون دراستهم", str(n_eleves), f"ذكور {ind['garcons']} · إناث {ind['filles']}",
+                 theme.BLEU, "التلاميذ"),
+                ("الأقسام", str(n_classes), "", theme.VIOLET, "التدبير التربوي"),
+                ("الموظفون", str(n_pers), "دون المدير", theme.SARCELLE, "الموارد البشرية"),
+                ("آخر نسخة احتياطية", derniere, f"{len(sv)} نسخة محفوظة", theme.ORANGE, "الإعدادات")]):
+            t = Tuile(lib, val, coul, sec, note)
+            self.tuiles.append(t)
+            grille.addWidget(t, i // 2, i % 2)
         self.v.addLayout(grille)
 
         self._rappels()
@@ -326,6 +324,21 @@ class PageEtablissement(QWidget):
         h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
+        # مظهر البرنامج (اقتراح المدير 2026-11-06)
+        c, cv = carte("مظهر البرنامج")
+        hb = QHBoxLayout()
+        self.choix_theme = QComboBox()
+        for k, lib in theme.NOMS_THEMES.items():
+            self.choix_theme.addItem(lib, k)
+        self.choix_theme.setCurrentIndex(max(0, self.choix_theme.findData(theme.THEME_ACTUEL)))
+        self.choix_theme.currentIndexChanged.connect(lambda _: self.f.appliquer_theme(self.choix_theme.currentData()))
+        l = QLabel("يُطبَّق فوراً ويُحفظ لهذا الحاسوب.")
+        l.setObjectName("etiquette")
+        hb.addWidget(self.choix_theme)
+        hb.addWidget(l)
+        hb.addStretch()
+        cv.addLayout(hb)
+        v.addWidget(c)
         # تصفير البرنامج (طلب المدير 2026-11-04)
         c, cv = carte("تصفير البرنامج")
         l = QLabel("يحذف كل ما أُدخل في البرنامج: معطيات المؤسسة والمدير، التلاميذ، الموظفون، الرخص، الجمعيات، "
@@ -412,7 +425,8 @@ class PageAVenir(QWidget):
 # الموارد البشرية أضافها المدير بعد ذلك (2026-11-03). المراسلات والإعدادات لم تردا في ترتيبه، فأُبقيتا بعده
 # حتى لا تضيع وظائفهما.
 SECTIONS = [
-    ("القيادة والتدبير", [("لوحة القيادة", "لوحة القيادة"), ("برنامج العمل", "برنامج العمل السنوي والتذكيرات"),
+    ("القيادة والتدبير", [("لوحة القيادة", "لوحة القيادة"), ("الإحصائيات", "إحصائيات المؤسسة"),
+                          ("برنامج العمل", "برنامج العمل السنوي والتذكيرات"),
                           ("أداء المؤسسة", "الأداء العام للمؤسسة"),
                           ("تتبع الغياب", "تتبع الغياب"), ("مجالس المؤسسة", "مجالس المؤسسة")]),
     ("التلاميذ", [("التلاميذ", "وثائق التلاميذ"), ("حركية التلاميذ", "حركية التلاميذ"),
@@ -431,7 +445,8 @@ SECTIONS = [
     ("مشروع المؤسسة", [("مشروع المؤسسة", "مشروع المؤسسة")]),
     ("تسليم المهام", [("تسليم المهام", "تسليم المهام")]),
     ("المراسلات", [("سجل الصادر", "سجل الصادر")]),
-    ("الإعدادات", [("إعداد المؤسسة", "المؤسسة"), ("الوثائق", "نماذج الوثائق")]),
+    ("الإعدادات", [("إعداد المؤسسة", "المؤسسة"), ("الوثائق", "نماذج الوثائق"),
+                   ("دليل الاستخدام", "كيفية استخدام البرنامج")]),
 ]
 A_VENIR = {
     "تتبع الغياب": (
@@ -481,31 +496,36 @@ class BoutonNav(QPushButton):
     """زر قسم رئيسي: الأيقونة ثم العنوان محاذيين لليمين بتخطيط صريح (محاذاة النص في Qt تنعكس مع RTL)،
     وعلامة الفتح للأقسام ذات الفروع."""
 
-    def __init__(self, section: str, libelle: str, deroulant: bool = False):
+    def __init__(self, section: str, libelle: str, deroulant: bool = False, nb: int = 0):
         super().__init__()
         self.setObjectName("nav")
         self.setCheckable(not deroulant)
         self.deroulant = deroulant
         self.actif = False
         self._icone = icones.icone(section)
+        self.setMinimumHeight(54)
         h = QHBoxLayout(self)
-        h.setContentsMargins(12, 0, 12, 0)
+        h.setContentsMargins(10, 4, 10, 4)
         h.setSpacing(12)
         self.l_icone = QLabel()
-        self.l_icone.setPixmap(icones.pixmap(section))
-        self.l_icone.setFixedSize(QSize(24, 24))
+        self.l_icone.setPixmap(icones.tuile(section))   # الأيقونة داخل مربع بلون القسم (2026-11-06)
+        self.l_icone.setFixedSize(QSize(38, 38))
         self.l_texte = QLabel(libelle)
         self.l_texte.setAlignment(Qt.AlignRight | Qt.AlignAbsolute | Qt.AlignVCenter)
         self.l_texte.setWordWrap(True)
+        self.l_badge = QLabel(str(nb) if nb > 1 else "")   # عدد الصفحات الفرعية
+        self.l_badge.setObjectName("badge")
+        self.l_badge.setVisible(nb > 1)
         self.l_fleche = QLabel()
         self.l_fleche.setFixedSize(QSize(14, 14))
         if deroulant:
-            self.l_fleche.setPixmap(icones.chevron(False))
+            self.l_fleche.setPixmap(icones.chevron(False, theme.NAV_TEXTE2))
         self.l_fleche.setVisible(deroulant)
-        for w in (self.l_icone, self.l_texte, self.l_fleche):
+        for w in (self.l_icone, self.l_texte, self.l_badge, self.l_fleche):
             w.setAttribute(Qt.WA_TransparentForMouseEvents)
         h.addWidget(self.l_icone)   # في RTL أول عنصر يكون في أقصى اليمين
         h.addWidget(self.l_texte, 1)
+        h.addWidget(self.l_badge)
         h.addWidget(self.l_fleche)
         self.toggled.connect(lambda c: self.marquer(c))
         self.marquer(False)
@@ -513,12 +533,12 @@ class BoutonNav(QPushButton):
     def marquer(self, actif: bool) -> None:
         """القسم الذي فيه الصفحة المفتوحة: عنوانه بخط عريض."""
         self.actif = actif
-        couleur = theme.VERT if actif and self.deroulant else theme.MARINE
-        self.l_texte.setStyleSheet(f"color:{couleur}; font-weight:{600 if actif else 400};")
+        couleur = theme.NAV_ACCENT if actif and self.deroulant else theme.NAV_TEXTE
+        self.l_texte.setStyleSheet(f"color:{couleur}; font-weight:{700 if actif else 600}; background:transparent;")
 
     def ouvrir(self, ouvert: bool) -> None:
         if self.deroulant:
-            self.l_fleche.setPixmap(icones.chevron(ouvert))
+            self.l_fleche.setPixmap(icones.chevron(ouvert, theme.NAV_TEXTE2))
 
     def text(self) -> str:  # noqa: D401
         return self.l_texte.text()
@@ -545,11 +565,57 @@ class BoutonSous(QPushButton):
         self._etat(False)
 
     def _etat(self, coche: bool) -> None:
-        self.l_texte.setStyleSheet(f"color:{theme.MARINE if coche else theme.GRIS}; "
-                                   f"font-weight:{600 if coche else 400};")
+        self.l_texte.setStyleSheet(f"color:{theme.NAV_TEXTE if coche else theme.NAV_TEXTE2}; "
+                                   f"font-weight:{600 if coche else 400}; background:transparent;")
 
     def text(self) -> str:  # noqa: D401
         return self.l_texte.text()
+
+
+def normaliser_recherche(t: str) -> str:
+    """للبحث في أسماء الصفحات: دون تشكيل، الهمزات ألف، التاء المربوطة هاء، ودون «ال» التعريف."""
+    import re
+    t = re.sub(r"[\u064B-\u0652\u0640]", "", t or "")
+    for a, b in (("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ة", "ه"), ("ى", "ي"), ("ؤ", "و"), ("ئ", "ي")):
+        t = t.replace(a, b)
+    mots = []
+    for m in t.split():
+        if m.startswith("وال") and len(m) > 4:
+            m = m[3:]
+        elif m.startswith("ال") and len(m) > 3:
+            m = m[2:]
+        mots.append(m)
+    return " ".join(mots)
+
+
+# كلمات إضافية للبحث (ما يكتبه المدير قد لا يكون في اسم الصفحة)
+MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "الموارد البشرية": "أساتذة أستاذ موظفين أطر xml",
+             "محاضر نهاية الأسدوس": "محضر مداولات نتائج نقط", "الامتحان": "امتحان موحد إشهادي سادس",
+             "التلاميذ": "تلميذ بحث شهادة مدرسية وثائق", "الاستيراد من مسار": "مسار لوائح استيراد",
+             "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
+             "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "مجالس الأقسام": "مجلس قسم",
+             "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص"}
+
+
+class BarreLaterale(QFrame):
+    """الشريط الجانبي: تدرّج لون المظهر مع زليج خافت (اقتراح المدير 2026-11-06)."""
+
+    def paintEvent(self, ev):
+        from PySide6.QtGui import QColor, QLinearGradient, QPainter
+        from idara.ui.zellige import dessiner_etoile
+        p = QPainter(self)
+        g = QLinearGradient(0, 0, 0, self.height())
+        g.setColorAt(0, QColor(theme.NAV_FOND))
+        g.setColorAt(1, QColor(theme.NAV_FOND2))
+        p.fillRect(self.rect(), g)
+        if theme.NAV_SOMBRE:
+            p.setRenderHint(QPainter.Antialiasing)
+            p.setOpacity(0.07)
+            for y in range(0, self.height() + 64, 64):
+                for x in range(0, self.width() + 64, 64):
+                    dessiner_etoile(p, x + 32, y + 32, 14, theme.NAV_MOTIF, pleine=False)
+        p.end()
+        super().paintEvent(ev)
 
 
 class FenetrePrincipale(QMainWindow):
@@ -591,13 +657,16 @@ class FenetrePrincipale(QMainWindow):
         self.page_sortants = PageSortants(self)
         self.page_docs = PageDocuments(self)
         self.page_calendrier = PageCalendrier(self)
+        self.page_guide = PageGuide(self)
+        self.page_stats = PageStatistiques(self)
         self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
                       "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "التنظيم التربوي": self.page_tanzim, "محاضر نهاية الأسدوس": self.page_deliberations,
                       "الامتحان": self.page_examen, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
-                      "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs}
+                      "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,
+                      "دليل الاستخدام": self.page_guide, "الإحصائيات": self.page_stats}
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
         self.section_de = {}    # اسم الصفحة ← رقم القسم الرئيسي
         self.pile = QStackedWidget()
@@ -610,7 +679,9 @@ class FenetrePrincipale(QMainWindow):
                 self.emplacement[nom] = self.pile.addWidget(w)
                 self.section_de[nom] = i
         self._boutons_suppression()
-        h.addWidget(self._barre_laterale())
+        self._disposition = h
+        self.barre = self._barre_laterale()
+        h.addWidget(self.barre)
         h.addWidget(self.pile, 1)
         self.setCentralWidget(centre)
         self.aller(0)
@@ -625,9 +696,9 @@ class FenetrePrincipale(QMainWindow):
                 b.style().polish(b)
 
     def _barre_laterale(self) -> QWidget:
-        barre = QFrame()
+        barre = BarreLaterale()
         barre.setObjectName("barreLaterale")
-        barre.setFixedWidth(290)
+        barre.setFixedWidth(300)
         v = QVBoxLayout(barre)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
@@ -639,13 +710,29 @@ class FenetrePrincipale(QMainWindow):
         noms = QVBoxLayout()
         noms.setSpacing(0)
         a = QLabel(NOM_APPLICATION)
-        a.setStyleSheet("font-weight:600; font-size:12pt;")
+        a.setObjectName("navTitre")
         self.nom_etab = QLabel()
-        self.nom_etab.setObjectName("etiquette")
+        self.nom_etab.setObjectName("navSous")
         noms.addWidget(a)
         noms.addWidget(self.nom_etab)
         tete.addLayout(noms, 1)
         v.addLayout(tete)
+        # البحث في الصفحات (اقتراح المدير 2026-11-06)
+        self.recherche = QLineEdit()
+        self.recherche.setObjectName("rechercheNav")
+        self.recherche.setPlaceholderText("ابحث عن صفحة… (مثال: رخص، محضر، امتحان)")
+        self.recherche.setClearButtonEnabled(True)
+        self.recherche.textChanged.connect(self.filtrer_nav)
+        self.recherche.returnPressed.connect(self.ouvrir_premier_resultat)
+        rv = QHBoxLayout()
+        rv.setContentsMargins(14, 0, 14, 10)
+        rv.addWidget(self.recherche)
+        v.addLayout(rv)
+        self.aucun_resultat = QLabel("لا صفحة بهذا الاسم.")
+        self.aucun_resultat.setObjectName("navSous")
+        self.aucun_resultat.setContentsMargins(20, 0, 20, 6)
+        self.aucun_resultat.hide()
+        v.addWidget(self.aucun_resultat)
 
         contenu = QWidget()
         contenu.setObjectName("navigation")
@@ -658,7 +745,7 @@ class FenetrePrincipale(QMainWindow):
         for i, (nom, fils) in enumerate(SECTIONS):
             deroulant = len(fils) > 1
             prog = _programmes(fils, self.pages)
-            b = BoutonNav(nom, nom if prog else f"{nom}  ·  قريباً", deroulant)
+            b = BoutonNav(nom, nom if prog else f"{nom}  ·  قريباً", deroulant, len(fils))
             b.setCursor(Qt.PointingHandCursor)
             nav.addWidget(b)
             self.boutons.append(b)
@@ -699,7 +786,7 @@ class FenetrePrincipale(QMainWindow):
         bv = QVBoxLayout(bas)
         bv.setContentsMargins(24, 16, 24, 16)
         self.etat_sauvegarde = QLabel()
-        self.etat_sauvegarde.setObjectName("etiquette")
+        self.etat_sauvegarde.setObjectName("navSous")
         bv.addWidget(self.etat_sauvegarde)
         b = QPushButton("نسخ إلى قرص خارجي")
         b.clicked.connect(self.exporter)
@@ -753,6 +840,61 @@ class FenetrePrincipale(QMainWindow):
             b.marquer(k == i)
         self.pile.setCurrentIndex(self.emplacement[nom])
         self._rafraichir(nom)
+
+    # ---------- البحث في الصفحات ----------
+    def resultats_recherche(self, texte: str) -> list[str]:
+        """الصفحات المطابقة لنص البحث (كل كلماته في اسم الصفحة أو قسمها أو كلماتها المفتاحية)."""
+        mots = normaliser_recherche(texte).split()
+        res = []
+        for titre, fils in SECTIONS:
+            for page, lib in fils:
+                cible = normaliser_recherche(f"{lib} {titre} {page} {MOTS_CLES.get(page, '')}")
+                if mots and all(m in cible for m in mots):
+                    res.append(page)
+        return res
+
+    def filtrer_nav(self, texte: str) -> list[str]:
+        res = self.resultats_recherche(texte)
+        if not texte.strip():
+            for k, (_, fils) in enumerate(SECTIONS):
+                self.boutons[k].show()
+                for sb in self.sous[k]:
+                    sb.show()
+            courante = self.page_courante()
+            self.basculer(self.section_de[courante] if courante else 0, True)
+            self.aucun_resultat.hide()
+            return []
+        for k, (_, fils) in enumerate(SECTIONS):
+            pages = [pg for pg, _ in fils]
+            vis = [pg in res for pg in pages]
+            self.boutons[k].setVisible(any(vis))
+            for sb, v in zip(self.sous[k], vis):
+                sb.setVisible(v)
+            self.blocs[k].setVisible(any(vis) and bool(self.sous[k]))
+            self.boutons[k].ouvrir(any(vis))
+        self.aucun_resultat.setVisible(not res)
+        return res
+
+    def ouvrir_premier_resultat(self) -> None:
+        res = self.resultats_recherche(self.recherche.text())
+        if res:
+            self.recherche.clear()
+            self.aller_a(res[0])
+
+    # ---------- المظهر ----------
+    def appliquer_theme(self, nom: str) -> None:
+        """يغيّر مظهر البرنامج فوراً ويحفظه في إعدادات الجهاز (اقتراح المدير 2026-11-06)."""
+        app = QApplication.instance()
+        app.setStyleSheet(theme.appliquer(nom))
+        config_srv.ecrire_config(theme=theme.THEME_ACTUEL)
+        courante = self.page_courante()
+        ancienne = self.barre
+        self.barre = self._barre_laterale()
+        self._disposition.replaceWidget(ancienne, self.barre)
+        ancienne.deleteLater()
+        if courante:
+            self.aller_a(courante)
+        self.tableau.rafraichir()
 
     def aller(self, i: int) -> None:
         """يفتح القسم الرئيسي رقم i على أول فرع مبرمج فيه."""

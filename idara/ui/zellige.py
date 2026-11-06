@@ -58,8 +58,8 @@ class BandeZellige(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         for x in range(0, self.width() + self.PAS, self.PAS):
-            dessiner_etoile(p, x + 14, 9, 6, theme.VERT, pleine=False)
-            p.setPen(QPen(QColor(theme.ROUGE), 1))
+            dessiner_etoile(p, x + 14, 9, 6, theme.NAV_ACCENT, pleine=False)
+            p.setPen(QPen(QColor(theme.ROUGE if not theme.NAV_SOMBRE else theme.NAV_MOTIF), 1))
             p.setBrush(Qt.NoBrush)
             p.drawPolygon(_losange(x, 9, 4))
         p.end()
@@ -70,20 +70,22 @@ class FondZellige(QWidget):
 
     PAS = 56
 
-    def __init__(self, parent=None, opacite: float = 0.08, couleur_fond: str = theme.BLANC):
+    def __init__(self, parent=None, opacite: float = 0.08, couleur_fond: str | None = None):
         super().__init__(parent)
         self.opacite = opacite
         self.couleur_fond = couleur_fond
 
     def paintEvent(self, _):
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor(self.couleur_fond))
+        if self.couleur_fond:   # دون لون: شفاف فوق خلفية الشريط الجانبي
+            p.fillRect(self.rect(), QColor(self.couleur_fond))
         p.setRenderHint(QPainter.Antialiasing)
         p.setOpacity(self.opacite)
-        pen = QPen(QColor(theme.VERT), 1.2)
+        motif = theme.NAV_MOTIF
+        pen = QPen(QColor(motif), 1.2)
         for y in range(0, self.height() + self.PAS, self.PAS):
             for x in range(0, self.width() + self.PAS, self.PAS):
-                dessiner_etoile(p, x + 28, y + 28, 12, theme.VERT, pleine=False)
+                dessiner_etoile(p, x + 28, y + 28, 12, motif, pleine=False)
                 p.setPen(pen)
                 p.setBrush(Qt.NoBrush)
                 p.drawPolygon(_losange(x, y, 8))
@@ -101,5 +103,5 @@ class LogoEtoile(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         t = self.width()
-        dessiner_etoile(p, t / 2, t / 2, t * 0.28, theme.VERT, pleine=True, trou=True)
+        dessiner_etoile(p, t / 2, t / 2, t * 0.28, theme.NAV_ACCENT, pleine=True, trou=True)
         p.end()

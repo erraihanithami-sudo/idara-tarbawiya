@@ -1,0 +1,56 @@
+"""ألوان مظاهر البرنامج (اقتراح المدير 2026-11-06)، دون Qt حتى تُختبر وحدها."""
+
+PALETTES = {
+    "classique": dict(
+        HERO_FOND="#1F2A44", HERO_FOND2="#0B5F58", HERO_TEXTE="#FFFFFF", HERO_TEXTE2="#D9E4EE",
+        MARINE="#1F2A44", SARCELLE="#0E9688", MENTHE="#5EE6D3", VIOLET="#7C3AED", BLEU="#2563EB",
+        ROSE="#DB2777", ORANGE="#D97706", VERT="#0B7A6F", VERT_FONCE="#1F2A44", VERT_CLAIR="#DDF1EC",
+        ROUGE="#DB2777", ROUGE_TEXTE="#9D174D", ROUGE_CLAIR="#FCE8F1", PLATRE="#F6F5F1", BLANC="#FFFFFF",
+        ENCRE="#1F2A44", GRIS="#5A6172", LIGNE="#E4E2DD", BORDURE_CHAMP="#4B5468", BORDURE_CARTE="#7A8191",
+        # الشريط الجانبي
+        NAV_FOND="#FFFFFF", NAV_FOND2="#FFFFFF", NAV_TEXTE="#1F2A44", NAV_TEXTE2="#5A6172",
+        NAV_ACTIF="#DDF1EC", NAV_ACCENT="#0B7A6F", NAV_SURVOL="#F6F5F1", NAV_BORD="#7A8191",
+        NAV_SOMBRE=False, NAV_MOTIF="#0B7A6F", BADGE_FOND="#E4E2DD", BADGE_TEXTE="#1F2A44",
+        RECHERCHE_FOND="#FFFFFF", RECHERCHE_TEXTE="#1F2A44"),
+    "marine": dict(
+        HERO_FOND="#0B1F4D", HERO_FOND2="#1A3F8F", HERO_TEXTE="#FFFFFF", HERO_TEXTE2="#D3DEF5",
+        MARINE="#0F1E3D", SARCELLE="#0E9688", MENTHE="#5EE6D3", VIOLET="#7C3AED", BLEU="#2563EB",
+        ROSE="#DB2777", ORANGE="#D97706", VERT="#1D4ED8", VERT_FONCE="#0F1E3D", VERT_CLAIR="#DCE7FB",
+        ROUGE="#DB2777", ROUGE_TEXTE="#9D174D", ROUGE_CLAIR="#FCE8F1", PLATRE="#EAF1FB", BLANC="#FFFFFF",
+        ENCRE="#0F1E3D", GRIS="#4F5B73", LIGNE="#D5DEEC", BORDURE_CHAMP="#3E4C6B", BORDURE_CARTE="#8C9AB5",
+        NAV_FOND="#0B1F4D", NAV_FOND2="#12317A", NAV_TEXTE="#FFFFFF", NAV_TEXTE2="#C9D6F2",
+        NAV_ACTIF="#24417F", NAV_ACCENT="#F2B544", NAV_SURVOL="#183A82", NAV_BORD="#0B1F4D",
+        NAV_SOMBRE=True, NAV_MOTIF="#8FB0F0", BADGE_FOND="#2C4A8C", BADGE_TEXTE="#FFFFFF",
+        RECHERCHE_FOND="#1A3570", RECHERCHE_TEXTE="#FFFFFF"),
+    "violet": dict(
+        HERO_FOND="#8E1457", HERO_FOND2="#5E1A7E", HERO_TEXTE="#FFFFFF", HERO_TEXTE2="#F6DDEB",
+        MARINE="#3B0A45", SARCELLE="#0E9688", MENTHE="#5EE6D3", VIOLET="#7C3AED", BLEU="#2563EB",
+        ROSE="#DB2777", ORANGE="#D97706", VERT="#7B2CBF", VERT_FONCE="#3B0A45", VERT_CLAIR="#F1E4FA",
+        ROUGE="#DB2777", ROUGE_TEXTE="#9D174D", ROUGE_CLAIR="#FCE8F1", PLATRE="#FBEFF5", BLANC="#FFFFFF",
+        ENCRE="#2A0A33", GRIS="#64506B", LIGNE="#EBD6E2", BORDURE_CHAMP="#5B3F66", BORDURE_CARTE="#A98BB2",
+        NAV_FOND="#8E1457", NAV_FOND2="#5E1A7E", NAV_TEXTE="#FFFFFF", NAV_TEXTE2="#F6D9EA",
+        NAV_ACTIF="#B0306F", NAV_ACCENT="#F7C948", NAV_SURVOL="#9C2366", NAV_BORD="#5E1A7E",
+        NAV_SOMBRE=True, NAV_MOTIF="#F6B7D6", BADGE_FOND="#6E1E5E", BADGE_TEXTE="#FFFFFF",
+        RECHERCHE_FOND="#7A1858", RECHERCHE_TEXTE="#FFFFFF"),
+}
+NOMS_THEMES = {"classique": "الأصلي (فاتح)", "marine": "الكحلي والذهبي", "violet": "البنفسجي والوردي"}
+
+
+def luminance(c: str) -> float:
+    r, g, b = (int(c[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    f = lambda x: x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4  # noqa: E731
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+
+
+def contraste(a: str, b: str) -> float:
+    x, y = sorted((luminance(a), luminance(b)), reverse=True)
+    return (x + 0.05) / (y + 0.05)
+
+
+# (النص، الخلفية) المستعملة في الواجهة: يجب أن يكون التباين 4.5:1 على الأقل
+PAIRES_TEXTE = (("BLANC", "VERT"), ("ENCRE", "PLATRE"), ("GRIS", "PLATRE"), ("GRIS", "BLANC"), ("ENCRE", "VERT_CLAIR"),
+                ("VERT_FONCE", "VERT_CLAIR"), ("ROUGE_TEXTE", "ROUGE_CLAIR"), ("NAV_TEXTE", "NAV_FOND"),
+                ("NAV_TEXTE", "NAV_FOND2"), ("NAV_TEXTE", "NAV_ACTIF"), ("NAV_TEXTE2", "NAV_FOND"),
+                ("NAV_TEXTE2", "NAV_FOND2"), ("BADGE_TEXTE", "BADGE_FOND"), ("RECHERCHE_TEXTE", "RECHERCHE_FOND"),
+                ("ENCRE", "BLANC"), ("NAV_TEXTE", "NAV_SURVOL"), ("HERO_TEXTE", "HERO_FOND"),
+                ("HERO_TEXTE", "HERO_FOND2"), ("HERO_TEXTE2", "HERO_FOND"), ("HERO_TEXTE2", "HERO_FOND2"))

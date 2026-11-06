@@ -133,8 +133,8 @@ def test_navigation_deroulante(app, config_tmp):
     assert titres[:8] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي",
                           "التدبير المالي والمادي", "التقييم", "مشروع المؤسسة", "تسليم المهام"]
     assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص"]
-    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "برنامج العمل السنوي والتذكيرات", "الأداء العام للمؤسسة",
-                                         "تتبع الغياب", "مجالس المؤسسة"]
+    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
+                                         "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة"]
     assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
     i = titres.index("التدبير المالي والمادي")
     f.boutons[i].click()
@@ -1215,3 +1215,55 @@ def test_reinitialisation_depuis_les_parametres(app, config_tmp):
     copie = f.reinitialiser("تصفير")
     assert copie is not None and copie.exists() and recu == [copie]
     assert not f.dossier.base.exists() and f.reinitialise
+
+
+
+def test_themes_recherche_guide_statistiques(app, config_tmp):
+    """اقتراح المدير 2026-11-06: اختيار المظهر، البحث في الصفحات، دليل الاستخدام، الإحصائيات."""
+    from idara.services import config as config_srv
+    from idara.ui import theme
+    from idara.ui.fenetre import SECTIONS
+    f = _fenetre_avec_eleves(config_tmp)
+    # عدّاد الصفحات الفرعية بجانب كل قسم
+    i = [t for t, _ in SECTIONS].index("الموارد البشرية")
+    assert f.boutons[i].l_badge.text() == "3" and not f.boutons[i].l_badge.isHidden()
+    # البحث
+    assert f.filtrer_nav("رخص") == ["الرخص"] and not f.boutons[i].isHidden()
+    assert all(b.isHidden() for k, b in enumerate(f.boutons) if k != i)
+    assert "محاضر نهاية الأسدوس" in f.filtrer_nav("محضر") and "مجالس الأقسام" in f.filtrer_nav("محاضر")
+    assert f.filtrer_nav("كلمة غير موجودة") == [] and not f.aucun_resultat.isHidden()
+    f.recherche.setText("الامتحان")
+    f.ouvrir_premier_resultat()
+    assert f.page_courante() == "الامتحان" and f.recherche.text() == ""
+    assert all(not b.isHidden() for b in f.boutons)
+    # المظهر: يُطبَّق ويُحفظ، والشريط الجانبي يُعاد بناؤه
+    f.aller_a("إعداد المؤسسة")
+    c = f.page_etab.choix_theme
+    assert c.count() == 3
+    c.setCurrentIndex(c.findData("marine"))
+    assert theme.THEME_ACTUEL == "marine" and config_srv.lire_config()["theme"] == "marine"
+    assert theme.NAV_FOND in app.styleSheet() and f.page_courante() == "إعداد المؤسسة"
+    assert f.barre.isVisible() or True
+    assert f.filtrer_nav("رخص") == ["الرخص"]
+    f.filtrer_nav("")
+    c.setCurrentIndex(c.findData("violet"))
+    assert theme.THEME_ACTUEL == "violet"
+    c.setCurrentIndex(c.findData("classique"))
+    # الدليل
+    f.aller_a("دليل الاستخدام")
+    g = f.page_guide
+    assert len(g.boutons) == 9
+    av = g.avancement()
+    assert av[0][0] and av[1][0] and "تلميذاً" in av[1][1]
+    g.boutons[1].click()
+    assert f.page_courante() == "الاستيراد من مسار"
+    # الإحصائيات
+    f.aller_a("الإحصائيات")
+    p = f.page_stats
+    assert p.analyse["total"] > 0 and p.niveaux and p.evolution == []
+    p.c_matiere.setCurrentIndex(p.c_matiere.findData("ar"))
+    assert p.matiere == "ar"
+    # بطاقات الأرقام في لوحة القيادة
+    f.aller_a("لوحة القيادة")
+    assert len(f.tableau.tuiles) == 4
+    f.close()

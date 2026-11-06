@@ -8,27 +8,16 @@ from PySide6.QtGui import QFont, QFontDatabase
 
 # لوحة الألوان (اختيار المدير 2026-11-03، من إنفوغرافيا «خارج الفصل... وأولويات التطوير»).
 # الأسماء القديمة محفوظة لأن الواجهة كلها تستعملها. التباين محسوب (WCAG): النص العادي 4.5:1 على الأقل.
-MARINE = "#1F2A44"       # الكحلي: النصوص والعناوين
-SARCELLE = "#0E9688"     # الأخضر المزرق: الأيقونات والتعبئات (3.7:1، لا يُكتب به نص صغير)
-MENTHE = "#5EE6D3"
-VIOLET = "#7C3AED"
-BLEU = "#2563EB"
-ROSE = "#DB2777"
-ORANGE = "#D97706"       # للأيقونات فقط (3.2:1 على الأبيض)
+# ---------------------------------------------------------------------------
+# مظاهر البرنامج (اقتراح المدير 2026-11-06): يختارها المدير من الإعدادات. القيم أسفله هي «الأصلي»؛
+# appliquer() تعوّضها بقيم المظهر المختار وتعيد بناء ورقة الأنماط. كل الألوان المكتوب بها نص تحترم
+# تباين 4.5:1 على خلفيتها (مختبر في tests/test_theme.py).
+# ---------------------------------------------------------------------------
+from idara.ui.palettes import NOMS_THEMES, PALETTES  # noqa: E402
 
-VERT = "#0B7A6F"         # الأزرار الرئيسية والعنصر النشط (الأبيض عليه 5.2:1)
-VERT_FONCE = MARINE      # النص على الخلفيات الفاتحة، وتمرير الفأرة على الأزرار الرئيسية
-VERT_CLAIR = "#DDF1EC"   # خلفية العنصر النشط والتحديد (الكحلي عليها 12:1)
-ROUGE = ROSE             # التنبيهات المهمة فقط
-ROUGE_TEXTE = "#9D174D"  # نص التنبيه (6.7:1 على خلفيته)
-ROUGE_CLAIR = "#FCE8F1"
-PLATRE = "#F6F5F1"       # خلفية الشاشات
-BLANC = "#FFFFFF"
-ENCRE = MARINE           # النصوص (13:1 على الخلفية)
-GRIS = "#5A6172"         # النصوص الثانوية (5.7:1)
-LIGNE = "#E4E2DD"
-BORDURE_CHAMP = "#4B5468"  # حواف الخانات والأزرار والجداول: كحلي رمادي واضح (7.6:1 على الأبيض) — طلب المدير 2026-11-03
-BORDURE_CARTE = "#7A8191"  # حواف البطاقات والقائمة الجانبية (4:1)
+THEME_ACTUEL = "classique"
+globals().update(PALETTES["classique"])
+DORE = "#C9A04A"   # الخط الذهبي في البطاقات
 
 DOSSIER_POLICES = Path(__file__).resolve().parent.parent / "resources" / "fonts"
 POLICE_PREFEREE = "IBM Plex Sans Arabic"
@@ -49,7 +38,8 @@ def charger_police() -> QFont:
     return police
 
 
-FEUILLE_STYLE = f"""
+def feuille() -> str:
+    return f"""
 QWidget {{ color: {ENCRE}; font-size: 10.5pt; }}
 QMainWindow, #fond {{ background: {PLATRE}; }}
 QScrollArea {{ background: {PLATRE}; border: 0; }}
@@ -62,7 +52,7 @@ QMenu::item {{ padding: 8px 18px; border-radius: 6px; }}
 QMenu::item:selected {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; }}
 #ok {{ color: {VERT_FONCE}; }}
 #alerte {{ color: {ROUGE_TEXTE}; }}
-#barreLaterale {{ background: {BLANC}; border-left: 2px solid {BORDURE_CARTE}; }}
+#barreLaterale {{ border-left: 2px solid {NAV_BORD}; }}
 #carte {{ background: {BLANC}; border: 1px solid {BORDURE_CARTE}; border-radius: 12px; }}
 #titrePage {{ font-size: 20pt; font-weight: 600; }}
 #sousTitre {{ color: {GRIS}; }}
@@ -96,14 +86,15 @@ QTabBar::tab {{ background: transparent; color: {GRIS}; padding: 10px 22px; marg
     border: 0; border-bottom: 3px solid transparent; font-size: 11pt; }}
 QTabBar::tab:selected {{ color: {VERT_FONCE}; border-bottom: 3px solid {VERT}; font-weight: 600; }}
 QTabBar::tab:hover:!selected {{ color: {ENCRE}; }}
-QPushButton#nav:checked {{ background: {VERT_CLAIR}; color: {MARINE}; font-weight: 600;
-    border-right: 4px solid {VERT}; }}
-QPushButton#nav:hover:!checked {{ background: {PLATRE}; }}
+QPushButton#nav {{ background: transparent; }}
+QPushButton#nav:checked {{ background: {NAV_ACTIF}; font-weight: 600; border-right: 4px solid {NAV_ACCENT}; }}
+QPushButton#nav:hover:!checked {{ background: {NAV_SURVOL}; }}
 QPushButton#sousnav {{ border: 0; border-radius: 8px; min-height: 38px; background: transparent; }}
 QPushButton#sousnav QLabel {{ background: transparent; }}
-QPushButton#sousnav:checked {{ background: {VERT_CLAIR}; border-right: 3px solid {VERT}; }}
-QPushButton#sousnav:hover:!checked {{ background: {PLATRE}; }}
-QScrollArea#defilNav, QWidget#navigation {{ background: {BLANC}; border: 0; }}
+QPushButton#sousnav:checked {{ background: {NAV_ACTIF}; border-right: 3px solid {NAV_ACCENT}; }}
+QPushButton#sousnav:hover:!checked {{ background: {NAV_SURVOL}; }}
+QScrollArea#defilNav, QWidget#navigation {{ background: transparent; border: 0; }}
+QScrollArea#defilNav > QWidget#qt_scrollarea_viewport {{ background: transparent; }}
 QRadioButton {{ min-height: 36px; }}
 QRadioButton::indicator, QCheckBox::indicator {{ width: 18px; height: 18px; }}
 QTableWidget, QTableView, QListWidget, QPlainTextEdit, QTextEdit {{
@@ -113,4 +104,33 @@ QHeaderView::section {{ background: {PLATRE}; color: {MARINE}; font-weight: 600;
 QTableWidget::item:selected, QListWidget::item:selected {{ background: {VERT_CLAIR}; color: {MARINE}; }}
 QPlainTextEdit:focus, QTextEdit:focus {{ border: 2px solid {VERT}; }}
 QTabWidget#sections > QTabBar {{ border-bottom: 1px solid {BORDURE_CARTE}; }}
+#navTitre {{ color: {NAV_TEXTE}; font-weight: 700; font-size: 12.5pt; background: transparent; }}
+#navSous {{ color: {NAV_TEXTE2}; font-size: 9pt; background: transparent; }}
+#badge {{ background: {BADGE_FOND}; color: {BADGE_TEXTE}; border-radius: 9px; padding: 1px 8px;
+    font-size: 8.5pt; font-weight: 600; }}
+QLineEdit#rechercheNav {{ background: {RECHERCHE_FOND}; color: {RECHERCHE_TEXTE}; border: 1px solid {NAV_TEXTE2};
+    border-radius: 12px; min-height: 40px; }}
+QLineEdit#rechercheNav:focus {{ border: 2px solid {NAV_ACCENT}; }}
+#tuile {{ background: {BLANC}; border: 1px solid {BORDURE_CARTE}; border-radius: 12px; }}
+#tuileChiffre {{ font-size: 19pt; font-weight: 700; color: {ENCRE}; background: transparent; }}
+#tuileLib {{ color: {GRIS}; font-size: 9.5pt; font-weight: 600; background: transparent; }}
+#etape {{ background: qlineargradient(x1:1, y1:0, x2:0, y2:1, stop:0 {HERO_FOND}, stop:1 {HERO_FOND2});
+    border-radius: 16px; }}
+#etapeTitre {{ color: {HERO_TEXTE}; font-size: 15pt; font-weight: 700; background: transparent; }}
+#etapeTexte {{ color: {HERO_TEXTE2}; background: transparent; }}
+#numero {{ background: {NAV_ACCENT}; color: #1A1A1A; border-radius: 13px; font-weight: 700; }}
+#pastille {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; border-radius: 10px; padding: 2px 10px;
+    font-weight: 600; font-size: 9pt; }}
 """
+
+
+def appliquer(nom: str) -> str:
+    """يفعّل مظهراً ويرجع ورقة الأنماط المناسبة له (المظهر غير المعروف ← الأصلي)."""
+    global THEME_ACTUEL, FEUILLE_STYLE
+    THEME_ACTUEL = nom if nom in PALETTES else "classique"
+    globals().update(PALETTES[THEME_ACTUEL])
+    FEUILLE_STYLE = feuille()
+    return FEUILLE_STYLE
+
+
+FEUILLE_STYLE = feuille()

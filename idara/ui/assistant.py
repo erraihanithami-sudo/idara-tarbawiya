@@ -81,7 +81,7 @@ class AssistantPremierLancement(QWidget):
         racine.setSpacing(0)
 
         # اللوحة الجانبية: الترحيب والخطوات، بخلفية زليج خافتة
-        cote = FondZellige()
+        cote = FondZellige(couleur_fond=theme.BLANC)
         cote.setFixedWidth(360)
         cv = QVBoxLayout(cote)
         cv.setContentsMargins(36, 44, 36, 36)
