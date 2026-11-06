@@ -309,6 +309,8 @@ def main(sortie: Path) -> None:
         photo(f, f"50_theme_{nom}_tableau")
         f.aller_a("الإحصائيات")
         photo(f, f"51_theme_{nom}_statistiques")
+        c = f.page_stats.contenu
+        print("stats:", nom, "min", c.minimumHeight(), "h", c.height(), "page", f.page_stats.height())
         f.aller_a("دليل الاستخدام")
         photo(f, f"52_theme_{nom}_guide")
     f.filtrer_nav("محضر")

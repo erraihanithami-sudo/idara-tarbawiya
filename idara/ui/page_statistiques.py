@@ -33,21 +33,25 @@ class PageStatistiques(QWidget):
         h.addWidget(self.unite)
         h.addStretch()
         racine.addLayout(h)
-        self.zone = QVBoxLayout()
-        self.zone.setSpacing(18)
-        racine.addLayout(self.zone)
+        self.externe = QVBoxLayout()   # محتوى يُعاد بناؤه كاملاً (نفس طريقة لوحة القيادة)
+        self.externe.setContentsMargins(0, 0, 0, 0)
+        racine.addLayout(self.externe)
         racine.addStretch()
+        self.contenu: QWidget | None = None
         self.matiere: str | None = None
         self.rafraichir()
 
     def _vider(self) -> None:
-        while self.zone.count():
-            it = self.zone.takeAt(0)
-            w = it.widget()
-            if w:   # يُخفى ويُفصل فوراً: الحذف المؤجل وحده يترك البطاقات القديمة ظاهرة تحت الجديدة
-                w.hide()
-                w.setParent(None)
-                w.deleteLater()
+        if self.contenu is not None:   # يُخفى ويُفصل فوراً: الحذف المؤجل وحده يترك البطاقات القديمة ظاهرة
+            self.externe.removeWidget(self.contenu)
+            self.contenu.hide()
+            self.contenu.setParent(None)
+            self.contenu.deleteLater()
+        self.contenu = QWidget()
+        self.zone = QVBoxLayout(self.contenu)
+        self.zone.setContentsMargins(0, 0, 0, 0)
+        self.zone.setSpacing(18)
+        self.externe.addWidget(self.contenu)
 
     def rafraichir(self, garder: bool = False) -> None:
         unites = etab_srv.unites(self.f.conn)
@@ -67,9 +71,9 @@ class PageStatistiques(QWidget):
         self.zone.addWidget(self._analyse(u))
         self.zone.addWidget(self._niveaux(u))
         self.zone.addWidget(self._tarl(u))
-        # داخل منطقة التمرير: الارتفاع الأدنى يُحدَّث بعد إعادة البناء، وإلا تتراكب البطاقات
-        self.layout().activate()
-        self.setMinimumHeight(self.layout().totalMinimumSize().height())
+        # داخل منطقة التمرير: الارتفاع الأدنى يُحدَّث بعد إعادة البناء، وإلا تنضغط البطاقات
+        self.zone.activate()
+        self.contenu.setMinimumHeight(self.zone.totalMinimumSize().height())
 
     # ---------- تحليل التلاميذ ----------
     def _analyse(self, u) -> QWidget:

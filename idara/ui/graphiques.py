@@ -20,6 +20,7 @@ class Tuile(QFrame):
     def __init__(self, libelle: str, valeur: str, couleur: str, section: str = "لوحة القيادة", note: str = ""):
         super().__init__()
         self.setObjectName("tuile")
+        self.setMinimumHeight(76)
         self.setStyleSheet(f"QFrame#tuile {{ border-right: 5px solid {couleur}; }}")
         h = QHBoxLayout(self)
         h.setContentsMargins(16, 12, 14, 12)
