@@ -27,15 +27,17 @@ jobs:
       - name: تنزيل الخط العربي (رخصة OFL)
         run: bash outils/telecharger_polices.sh
       - name: الاختبارات
+        timeout-minutes: 40
         run: |
           mkdir -p rapports
           set +e
-          python -m pytest -v -rs > rapports/pytest.txt 2>&1
+          python -m pytest -v -rs --timeout=180 > rapports/pytest.txt 2>&1
           echo $? > rapports/code_retour.txt
           cat rapports/pytest.txt
           exit $(cat rapports/code_retour.txt)
       - name: لقطات الواجهة
         if: always()
+        timeout-minutes: 15
         run: python outils/captures.py rapports/captures > rapports/captures.txt 2>&1 || cat rapports/captures.txt
       - name: نشر التقرير في فرع rapports
         if: always()
