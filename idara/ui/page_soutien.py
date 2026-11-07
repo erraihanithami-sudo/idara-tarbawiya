@@ -12,7 +12,7 @@ from idara.services import annee as annee_srv
 from idara.services import bureautique
 from idara.services import soutien as sv
 from idara.ui import theme
-from idara.ui.composants import carte
+from idara.ui.composants import bouton, carte
 from idara.ui.formulaires import champ
 from idara.ui.graphiques import BarresGroupees, Tuile
 from idara.ui.page_pedagogie import _grille, _page
@@ -94,7 +94,7 @@ class PageSoutien(QWidget):
         b = QPushButton("إنشاء مجموعة")
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.creer_groupe())
-        bs = QPushButton("حذف المجموعة المحددة")
+        bs = bouton("حذف المجموعة المحددة")
         bs.clicked.connect(lambda: self.supprimer_groupe())
         h.addWidget(b)
         h.addWidget(bs)
@@ -151,7 +151,7 @@ class PageSoutien(QWidget):
         h = QHBoxLayout()
         b = QPushButton("إضافة حصة للمجموعة المحددة")
         b.clicked.connect(lambda: self.ajouter_seance())
-        bs = QPushButton("حذف الحصة المحددة")
+        bs = bouton("حذف الحصة المحددة")
         bs.clicked.connect(lambda: self.supprimer_seance())
         h.addWidget(b)
         h.addWidget(bs)
