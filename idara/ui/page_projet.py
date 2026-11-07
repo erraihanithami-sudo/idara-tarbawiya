@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
-                               QPushButton, QTableWidgetItem, QWidget)
+                               QPushButton, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from idara.services import annee as annee_srv
 from idara.services import bureautique
@@ -18,7 +18,7 @@ from idara.ui.composants import bouton, carte
 from idara.ui.formulaires import champ
 from idara.ui.graphiques import BarresGroupees, Tuile
 from idara.ui.page_pedagogie import _grille, _page
-from idara.ui.page_soutien import _vider, png_barres
+from idara.ui.page_soutien import png_barres
 from idara.ui.saisie import cellule, message
 
 COULEURS = {"tarl": theme.SARCELLE, "hadar": theme.ROSE, "activites": theme.VIOLET}
@@ -73,14 +73,8 @@ class PageProjet(QWidget):
         racine.addWidget(c)
         # 2. لوحة القيادة (يعاد بناؤها)
         self.c_tableau, tv = carte("لوحة قيادة المشروع")
-        self.grille = QGridLayout()
-        self.grille.setSpacing(12)
-        tv.addLayout(self.grille)
-        self.zone_graphs = QWidget()
-        self.l_graphs = QGridLayout(self.zone_graphs)
-        self.l_graphs.setContentsMargins(0, 0, 0, 0)
-        self.l_graphs.setSpacing(14)
-        tv.addWidget(self.zone_graphs)
+        self.tv = tv
+        self.contenu_tb: QWidget | None = None   # يُعاد إنشاؤه عند كل تحديث (نفس طريقة صفحة الإحصائيات)
         racine.addWidget(self.c_tableau)
         # 3. المستهدفات
         c, v = carte("القيمة المرجعية والمستهدفات (من وثيقة المشروع في مسار)")
@@ -180,8 +174,19 @@ class PageProjet(QWidget):
         self._operations()
 
     def _tableau_bord(self) -> None:
-        _vider(self.grille)
-        _vider(self.l_graphs)
+        if self.contenu_tb is not None:
+            self.tv.removeWidget(self.contenu_tb)
+            self.contenu_tb.hide()
+            self.contenu_tb.setParent(None)
+            self.contenu_tb.deleteLater()
+        self.contenu_tb = QWidget()
+        zone = QVBoxLayout(self.contenu_tb)
+        zone.setContentsMargins(0, 0, 0, 0)
+        zone.setSpacing(14)
+        self.grille = QGridLayout()
+        self.grille.setSpacing(12)
+        zone.addLayout(self.grille)
+        self.tv.addWidget(self.contenu_tb)
         self.graphs: dict[str, BarresGroupees] = {}
         if not self.ind:
             self.grille.addWidget(Tuile("سجّل المشروع (العنوان والسنوات) لبدء التتبع", "—", theme.GRIS,
@@ -216,14 +221,10 @@ class PageProjet(QWidget):
                 v.addWidget(l)
             v.activate()
             c.setMinimumHeight(max(330, v.totalMinimumSize().height() + 40))
-            self.l_graphs.addWidget(c, i, 0)
+            zone.addWidget(c)
         # داخل منطقة التمرير: الارتفاع الأدنى يُحدَّث بعد إعادة البناء، وإلا تنضغط المبيانات
-        self.l_graphs.activate()
-        self.zone_graphs.setMinimumHeight(self.l_graphs.totalMinimumSize().height())
-        self.c_tableau.layout().activate()
-        self.c_tableau.setMinimumHeight(self.c_tableau.layout().totalMinimumSize().height())
-        self.layout().activate()
-        self.setMinimumHeight(self.layout().totalMinimumSize().height())
+        zone.activate()
+        self.contenu_tb.setMinimumHeight(zone.totalMinimumSize().height())
 
     def _cibles(self) -> None:
         t = self.t_cibles
