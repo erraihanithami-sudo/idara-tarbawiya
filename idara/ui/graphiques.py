@@ -112,9 +112,17 @@ class Anneau(QWidget):
 class BarresGroupees(QWidget):
     """أعمدة مزدوجة لكل فئة (مثلاً: قبلي/بعدي لكل مستوى)، بالنسب المئوية من 0 إلى 100."""
 
-    def __init__(self, categories: list[str], series: list[tuple[str, list[float | None], str]]):
+    def __init__(self, categories: list[str], series: list[tuple[str, list[float | None], str]],
+                 maximum: float | None = 100):
+        """maximum=None: سلّم آلي حسب أكبر قيمة (نسب الغياب الصغيرة مثلاً)."""
         super().__init__()
         self.categories, self.series = categories, series
+        if maximum is None:
+            vals = [v for _, l, _ in series for v in l if v is not None]
+            haut = max(vals, default=0)
+            pas = next((p for p in (1, 2, 5, 10, 20, 25) if haut <= p * 4), 25)
+            maximum = pas * 4
+        self.maximum = maximum
         self.setMinimumHeight(300)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -146,7 +154,8 @@ class BarresGroupees(QWidget):
             p.setPen(QPen(QColor(theme.LIGNE), 1))
             p.drawLine(gauche, int(y), gauche + w, int(y))
             p.setPen(QColor(theme.GRIS))
-            p.drawText(QRectF(0, y - 9, gauche - 6, 18), Qt.AlignRight | Qt.AlignVCenter, _ltr(f"{25 * k}%"))
+            p.drawText(QRectF(0, y - 9, gauche - 6, 18), Qt.AlignRight | Qt.AlignVCenter,
+                       _ltr(f"{self.maximum * k / 4:g}%"))
         n = max(1, len(self.categories))
         pas = w / n
         larg = min(46, pas / (len(self.series) + 1.2))
@@ -159,7 +168,7 @@ class BarresGroupees(QWidget):
                 v = vals[i]
                 xb = x0 - (j + 1) * larg - j * 6
                 if v is not None:
-                    hb = h * min(v, 100) / 100
+                    hb = h * min(v, self.maximum) / self.maximum
                     p.setPen(Qt.NoPen)
                     p.setBrush(QColor(c))
                     p.drawRoundedRect(QRectF(xb, haut + h - hb, larg, hb), 4, 4)

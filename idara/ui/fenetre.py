@@ -44,6 +44,7 @@ from idara.ui.page_calendrier import PageCalendrier
 from idara.ui.page_guide import PageGuide
 from idara.ui.page_statistiques import PageStatistiques
 from idara.ui.page_inscriptions import PageInscriptions
+from idara.ui.page_absences import PageAbsences
 from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
@@ -146,7 +147,10 @@ class PageTableauBord(QWidget):
         h = QHBoxLayout()
         h.setSpacing(8)
         hd = ind["hadar"]
-        jauges = [Jauge("الغياب", None, "يُحسب عند برمجة تتبع الغياب", theme.ORANGE),
+        from idara.services import absences as abs_srv
+        dt = abs_srv.dernier_taux(self.f.conn)
+        jauges = [Jauge("الغياب", dt[1] if dt else None, f"آخر شهر مُدرج: {dt[0]}" if dt else "لم يُدرج أي شهر بعد",
+                        theme.ORANGE),
                   Jauge("الهدر المدرسي", hd["taux"], f"منقطعون {hd['interrompus']} · مفصولون {hd['exclus']}", theme.ROSE),
                   Jauge("الأنشطة الموازية", ind["activites"]["taux"],
                         f"{ind['activites']['participants']} تلميذاً في الأندية", theme.VIOLET)]
@@ -459,10 +463,6 @@ SECTIONS = [
                    ("دليل الاستخدام", "كيفية استخدام البرنامج")]),
 ]
 A_VENIR = {
-    "تتبع الغياب": (
-        ["غياب التلاميذ: التسجيل اليومي، الإحصاء الشهري حسب الأقسام، تنبيه الغياب المتكرر، إشعار الأولياء.",
-         "غياب الموظفين وتأخرهم، مرتبطاً بالرخص المسجلة."],
-        ["الوثائق التي تعتمدونها حالياً في تتبع الغياب (السجل، الإحصاء الشهري، الإشعار)."]),
     "أولياء الأمور": (
         ["معلومات الأولياء: الاسم، صلة القرابة، الهاتف، العنوان، لكل تلميذ.",
          "استعمالها في الاستدعاءات والإشعارات، ولوائح الاتصال حسب القسم."],
@@ -602,7 +602,7 @@ def normaliser_recherche(t: str) -> str:
 MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "الموارد البشرية": "أساتذة أستاذ موظفين أطر xml",
              "محاضر نهاية الأسدوس": "محضر مداولات نتائج نقط", "الامتحان": "امتحان موحد إشهادي سادس",
              "التلاميذ": "تلميذ بحث شهادة مدرسية وثائق", "الاستيراد من مسار": "مسار لوائح استيراد",
-             "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
+             "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "تتبع الغياب": "غياب متغيبون نسبة", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
              "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون", "مجالس الأقسام": "مجلس قسم محضر",
              "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص"}
 
@@ -670,6 +670,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_guide = PageGuide(self)
         self.page_stats = PageStatistiques(self)
         self.page_inscriptions = PageInscriptions(self)
+        self.page_absences = PageAbsences(self)
         self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
@@ -678,7 +679,7 @@ class FenetrePrincipale(QMainWindow):
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,
                       "دليل الاستخدام": self.page_guide, "الإحصائيات": self.page_stats,
-                      "التسجيلات": self.page_inscriptions}
+                      "التسجيلات": self.page_inscriptions, "تتبع الغياب": self.page_absences}
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
         self.section_de = {}    # اسم الصفحة ← رقم القسم الرئيسي
         self.pile = QStackedWidget()

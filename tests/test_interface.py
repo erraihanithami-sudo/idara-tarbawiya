@@ -1293,3 +1293,30 @@ def test_inscriptions_frais(app, config_tmp):
     f.aller_a("إعداد المؤسسة")
     assert f.page_etab.f_etab.milieu.currentData() == "urbain"
     f.close()
+
+
+def test_absences_mensuelles(app, config_tmp, monkeypatch):
+    """تتبع الغياب الشهري (طلب المدير 2026-11-07)."""
+    from idara.services import bureautique
+    from idara.ui.page_absences import png_evolution
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("تتبع الغياب")
+    p = f.page_absences
+    assert p.mois.count() == 10 and p.table.rowCount() >= 1
+    p.mois.setCurrentIndex(p.mois.findData("2026-10"))
+    assert p.s is None and p.generer() is None
+    p.jours.setValue(20)
+    p.table.item(0, 3).setText("2")
+    p.table.item(0, 4).setText("3.5")
+    assert p.enregistrer(), p.message.text()
+    assert p.s["etablissement"]["jours_absence"] == 3.5 and "✓" in p.mois.currentText()
+    p.table.item(0, 4).setText("abc")
+    assert not p.enregistrer() and "أرقام" in p.message.text()
+    png = png_evolution(p.evolution)
+    assert png and png[:4] == b"\\x89PNG"
+    chemin = p.generer()
+    assert chemin is not None and chemin.exists()
+    f.aller_a("لوحة القيادة")
+    assert "أكتوبر 2026" in " ".join(l.text() for l in f.tableau.findChildren(type(p.message)))
+    f.close()
