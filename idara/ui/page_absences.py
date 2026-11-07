@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
 from PySide6.QtGui import QColor, QImage, QPainter
-from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox, QGridLayout, QHBoxLayout, QPushButton, QTableWidgetItem,
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDoubleSpinBox, QGridLayout, QHBoxLayout, QPushButton,
+                               QTableWidgetItem,
                                QWidget)
 
 from idara.services import absences as ab
@@ -58,7 +59,7 @@ class PageAbsences(QWidget):
         self.jours.setSuffix(" يوماً")
         v.addLayout(_grille([("الشهر", self.mois), ("أيام الدراسة الفعلية في الشهر", self.jours)]))
         self.table = tableau(["الوحدة", "القسم", "عدد التلاميذ", "المتغيبون", "أيام الغياب", "النسبة"], etirer=1)
-        self.table.setEditTriggers(self.table.AllEditTriggers)
+        self.table.setEditTriggers(QAbstractItemView.AllEditTriggers)
         self.table.setMinimumHeight(360)
         v.addWidget(self.table)
         h = QHBoxLayout()

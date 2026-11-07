@@ -328,6 +328,24 @@ def main(sortie: Path) -> None:
         pa.table.item(i, 4).setText("2")
     pa.enregistrer()
     photo(f, "55_absences")
+    with f.conn:   # أستاذة وهمية للدعم
+        f.conn.execute("INSERT OR IGNORE INTO personnel(nom_ar, prenom_ar, sexe, categorie, ppr) VALUES "
+                       "('التجريبية', 'سعاد', 'F', 'enseignant', '7654329')")
+    f.aller_a("الدعم التربوي")
+    ps = f.page_soutien
+    ps.nom_etape.setText("الدعم المرحلي الأول")
+    ps.ajouter_etape()
+    if ps.creer_groupe():
+        ps.cocher(list(range(min(4, ps.t_classe.rowCount()))))
+        ps.affecter()
+        for i in range(ps.t_membres.rowCount()):
+            ps.t_membres.item(i, 2).setText(str(3 + i % 3))
+            ps.t_membres.item(i, 3).setText(str(5 + i % 4))
+        ps.enregistrer_notes()
+        ps.h_debut.setText("14:30")
+        ps.h_fin.setText("15:30")
+        ps.ajouter_seance()
+    photo(f, "56_soutien")
     f.filtrer_nav("محضر")
     photo(f, "53_recherche_nav")
     f.filtrer_nav("")

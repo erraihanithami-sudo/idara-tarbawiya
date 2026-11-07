@@ -1320,3 +1320,34 @@ def test_absences_mensuelles(app, config_tmp, monkeypatch):
     f.aller_a("لوحة القيادة")
     assert "أكتوبر 2026" in " ".join(l.text() for l in f.tableau.findChildren(type(p.message)))
     f.close()
+
+
+def test_soutien_pedagogique(app, config_tmp):
+    """الدعم التربوي (طلب المدير 2026-11-07): مرحلة، مجموعة، تلاميذ، نتائج، حصة، ووثائق."""
+    f = _fenetre_avec_eleves(config_tmp)
+    with f.conn:
+        f.conn.execute("INSERT INTO personnel(nom_ar, prenom_ar, sexe, categorie, ppr) VALUES "
+                       "('التجريبية', 'سعاد', 'F', 'enseignant', '7654321')")
+    f.aller_a("الدعم التربوي")
+    p = f.page_soutien
+    assert p.creer_groupe() is None and "مرحلة" in p.message.text()
+    p.nom_etape.setText("الدعم المرحلي الأول")
+    assert p.ajouter_etape()
+    assert p.intervenant.count() >= 1 and p.categorie.count() >= 5
+    gid = p.creer_groupe()
+    assert gid and p.gid() == gid
+    assert p.t_classe.rowCount() > 0
+    p.cocher(list(range(min(2, p.t_classe.rowCount()))))
+    n = p.affecter()
+    assert n >= 1 and p.t_membres.rowCount() == n
+    p.t_membres.item(0, 2).setText("3")
+    p.t_membres.item(0, 3).setText("7")
+    assert p.enregistrer_notes()
+    assert p.t_membres.item(0, 4).text() == "تحسن"
+    p.h_debut.setText("14:30")
+    p.h_fin.setText("15:30")
+    assert p.ajouter_seance() and p.t_edt.rowCount() == 1
+    assert p.b["global"]["ameliores"] == 1
+    for fn in (p.generer_registre, p.generer_programme, p.generer_rapport):
+        assert fn() is not None, p.message.text()
+    f.close()

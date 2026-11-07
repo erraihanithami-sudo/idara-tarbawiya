@@ -45,6 +45,7 @@ from idara.ui.page_guide import PageGuide
 from idara.ui.page_statistiques import PageStatistiques
 from idara.ui.page_inscriptions import PageInscriptions
 from idara.ui.page_absences import PageAbsences
+from idara.ui.page_soutien import PageSoutien
 from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
@@ -365,6 +366,10 @@ class PageEtablissement(QWidget):
         v.addStretch()
         self.charger()
 
+    def rafraichir(self) -> None:
+        """عند فتح الصفحة: تُقرأ القيم المحفوظة (قد تكون صفحة أخرى غيّرتها، مثل وسط المؤسسة)."""
+        self.charger()
+
     def charger(self) -> None:
         conn = self.f.conn
         e = etab_srv.lire_etablissement(conn)
@@ -448,7 +453,7 @@ SECTIONS = [
     ("الموارد البشرية", [("الموارد البشرية", "معلومات الأطر"), ("تدبير الفائض", "تدبير الفائض"),
                          ("الرخص", "الرخص")]),
     ("التدبير التربوي", [("التنظيم التربوي", "التنظيم التربوي"), ("الأندية والأنشطة", "الحياة المدرسية"), ("التعلمات الأساس", "تتبع التعلمات الأساس"),
-                         ("الريادة", "المدرسة الرائدة")]),
+                         ("الدعم التربوي", "الدعم التربوي"), ("الريادة", "المدرسة الرائدة")]),
     ("التدبير المالي والمادي", [("التسجيلات", "تدبير التسجيلات"), ("الجرد", "الجرد"),
                                 ("جمعية دعم مدرسة النجاح", "جمعية دعم مدرسة النجاح"),
                                 ("الصرف", "الصرف: سند الطلب والاتفاقية"), ("الجمعية الرياضية", "الجمعية الرياضية"),
@@ -604,7 +609,8 @@ MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "
              "التلاميذ": "تلميذ بحث شهادة مدرسية وثائق", "الاستيراد من مسار": "مسار لوائح استيراد",
              "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "تتبع الغياب": "غياب متغيبون نسبة", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
              "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون", "مجالس الأقسام": "مجلس قسم محضر",
-             "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص"}
+             "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص",
+             "الدعم التربوي": "دعم متعثرين تعثر معالجة سجل"}
 
 
 class BarreLaterale(QFrame):
@@ -671,6 +677,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_stats = PageStatistiques(self)
         self.page_inscriptions = PageInscriptions(self)
         self.page_absences = PageAbsences(self)
+        self.page_soutien = PageSoutien(self)
         self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
@@ -679,7 +686,8 @@ class FenetrePrincipale(QMainWindow):
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,
                       "دليل الاستخدام": self.page_guide, "الإحصائيات": self.page_stats,
-                      "التسجيلات": self.page_inscriptions, "تتبع الغياب": self.page_absences}
+                      "التسجيلات": self.page_inscriptions, "تتبع الغياب": self.page_absences,
+                      "الدعم التربوي": self.page_soutien}
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
         self.section_de = {}    # اسم الصفحة ← رقم القسم الرئيسي
         self.pile = QStackedWidget()
