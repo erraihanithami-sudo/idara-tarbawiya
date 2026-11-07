@@ -220,6 +220,10 @@ class PageProjet(QWidget):
         # داخل منطقة التمرير: الارتفاع الأدنى يُحدَّث بعد إعادة البناء، وإلا تنضغط المبيانات
         self.l_graphs.activate()
         self.zone_graphs.setMinimumHeight(self.l_graphs.totalMinimumSize().height())
+        self.c_tableau.layout().activate()
+        self.c_tableau.setMinimumHeight(self.c_tableau.layout().totalMinimumSize().height())
+        self.layout().activate()
+        self.setMinimumHeight(self.layout().totalMinimumSize().height())
 
     def _cibles(self) -> None:
         t = self.t_cibles
