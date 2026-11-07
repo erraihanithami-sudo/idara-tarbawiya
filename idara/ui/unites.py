@@ -23,11 +23,11 @@ class BarreUnites(QWidget):
 
     def actualiser(self) -> None:
         while self.h.count():
-            it = self.h.takeAt(0)
-            if it.widget():
-                it.widget().hide()
-                it.widget().setParent(None)
-                it.widget().deleteLater()
+            w = self.h.takeAt(0).widget()
+            if w is not None:
+                w.hide()
+                w.setParent(None)
+                w.deleteLater()
         unites = etab_srv.unites(self.conn_fn())
         if self.unite not in unites:
             self.unite = None
