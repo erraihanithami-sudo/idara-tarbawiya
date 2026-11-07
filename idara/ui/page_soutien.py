@@ -19,10 +19,11 @@ from idara.ui.page_pedagogie import _grille, _page
 from idara.ui.saisie import ChampDate, cellule, message, selectionner, tableau
 
 
-def png_barres(categories: list[str], series, largeur: int = 1000, hauteur: int = 380) -> bytes | None:
+def png_barres(categories: list[str], series, largeur: int = 1000, hauteur: int = 380,
+               maximum: float | None = 100) -> bytes | None:
     if not categories:
         return None
-    w = BarresGroupees(categories, series)
+    w = BarresGroupees(categories, series, maximum=maximum)
     w.setLayoutDirection(Qt.RightToLeft)
     w.resize(largeur, hauteur)
     img = QImage(largeur, hauteur, QImage.Format_ARGB32)

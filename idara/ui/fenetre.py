@@ -46,6 +46,7 @@ from idara.ui.page_statistiques import PageStatistiques
 from idara.ui.page_inscriptions import PageInscriptions
 from idara.ui.page_absences import PageAbsences
 from idara.ui.page_soutien import PageSoutien
+from idara.ui.page_projet import PageProjet
 from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
@@ -461,7 +462,7 @@ SECTIONS = [
     ("التقييم", [("المراقبة المستمرة", "المراقبة المستمرة"), ("الامتحان", "الامتحان"),
                  ("استثمار النتائج", "استثمار النتائج"), ("مجالس الأقسام", "المحاضر: مجالس الأقسام"),
                  ("محاضر نهاية الأسدوس", "المحاضر: نهاية الأسدوس")]),
-    ("مشروع المؤسسة", [("مشروع المؤسسة", "مشروع المؤسسة")]),
+    ("مشروع المؤسسة", [("مشروع المؤسسة", "تتبع مشروع المؤسسة المندمج")]),
     ("تسليم المهام", [("تسليم المهام", "تسليم المهام")]),
     ("المراسلات", [("سجل الصادر", "سجل الصادر")]),
     ("الإعدادات", [("إعداد المؤسسة", "المؤسسة"), ("الوثائق", "نماذج الوثائق"),
@@ -491,10 +492,6 @@ A_VENIR = {
     "استثمار النتائج": (
         ["تحليل نتائج المراقبة المستمرة والامتحان حسب المستويات والمواد، وتحديد حاجيات الدعم."],
         ["نموذج تقرير استثمار النتائج الذي تعتمدونه إن وُجد."]),
-    "مشروع المؤسسة": (
-        ["إدراج المشروع: الأهداف، العمليات، المسؤوليات، المؤشرات.",
-         "تتبع الإنجاز وتقييم النتائج، واقتراح أولويات المشروع اللاحق."],
-        ["أنموذج من مشروع المؤسسة والمذكرات المؤطرة له (اتفقنا أن نفصل فيه لاحقاً)."]),
     "تسليم المهام": (
         ["محضر تسليم المهام الإدارية: يُحيَّن آلياً من معطيات المؤسسة (التلاميذ، الموظفون، الجرد، الجمعيات)، "
          "والمحاور اختيارية.",
@@ -610,7 +607,8 @@ MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "
              "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "تتبع الغياب": "غياب متغيبون نسبة", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
              "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون", "مجالس الأقسام": "مجلس قسم محضر",
              "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص",
-             "الدعم التربوي": "دعم متعثرين تعثر معالجة سجل"}
+             "الدعم التربوي": "دعم متعثرين تعثر معالجة سجل",
+             "مشروع المؤسسة": "مشروع مؤشرات عمليات خطة العمل مسار حصيلة"}
 
 
 class BarreLaterale(QFrame):
@@ -678,6 +676,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_inscriptions = PageInscriptions(self)
         self.page_absences = PageAbsences(self)
         self.page_soutien = PageSoutien(self)
+        self.page_projet = PageProjet(self)
         self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
@@ -687,7 +686,8 @@ class FenetrePrincipale(QMainWindow):
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,
                       "دليل الاستخدام": self.page_guide, "الإحصائيات": self.page_stats,
                       "التسجيلات": self.page_inscriptions, "تتبع الغياب": self.page_absences,
-                      "الدعم التربوي": self.page_soutien}
+                      "الدعم التربوي": self.page_soutien,
+                      "مشروع المؤسسة": self.page_projet}
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
         self.section_de = {}    # اسم الصفحة ← رقم القسم الرئيسي
         self.pile = QStackedWidget()

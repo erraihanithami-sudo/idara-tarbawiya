@@ -288,7 +288,7 @@ def main(sortie: Path) -> None:
                                                                         cex.SUGGESTIONS["gestion"][1]]))
     f.aller_a("مجالس المؤسسة")
     photo(f, "42_conseils_etab")
-    f.aller_a("مشروع المؤسسة")
+    f.aller_a("تسليم المهام")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")
     photo(f, "30_sections_onglets")
@@ -346,6 +346,25 @@ def main(sortie: Path) -> None:
         ps.h_fin.setText("15:30")
         ps.ajouter_seance()
     photo(f, "56_soutien")
+    from tests.fabrique_projet import rapport_plan_action   # خطة عمل وهمية
+    f.aller_a("مشروع المؤسسة")
+    pp = f.page_projet
+    pp.intitule.setText("مشروع المؤسسة المندمج")
+    pp.debut.setCurrentIndex(pp.debut.findData("2025/2026"))
+    pp.fin.setCurrentIndex(pp.fin.findData("2027/2028"))
+    if pp.enregistrer_projet():
+        from idara.services import projet_etab as pe
+        pe.enregistrer_cibles(f.conn, pp.pid(), [
+            ("tarl", "ref", 35, None), ("tarl", "2025/2026", 40, 38), ("tarl", "2026/2027", 50, None),
+            ("tarl", "2027/2028", 60, None), ("hadar", "ref", 3, None), ("hadar", "2025/2026", 2.5, 2.8),
+            ("hadar", "2026/2027", 2, None), ("hadar", "2027/2028", 1.5, None), ("activites", "ref", 15, None),
+            ("activites", "2025/2026", 25, 22), ("activites", "2026/2027", 35, None),
+            ("activites", "2027/2028", 45, None)])
+        pp.importer(rapport_plan_action(Path(tempfile.mkdtemp()) / "plan.xlsx"))
+        if pp.t_ops.rowCount():
+            pp.t_ops.cellWidget(0, 5).setCurrentIndex(pp.t_ops.cellWidget(0, 5).findData("realisee"))
+            pp.enregistrer_suivi()
+    photo(f, "57_projet_etablissement")
     f.filtrer_nav("محضر")
     photo(f, "53_recherche_nav")
     f.filtrer_nav("")

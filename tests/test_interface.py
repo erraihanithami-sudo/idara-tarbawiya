@@ -1384,3 +1384,33 @@ def test_guide_jolie_tournee(app, config_tmp):
     f.aller_a("دليل الاستخدام")
     assert len(f.page_guide.images) == len(TOUR)
     f.close()
+
+
+def test_projet_etablissement(app, config_tmp, monkeypatch, tmp_path):
+    """تتبع مشروع المؤسسة (قرار المدير 2026-11-07): المشروع، المستهدفات، الاستيراد من مسار، التتبع، التقارير."""
+    from idara.services import bureautique
+    from tests.fabrique_projet import rapport_plan_action
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("مشروع المؤسسة")
+    p = f.page_projet
+    assert p.importer(tmp_path / "x.xlsx") is None and "سجّل المشروع" in p.message.text()
+    p.debut.setCurrentIndex(p.debut.findData("2025/2026"))
+    p.fin.setCurrentIndex(p.fin.findData("2027/2028"))
+    pid = p.enregistrer_projet()
+    assert pid and p.pid() == pid and set(p.graphs) == {"tarl", "hadar", "activites"}
+    assert p.t_cibles.rowCount() == 3 * 4
+    p.t_cibles.item(4, 2).setText("2.5")     # الهدر: المرجعية ثم السنوات
+    p.t_cibles.item(5, 4).setText("abc")
+    assert not p.enregistrer_cibles()
+    p.t_cibles.item(5, 4).setText("2.8")
+    assert p.enregistrer_cibles(), p.message.text()
+    assert p.ind["hadar"]["annees"][0]["realise"] == 2.8
+    r = p.importer(rapport_plan_action(tmp_path / "plan.xlsx"))
+    assert r and r.ajoutees == 3 and p.t_ops.rowCount() == 3
+    p.t_ops.cellWidget(0, 5).setCurrentIndex(p.t_ops.cellWidget(0, 5).findData("realisee"))
+    p.t_ops.item(1, 6).setText("50")
+    assert p.enregistrer_suivi(), p.message.text()
+    assert p.synthese["par_statut"]["realisee"] == 1 and p.synthese["taux_global"] == 50
+    assert p.generer() is not None and p.generer(final=True) is not None
+    f.close()
