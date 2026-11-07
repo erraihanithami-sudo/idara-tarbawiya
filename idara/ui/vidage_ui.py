@@ -59,7 +59,7 @@ class LigneVidage(QWidget):
 
     def vider(self, confirmer: bool | None = None):
         c = vd.PAR_CLE[self.cle]
-        unite = self.portee.currentData() if self.portee.isVisible() else None
+        unite = self.portee.currentData() if not self.portee.isHidden() else None
         cible = c.libelle + (f" (الوحدة: {unite})" if unite else "")
         if confirmer is None:
             confirmer = getattr(self.f, "confirmer_vidage", None)
