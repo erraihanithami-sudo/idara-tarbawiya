@@ -139,10 +139,10 @@ def test_navigation_deroulante(app, config_tmp):
     i = titres.index("التدبير المالي والمادي")
     f.boutons[i].click()
     assert f.est_ouvert(i) and not f.est_ouvert(0) and f.page_courante() == "لوحة القيادة"
-    assert [b.text().split("  ")[0] for b in f.sous[i]][:2] == ["الجرد", "جمعية دعم مدرسة النجاح"]
-    assert "قريباً" in f.sous[i][0].text() and "قريباً" not in f.sous[i][1].text()
-    f.sous[i][1].click()
-    assert f.page_courante() == "جمعية دعم مدرسة النجاح" and f.sous[i][1].isChecked() and f.boutons[i].actif
+    assert [b.text().split("  ")[0] for b in f.sous[i]][:3] == ["تدبير التسجيلات", "الجرد", "جمعية دعم مدرسة النجاح"]
+    assert "قريباً" in f.sous[i][1].text() and "قريباً" not in f.sous[i][2].text()
+    f.sous[i][2].click()
+    assert f.page_courante() == "جمعية دعم مدرسة النجاح" and f.sous[i][2].isChecked() and f.boutons[i].actif
     f.boutons[i].click()   # الضغطة الثانية تطوي الفروع، والصفحة تبقى
     assert not f.est_ouvert(i) and f.page_courante() == "جمعية دعم مدرسة النجاح"
     f.aller_a("الجرد")
@@ -648,7 +648,7 @@ def test_page_association_najah(app, config_tmp, monkeypatch, tmp_path):
     from idara.ui.saisie import selectionner
     monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
     f = _fenetre_avec_eleves(config_tmp)
-    f.aller_a("التدبير المالي والمادي")
+    f.aller_a("جمعية دعم مدرسة النجاح")
     p = f.page_asso
     assert f.page_courante() == "جمعية دعم مدرسة النجاح" and not p.b_save.isEnabled()
     eid = p.ouvrir(dict(libelle="2025/2026", debut="2025-09-01", fin="2026-08-31",
@@ -1266,4 +1266,30 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     # بطاقات الأرقام في لوحة القيادة
     f.aller_a("لوحة القيادة")
     assert len(f.tableau.tuiles) == 4
+    f.close()
+
+
+
+def test_inscriptions_frais(app, config_tmp):
+    """تدبير التسجيلات (طلب المدير 2026-11-07)."""
+    from idara.services import etablissement as et
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("التسجيلات")
+    p = f.page_inscriptions
+    assert "حدّد وسط المؤسسة" in p.l_milieu.text() and p.table.rowCount() > 0
+    e = et.lire_etablissement(f.conn)
+    e.milieu = "urbain"
+    et.enregistrer_etablissement(f.conn, e)
+    p.rafraichir()
+    assert "حضري" in p.l_milieu.text()
+    n = p.table.rowCount()
+    p.table.item(0, 3).setCheckState(Qt.Checked)
+    assert p.totaux["elements"]["assurance"] == {"libelle": "التأمين المدرسي", "payes": 1, "montant_unitaire": 12,
+                                                 "montant": 12}
+    assert p.tout_cocher("sport") == n and p.totaux["elements"]["sport"]["montant"] == 10 * n
+    assert p.totaux["total"] == 12 + 10 * n
+    p.table.item(0, 4).setCheckState(Qt.Unchecked)
+    assert p.totaux["elements"]["sport"]["payes"] == n - 1
+    f.aller_a("إعداد المؤسسة")
+    assert f.page_etab.f_etab.milieu.currentData() == "urbain"
     f.close()

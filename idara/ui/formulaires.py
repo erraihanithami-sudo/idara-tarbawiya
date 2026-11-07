@@ -5,11 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QDate, Qt
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QDateEdit, QFileDialog, QGridLayout,
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDateEdit, QFileDialog, QGridLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton,
                                QVBoxLayout, QWidget)
 
-from idara.services.etablissement import Directeur, Etablissement
+from idara.services.etablissement import MILIEUX, Directeur, Etablissement
 
 
 def champ(texte_aide: str = "", ltr: bool = False) -> QLineEdit:
@@ -72,6 +72,12 @@ class FormEtablissement(QWidget):
         self.commune_ar = g.ajouter("الجماعة", champ())
         self.direction_ar = g.ajouter("المديرية الإقليمية *", champ("مثال: بركان"))
         self.academie_ar = g.ajouter("الأكاديمية الجهوية *", champ("مثال: جهة الشرق"))
+        # وسط المؤسسة: يحدد واجب التأمين المدرسي في تدبير التسجيلات (طلب المدير 2026-11-07)
+        self.milieu = QComboBox()
+        self.milieu.addItem("— غير محدد —", "")
+        for k, lib in MILIEUX.items():
+            self.milieu.addItem(lib, k)
+        g.ajouter("وسط المؤسسة (لواجب التأمين)", self.milieu)
         v.addWidget(g)
 
         v.addSpacing(10)
@@ -109,6 +115,7 @@ class FormEtablissement(QWidget):
         e.direction_ar, e.academie_ar = self.direction_ar.text(), self.academie_ar.text()
         e.type_etab = "groupe" if self.r_groupe.isChecked() else "independant"
         e.est_pionniere = "1" if self.pionniere.isChecked() else ""
+        e.milieu = self.milieu.currentData() or ""
         return e
 
     def liste_unites(self) -> list[str]:
@@ -126,6 +133,7 @@ class FormEtablissement(QWidget):
         (self.r_groupe if e.type_etab == "groupe" else self.r_independant).setChecked(True)
         self.bloc_unites.setVisible(e.type_etab == "groupe")
         self.pionniere.setChecked(bool(e.est_pionniere))
+        self.milieu.setCurrentIndex(max(0, self.milieu.findData(e.milieu)))
         self.unites.setText("، ".join(unites or []))
 
 

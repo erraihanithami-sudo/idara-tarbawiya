@@ -43,6 +43,7 @@ from idara.ui.page_tanzim import PageTanzim
 from idara.ui.page_calendrier import PageCalendrier
 from idara.ui.page_guide import PageGuide
 from idara.ui.page_statistiques import PageStatistiques
+from idara.ui.page_inscriptions import PageInscriptions
 from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
@@ -444,7 +445,8 @@ SECTIONS = [
                          ("الرخص", "الرخص")]),
     ("التدبير التربوي", [("التنظيم التربوي", "التنظيم التربوي"), ("الأندية والأنشطة", "الحياة المدرسية"), ("التعلمات الأساس", "تتبع التعلمات الأساس"),
                          ("الريادة", "المدرسة الرائدة")]),
-    ("التدبير المالي والمادي", [("الجرد", "الجرد"), ("جمعية دعم مدرسة النجاح", "جمعية دعم مدرسة النجاح"),
+    ("التدبير المالي والمادي", [("التسجيلات", "تدبير التسجيلات"), ("الجرد", "الجرد"),
+                                ("جمعية دعم مدرسة النجاح", "جمعية دعم مدرسة النجاح"),
                                 ("الصرف", "الصرف: سند الطلب والاتفاقية"), ("الجمعية الرياضية", "الجمعية الرياضية"),
                                 ("جمعية تنمية التعاون المدرسي", "جمعية تنمية التعاون المدرسي")]),
     ("التقييم", [("المراقبة المستمرة", "المراقبة المستمرة"), ("الامتحان", "الامتحان"),
@@ -601,7 +603,7 @@ MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "
              "محاضر نهاية الأسدوس": "محضر مداولات نتائج نقط", "الامتحان": "امتحان موحد إشهادي سادس",
              "التلاميذ": "تلميذ بحث شهادة مدرسية وثائق", "الاستيراد من مسار": "مسار لوائح استيراد",
              "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
-             "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "مجالس الأقسام": "مجلس قسم محضر",
+             "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون", "مجالس الأقسام": "مجلس قسم محضر",
              "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص"}
 
 
@@ -667,6 +669,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_calendrier = PageCalendrier(self)
         self.page_guide = PageGuide(self)
         self.page_stats = PageStatistiques(self)
+        self.page_inscriptions = PageInscriptions(self)
         self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
@@ -674,7 +677,8 @@ class FenetrePrincipale(QMainWindow):
                       "الامتحان": self.page_examen, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,
-                      "دليل الاستخدام": self.page_guide, "الإحصائيات": self.page_stats}
+                      "دليل الاستخدام": self.page_guide, "الإحصائيات": self.page_stats,
+                      "التسجيلات": self.page_inscriptions}
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
         self.section_de = {}    # اسم الصفحة ← رقم القسم الرئيسي
         self.pile = QStackedWidget()
