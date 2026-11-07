@@ -17,3 +17,10 @@ def conn(dossier):
     c = ouvrir_base(dossier.base)
     yield c
     c.close()
+
+
+def pytest_runtest_logreport(report):
+    """يكتب سبب الفشل فوراً: إن توقف Python بعده (نوافذ Qt على Windows) لا يضيع الملخص النهائي."""
+    if report.failed:
+        import sys
+        print(f"\n===== فشل {report.nodeid} =====\n{report.longreprtext[-4000:]}\n", file=sys.__stderr__, flush=True)
