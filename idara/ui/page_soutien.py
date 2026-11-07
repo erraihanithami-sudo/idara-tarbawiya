@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
-from PySide6.QtGui import QColor, QImage, QPainter
+from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QGridLayout, QHBoxLayout, QLabel, QPushButton,
                                QTableWidgetItem, QWidget)
 
@@ -27,9 +27,7 @@ def png_barres(categories: list[str], series, largeur: int = 1000, hauteur: int 
     w.resize(largeur, hauteur)
     img = QImage(largeur, hauteur, QImage.Format_ARGB32)
     img.fill(QColor("white"))
-    p = QPainter(img)
-    w.render(p)
-    p.end()
+    w.render(img)
     ba = QByteArray()
     buf = QBuffer(ba)
     buf.open(QIODevice.WriteOnly)
@@ -215,13 +213,14 @@ class PageSoutien(QWidget):
         for c in cats:
             self.categorie.addItem(c["nom"], c["id"])
         self.categorie.setCurrentIndex(max(0, self.categorie.findData(cat)))
-        prof = self.intervenant.currentData()
+        prof, prof_r = self.intervenant.currentData(), self.prof_registre.currentData()
         self.intervenant.clear()
         self.prof_registre.clear()
         for p in sv.intervenants(conn):
             self.intervenant.addItem(p["nom"], p["id"])
             self.prof_registre.addItem(p["nom"], p["id"])
         self.intervenant.setCurrentIndex(max(0, self.intervenant.findData(prof)))
+        self.prof_registre.setCurrentIndex(max(0, self.prof_registre.findData(prof_r)))
         cl = self.classe.currentData()
         self.classe.blockSignals(True)
         self.classe.clear()
@@ -269,6 +268,8 @@ class PageSoutien(QWidget):
         self.membres = sv.membres(self.f.conn, gid) if gid else []
         g = next((x for x in self.groupes if x["id"] == gid), None)
         self.l_groupe.setText(f"المجموعة: {g['nom']} · {g['intervenant']}" if g else "حدد مجموعة في الجدول أعلاه.")
+        if g:   # السجل يُولَّد افتراضياً لأستاذ المجموعة المحددة
+            self.prof_registre.setCurrentIndex(max(0, self.prof_registre.findData(g["personnel_id"])))
         self.t_membres.setRowCount(len(self.membres))
         for i, m in enumerate(self.membres):
             self.t_membres.setItem(i, 0, cellule(m["nom"], m["inscription_id"]))

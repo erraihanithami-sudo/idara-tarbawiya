@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
-from PySide6.QtGui import QColor, QImage, QPainter
+from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDoubleSpinBox, QGridLayout, QHBoxLayout, QPushButton,
                                QTableWidgetItem,
                                QWidget)
@@ -31,9 +31,7 @@ def png_evolution(evolution: list[dict], largeur: int = 1000, hauteur: int = 380
     w.resize(largeur, hauteur)
     img = QImage(largeur, hauteur, QImage.Format_ARGB32)
     img.fill(QColor("white"))
-    p = QPainter(img)
-    w.render(p)
-    p.end()
+    w.render(img)
     ba = QByteArray()
     buf = QBuffer(ba)
     buf.open(QIODevice.WriteOnly)
