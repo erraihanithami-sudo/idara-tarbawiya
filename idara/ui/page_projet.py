@@ -214,8 +214,12 @@ class PageProjet(QWidget):
                 l = QLabel("كلما انخفضت النسبة كان أفضل.")
                 l.setObjectName("etiquette")
                 v.addWidget(l)
+            v.activate()
+            c.setMinimumHeight(max(330, v.totalMinimumSize().height() + 40))
             self.l_graphs.addWidget(c, i, 0)
-        self.zone_graphs.adjustSize()
+        # داخل منطقة التمرير: الارتفاع الأدنى يُحدَّث بعد إعادة البناء، وإلا تنضغط المبيانات
+        self.l_graphs.activate()
+        self.zone_graphs.setMinimumHeight(self.l_graphs.totalMinimumSize().height())
 
     def _cibles(self) -> None:
         t = self.t_cibles
