@@ -1339,8 +1339,10 @@ def test_absences_mensuelles(app, config_tmp, monkeypatch):
     f.close()
 
 
-def test_soutien_pedagogique(app, config_tmp):
+def test_soutien_pedagogique(app, config_tmp, monkeypatch):
     """الدعم التربوي (طلب المدير 2026-11-07): مرحلة، مجموعة، تلاميذ، نتائج، حصة، ووثائق."""
+    from idara.services import bureautique
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
     f = _fenetre_avec_eleves(config_tmp)
     with f.conn:
         f.conn.execute("INSERT INTO personnel(nom_ar, prenom_ar, sexe, categorie, ppr) VALUES "
