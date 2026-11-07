@@ -25,7 +25,23 @@ def app():
 @pytest.fixture
 def config_tmp(tmp_path, monkeypatch):
     monkeypatch.setenv("IDARA_CONFIG_DIR", str(tmp_path / "config"))
-    return tmp_path
+    yield tmp_path
+    # اختبار فاشل لا يصل إلى f.close(): تُغلق نوافذه هنا حتى لا تتراكم (تراكمها أوقف Python على Windows)
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if app is not None:
+        import sqlite3
+        for w in app.topLevelWidgets():
+            conn = getattr(w, "conn", None)
+            if conn is not None:
+                try:
+                    conn.execute("SELECT 1")
+                except sqlite3.ProgrammingError:   # أُغلقت من قبل
+                    continue
+                w.close()
+            elif w.isVisible():
+                w.close()
+        app.processEvents()
 
 
 def remplir_assistant(a, dossier):
@@ -1318,7 +1334,7 @@ def test_absences_mensuelles(app, config_tmp, monkeypatch):
     chemin = p.generer()
     assert chemin is not None and chemin.exists()
     f.aller_a("لوحة القيادة")
-    assert "أكتوبر 2026" in " ".join(l.text() for l in f.tableau.findChildren(type(p.message)))
+    assert "أكتوبر 2026" in f.tableau.jauges[0].note and f.tableau.jauges[0].taux is not None
     f.close()
 
 
@@ -1350,4 +1366,18 @@ def test_soutien_pedagogique(app, config_tmp):
     assert p.b["global"]["ameliores"] == 1
     for fn in (p.generer_registre, p.generer_programme, p.generer_rapport):
         assert fn() is not None, p.message.text()
+    f.close()
+
+
+def test_guide_jolie_tournee(app, config_tmp):
+    """الجولة المصورة في الدليل: كل صفحة موجودة وكل لقطة متوفرة."""
+    from idara.ui.fenetre import SECTIONS
+    from idara.ui.page_guide import TOUR, image_guide
+    pages = {p for _, fils in SECTIONS for p, _ in fils}
+    for titre, img, _, _, page in TOUR:
+        assert page is None or page in pages, titre
+        assert image_guide(img) is not None, img
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("دليل الاستخدام")
+    assert len(f.page_guide.images) == len(TOUR)
     f.close()
