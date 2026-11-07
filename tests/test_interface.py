@@ -1414,3 +1414,53 @@ def test_projet_etablissement(app, config_tmp, monkeypatch, tmp_path):
     assert p.synthese["par_statut"]["realisee"] == 1 and p.synthese["taux_global"] == 50
     assert p.generer() is not None and p.generer(final=True) is not None
     f.close()
+
+
+def test_unites_et_vidage(app, config_tmp):
+    """طلب المدير 2026-11-07: لوائح كل وحدة على حدة، وتفريغ مكوّن واحد من صفحته أو من الإعدادات."""
+    from tests.fabrique_massar import classeur
+    from tests.test_import_massar import AR
+    from idara.services import import_eleves as imp
+    from idara.services import vidage as vd
+    from idara.ui.vidage_ui import LigneVidage
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("الاستيراد من مسار")
+    p = f.page_import
+    assert list(p.barre_unites.boutons) == [None, "الوحدة المركزية", "وحدة فرعية"]
+    assert p.c_unites.isVisibleTo(p) and p.t_unites.rowCount() >= 2
+    p.barre_unites.boutons["الوحدة المركزية"].click()
+    assert p.barre_unites.unite == "الوحدة المركزية" and p.t_unites.rowCount() == 0
+    p.definir_fichiers([classeur(config_tmp / "ar2.xlsx", AR)])
+    p.analyser()
+    assert p.appliquer() is not None and "الوحدة المركزية" in p.message.text()
+    assert p.t_unites.rowCount() >= 1
+    # تصحيح وحدة قسم
+    p.barre_unites.boutons[None].click()
+    i = next(k for k, r in enumerate(p.lignes_unites) if r["unite"] == "الوحدة المركزية")
+    cb = p.t_unites.cellWidget(i, 1)
+    cb.setCurrentIndex(cb.findData("وحدة فرعية"))
+    assert p.enregistrer_unites() == 1
+    # التلاميذ حسب الوحدة
+    f.aller_a("التلاميذ")
+    e = f.page_eleves
+    tous = e.resultats.rowCount()
+    e.barre_unites.boutons["وحدة فرعية"].click()
+    n_sub = e.resultats.rowCount()
+    assert 0 < n_sub <= tous and "وحدة فرعية" in e.nb.text()
+    e.barre_unites.boutons[None].click()
+    assert e.resultats.rowCount() == tous
+    # التفريغ من صفحة الاستيراد: وحدة واحدة
+    f.aller_a("الاستيراد من مسار")
+    ligne = next(w for w in p.findChildren(LigneVidage) if w.cle == "eleves")
+    assert ligne.portee.isVisibleTo(ligne)
+    ligne.portee.setCurrentIndex(ligne.portee.findData("وحدة فرعية"))
+    assert ligne.vider(confirmer=False) is None and vd.compter(f.conn, "eleves") == tous
+    assert ligne.vider(confirmer=True) == n_sub
+    assert vd.compter(f.conn, "eleves") == tous - n_sub
+    # الإعدادات: سطر لكل مكوّن
+    f.aller_a("إعداد المؤسسة")
+    lignes = {w.cle: w for w in f.page_etab.findChildren(LigneVidage)}
+    assert set(lignes) == {c.cle for c in vd.COMPOSANTS}
+    assert lignes["eleves"].vider(confirmer=True) is not None and vd.compter(f.conn, "eleves") == 0
+    assert not lignes["eleves"].bouton.isEnabled()
+    f.close()

@@ -346,6 +346,8 @@ class PageEtablissement(QWidget):
         hb.addStretch()
         cv.addLayout(hb)
         v.addWidget(c)
+        from idara.ui.vidage_ui import carte_parametres
+        v.addWidget(carte_parametres(self.f, self.message))
         # تصفير البرنامج (طلب المدير 2026-11-04)
         c, cv = carte("تصفير البرنامج")
         l = QLabel("يحذف كل ما أُدخل في البرنامج: معطيات المؤسسة والمدير، التلاميذ، الموظفون، الرخص، الجمعيات، "
@@ -688,6 +690,8 @@ class FenetrePrincipale(QMainWindow):
                       "التسجيلات": self.page_inscriptions, "تتبع الغياب": self.page_absences,
                       "الدعم التربوي": self.page_soutien,
                       "مشروع المؤسسة": self.page_projet}
+        from idara.ui import vidage_ui
+        vidage_ui.installer(self)   # تفريغ كل مكوّن من صفحته (طلب المدير 2026-11-07)
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
         self.section_de = {}    # اسم الصفحة ← رقم القسم الرئيسي
         self.pile = QStackedWidget()

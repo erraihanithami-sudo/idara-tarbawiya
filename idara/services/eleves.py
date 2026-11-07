@@ -29,7 +29,8 @@ class ErreurEleve(ValueError):
 _SELECT = """
 SELECT e.id, e.code_massar, e.num_registre, e.nom_ar, e.prenom_ar, e.nom_fr, e.prenom_fr, e.sexe,
        e.date_naissance, e.source, l.nom_ar AS lieu_ar, l.nom_fr AS lieu_fr,
-       i.id AS inscription_id, i.statut, c.code AS classe, n.code AS niveau, i.niveau_confirme
+       i.id AS inscription_id, i.statut, c.code AS classe, n.code AS niveau, i.niveau_confirme,
+       c.unite_id
 FROM eleve e
 LEFT JOIN lieu l ON l.id = e.lieu_naissance_id
 LEFT JOIN inscription i ON i.eleve_id = e.id AND i.annee_id = ?
@@ -44,12 +45,15 @@ def _annee_id(conn) -> int:
 
 
 def rechercher(conn: sqlite3.Connection, texte: str, source: str = "massar",
-               limite: int = 60) -> list[sqlite3.Row]:
+               limite: int = 60, unite: str | None = None) -> list[sqlite3.Row]:
     """بالرمز (أو جزء منه)، أو برقم السجل، أو بالاسم والنسب بالعربية أو الفرنسية وبأي ترتيب.
     البحث يتجاهل الهمزات والمسافات وحالة الأحرف. نص فارغ ← تلاميذ السنة الجارية."""
     t = (texte or "").strip()
     lignes = conn.execute(_SELECT + " WHERE e.source = ? ORDER BY c.code, e.nom_ar, e.prenom_ar",
                           (_annee_id(conn), source)).fetchall()
+    if unite:   # تلاميذ وحدة مدرسية واحدة (طلب المدير 2026-11-07)
+        u = conn.execute("SELECT id FROM unite_scolaire WHERE nom_ar=?", (unite,)).fetchone()
+        lignes = [r for r in lignes if u and r["unite_id"] == u[0]]
     if not t:
         return [r for r in lignes if r["inscription_id"] is not None][:limite] if source == "massar" \
             else lignes[:limite]

@@ -141,6 +141,10 @@ class PageEleves(QWidget):
         self.recherche.setPlaceholderText("الاسم أو النسب (بالعربية أو الفرنسية) أو رمز مسار")
         self.recherche.setClearButtonEnabled(True)
         self.recherche.textChanged.connect(self.chercher)
+        # المجموعة المدرسية: تلاميذ كل وحدة على حدة، و«المؤسسة كاملة» للجميع (طلب المدير 2026-11-07)
+        from idara.ui.unites import BarreUnites
+        self.barre_unites = BarreUnites(lambda: self.f.conn, lambda _u: self.chercher(self.recherche.text()))
+        cv.addWidget(self.barre_unites)
         cv.addWidget(etiquette("بحث", self.recherche))
         cv.addWidget(self.recherche)
         self.resultats = tableau(["الرمز", "الاسم", "القسم", "الوضعية"])
@@ -242,18 +246,22 @@ class PageEleves(QWidget):
     # ---------- البحث ----------
 
     def rafraichir(self) -> None:
+        self.barre_unites.actualiser()
         self.chercher(self.recherche.text())
         if self.eleve_id:
             self.afficher(self.eleve_id)
 
     def chercher(self, texte: str) -> None:
-        lignes = el.rechercher(self.f.conn, texte)
+        u = self.barre_unites.unite if hasattr(self, "barre_unites") else None
+        lignes = el.rechercher(self.f.conn, texte, unite=u, limite=60 if texte.strip() else 2000)
         self.resultats.setRowCount(len(lignes))
         for i, r in enumerate(lignes):
             for j, v in enumerate([r["code_massar"], el.nom_complet(r), r["classe"] or "—",
                                    el.STATUTS.get(r["statut"], "غير مسجل")]):
                 self.resultats.setItem(i, j, cellule(v, r["id"]))
-        self.nb.setText(f"{len(lignes)} نتيجة" if texte.strip() else f"تلاميذ السنة الجارية: {len(lignes)}")
+        portee = f" · {u}" if u else ""
+        self.nb.setText(f"{len(lignes)} نتيجة{portee}" if texte.strip() else
+                        f"تلاميذ السنة الجارية{portee}: {len(lignes)}")
 
     def _selection(self) -> None:
         ids = self.ids_selectionnes()

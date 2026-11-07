@@ -210,7 +210,15 @@ class ResultatImport:
     sauvegarde: Path
 
 
-def appliquer(conn: sqlite3.Connection, dossier: DossierDonnees, rapport: RapportImport) -> ResultatImport:
+def appliquer(conn: sqlite3.Connection, dossier: DossierDonnees, rapport: RapportImport,
+              unite: str | None = None) -> ResultatImport:
+    """unite: في المجموعة المدرسية تُسند أقسام اللائحة إلى هذه الوحدة (طلب المدير 2026-11-07)."""
+    unite_id = None
+    if unite:
+        r = conn.execute("SELECT id FROM unite_scolaire WHERE nom_ar=?", (unite,)).fetchone()
+        if r is None:
+            raise ErreurImport("الوحدة المدرسية غير موجودة.")
+        unite_id = r["id"]
     copie = sauvegarde.creer_sauvegarde(dossier, "avant_import")
     liste = rapport.liste
     with conn:
@@ -233,6 +241,8 @@ def appliquer(conn: sqlite3.Connection, dossier: DossierDonnees, rapport: Rappor
             r = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=?", (annee_id, code)).fetchone()
             classes[code] = r["id"] if r else conn.execute(
                 "INSERT INTO classe(annee_id, code) VALUES (?,?)", (annee_id, code)).lastrowid
+            if unite_id is not None:
+                conn.execute("UPDATE classe SET unite_id=? WHERE id=?", (unite_id, classes[code]))
 
         majoritaires = _ecritures_majoritaires(liste)
         ajoutes = 0
@@ -345,3 +355,25 @@ def confirmer_niveaux(conn: sqlite3.Connection, choix: dict[int, str]) -> int:
 def historique(conn: sqlite3.Connection, limite: int = 10) -> list[sqlite3.Row]:
     return conn.execute("SELECT * FROM import_lot ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
 
+
+
+# ---------- الأقسام والوحدات المدرسية ----------
+
+def repartition_classes(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """أقسام السنة الجارية ووحدة كل قسم وعدد تلاميذه."""
+    a = annee_srv.annee_courante(conn)
+    return conn.execute(
+        "SELECT c.id, c.code, u.nom_ar AS unite, (SELECT COUNT(*) FROM inscription i WHERE i.classe_id=c.id AND "
+        "i.statut IN ('inscrit','arrive')) AS eleves FROM classe c LEFT JOIN unite_scolaire u ON u.id=c.unite_id "
+        "WHERE c.annee_id=? ORDER BY c.code", (a["id"] if a else -1,)).fetchall()
+
+
+def affecter_unite(conn: sqlite3.Connection, classe_id: int, unite: str | None) -> None:
+    uid = None
+    if unite:
+        r = conn.execute("SELECT id FROM unite_scolaire WHERE nom_ar=?", (unite,)).fetchone()
+        if r is None:
+            raise ErreurImport("الوحدة المدرسية غير موجودة.")
+        uid = r["id"]
+    with conn:
+        conn.execute("UPDATE classe SET unite_id=? WHERE id=?", (uid, classe_id))

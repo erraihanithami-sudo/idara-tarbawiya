@@ -14,6 +14,7 @@ from idara.services import massar as ms
 from idara.services import textes as tx
 from idara.services.massar import ErreurMassar
 from idara.ui.composants import carte, entete
+from idara.ui.unites import BarreUnites
 
 MAX_LIGNES = 40
 
@@ -34,6 +35,7 @@ class PageImport(QWidget):
         self.f = fenetre
         self.fichiers: list[Path] = []
         self.rapport: imp.RapportImport | None = None
+        self.lignes_unites: list = []
         v = QVBoxLayout(self)
         v.setContentsMargins(40, 32, 40, 32)
         v.setSpacing(20)
@@ -45,6 +47,13 @@ class PageImport(QWidget):
         aide.setObjectName("etiquette")
         aide.setWordWrap(True)
         cv.addWidget(aide)
+        # المجموعة المدرسية: لوائح كل وحدة على حدة (طلب المدير 2026-11-07)
+        self.barre_unites = BarreUnites(lambda: self.f.conn, self._changer_unite, "تحميل لوائح:")
+        cv.addWidget(self.barre_unites)
+        self.l_unite = QLabel()
+        self.l_unite.setObjectName("etiquette")
+        self.l_unite.setWordWrap(True)
+        cv.addWidget(self.l_unite)
         h = QHBoxLayout()
         b = QPushButton("اختيار اللوائح...")
         b.clicked.connect(self.choisir)
@@ -121,6 +130,27 @@ class PageImport(QWidget):
         nv.addLayout(hn)
         v.addWidget(self.c_niveaux)
 
+        # أقسام كل وحدة
+        self.c_unites, uv = carte("أقسام الوحدات المدرسية")
+        a3 = QLabel("تُسند أقسام اللائحة إلى الوحدة المختارة عند الاستيراد. يمكن تصحيح وحدة أي قسم هنا.")
+        a3.setObjectName("etiquette")
+        a3.setWordWrap(True)
+        uv.addWidget(a3)
+        self.t_unites = QTableWidget(0, 3)
+        self.t_unites.setHorizontalHeaderLabels(["القسم", "الوحدة المدرسية", "التلاميذ"])
+        self.t_unites.verticalHeader().setVisible(False)
+        self.t_unites.verticalHeader().setDefaultSectionSize(46)
+        self.t_unites.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        uv.addWidget(self.t_unites)
+        hu = QHBoxLayout()
+        self.b_unites = QPushButton("حفظ وحدات الأقسام")
+        self.b_unites.setObjectName("principal")
+        self.b_unites.clicked.connect(lambda: self.enregistrer_unites())
+        hu.addWidget(self.b_unites)
+        hu.addStretch()
+        uv.addLayout(hu)
+        v.addWidget(self.c_unites)
+
         self.c_historique, self.hv = carte("آخر عمليات الاستيراد")
         self.l_historique = QLabel()
         self.l_historique.setObjectName("etiquette")
@@ -140,6 +170,9 @@ class PageImport(QWidget):
         self.message.show()
 
     def rafraichir(self) -> None:
+        self.barre_unites.actualiser()
+        self._changer_unite(self.barre_unites.unite, rafraichir=False)
+        self._remplir_unites()
         self._remplir_niveaux()
         lots = imp.historique(self.f.conn, 5)
         self.l_historique.setText("\n".join(
@@ -219,13 +252,15 @@ class PageImport(QWidget):
         if self.rapport is None:
             return None
         try:
-            res = imp.appliquer(self.f.conn, self.f.dossier, self.rapport)
+            res = imp.appliquer(self.f.conn, self.f.dossier, self.rapport, self.barre_unites.unite)
         except Exception as e:  # noqa: BLE001 — المعاملة أُلغيت كاملة
             self._message(f"لم يتم الاستيراد ولم يتغير شيء: {e}", erreur=True)
             return None
         self.rapport = None
         self.c_rapport.hide()
-        self._message(f"تم الاستيراد: {res.ajoutes} تلميذ جديد، {res.mis_a_jour} تحديث. "
+        u = self.barre_unites.unite
+        self._message(f"تم الاستيراد{f' (الوحدة: {u})' if u else ''}: {res.ajoutes} تلميذ جديد، "
+                      f"{res.mis_a_jour} تحديث. "
                       f"أُخذت نسخة احتياطية قبله ({res.sauvegarde.name}).")
         self.rafraichir()
         self.f.rafraichir_entete()
@@ -302,4 +337,52 @@ class PageImport(QWidget):
         n = imp.confirmer_niveaux(self.f.conn, choix)
         self._message(f"أُكِّد مستوى {n} تلميذاً." + (f" بقي {restants} دون مستوى." if restants else ""))
         self.rafraichir()
+        return n
+
+    # ---------- الوحدات المدرسية ----------
+
+    def _changer_unite(self, u: str | None, rafraichir: bool = True) -> None:
+        if u:
+            self.l_unite.setText(f"اللوائح التي تختارها الآن تخص «{u}»: تُسند أقسامها إلى هذه الوحدة.")
+        else:
+            self.l_unite.setText("«المؤسسة كاملة»: تحتفظ الأقسام بوحداتها الحالية. لتحميل لوائح وحدة، اختر الوحدة "
+                                 "أولاً." if self.barre_unites.boutons else "")
+        self.l_unite.setVisible(bool(self.barre_unites.boutons))
+        if rafraichir:
+            self._remplir_unites()
+
+    def _remplir_unites(self) -> None:
+        from idara.services import etablissement as etab_srv
+        unites = etab_srv.unites(self.f.conn)
+        self.c_unites.setVisible(bool(unites))
+        if not unites:
+            return
+        u = self.barre_unites.unite
+        lignes = [r for r in imp.repartition_classes(self.f.conn) if u is None or r["unite"] == u]
+        self.lignes_unites = lignes
+        self.t_unites.setRowCount(len(lignes))
+        for i, r in enumerate(lignes):
+            it = QTableWidgetItem(r["code"])
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+            self.t_unites.setItem(i, 0, it)
+            cb = QComboBox()
+            cb.addItem("غير محددة", None)
+            for x in unites:
+                cb.addItem(x, x)
+            cb.setCurrentIndex(max(0, cb.findData(r["unite"])))
+            self.t_unites.setCellWidget(i, 1, cb)
+            it = QTableWidgetItem(str(r["eleves"]))
+            it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+            self.t_unites.setItem(i, 2, it)
+        self.t_unites.setMinimumHeight(60 + 46 * min(len(lignes), 12))
+
+    def enregistrer_unites(self) -> int:
+        n = 0
+        for i, r in enumerate(self.lignes_unites):
+            nouvelle = self.t_unites.cellWidget(i, 1).currentData()
+            if nouvelle != r["unite"]:
+                imp.affecter_unite(self.f.conn, r["id"], nouvelle)
+                n += 1
+        self._message(f"حُفظت وحدات الأقسام ({n} تغيير).")
+        self._remplir_unites()
         return n
