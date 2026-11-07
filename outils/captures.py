@@ -311,6 +311,23 @@ def main(sortie: Path) -> None:
         photo(f, f"51_theme_{nom}_statistiques")
         f.aller_a("دليل الاستخدام")
         photo(f, f"52_theme_{nom}_guide")
+    f.aller_a("التسجيلات")
+    photo(f, "54_inscriptions")
+    f.aller_a("تتبع الغياب")
+    pa = f.page_absences
+    pa.mois.setCurrentIndex(pa.mois.findData("2026-10"))
+    pa.jours.setValue(20)
+    for i in range(pa.table.rowCount()):
+        pa.table.item(i, 3).setText("2")
+        pa.table.item(i, 4).setText(str(3 + i))
+    pa.enregistrer()
+    pa.mois.setCurrentIndex(pa.mois.findData("2026-11"))
+    pa.jours.setValue(18)
+    for i in range(pa.table.rowCount()):
+        pa.table.item(i, 3).setText("1")
+        pa.table.item(i, 4).setText("2")
+    pa.enregistrer()
+    photo(f, "55_absences")
     f.filtrer_nav("محضر")
     photo(f, "53_recherche_nav")
     f.filtrer_nav("")

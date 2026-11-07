@@ -1314,7 +1314,7 @@ def test_absences_mensuelles(app, config_tmp, monkeypatch):
     p.table.item(0, 4).setText("abc")
     assert not p.enregistrer() and "أرقام" in p.message.text()
     png = png_evolution(p.evolution)
-    assert png and png[:4] == b"\\x89PNG"
+    assert png and png[:4] == b"\x89PNG"
     chemin = p.generer()
     assert chemin is not None and chemin.exists()
     f.aller_a("لوحة القيادة")
