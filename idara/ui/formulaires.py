@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QDateEdit, QFileDialog, QGridLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton,
@@ -214,14 +216,49 @@ class FormIdentite(QWidget):
         self.logo = g.ajouter("الترويسة (صورة تُوضع أعلى الوثائق)", SelecteurFichier("اختيار صورة الترويسة"), pleine_largeur=True)
         self.filigrane = g.ajouter("العلامة المائية (اختياري)", SelecteurFichier("اختيار العلامة المائية"),
                                    pleine_largeur=True)
+        # التذييل: نص أو صورة من الحاسوب (طلب المدير 2026-11-07)
+        ligne = QWidget()
+        hl = QHBoxLayout(ligne)
+        hl.setContentsMargins(0, 0, 0, 0)
+        self.r_pied_texte = QRadioButton("نص")
+        self.r_pied_image = QRadioButton("صورة")
+        self.r_pied_texte.setChecked(True)
+        self._mode_pied = QButtonGroup(self)
+        self._mode_pied.addButton(self.r_pied_texte)
+        self._mode_pied.addButton(self.r_pied_image)
+        hl.addWidget(self.r_pied_texte)
+        hl.addWidget(self.r_pied_image)
+        hl.addStretch()
+        g.ajouter("التذييل", ligne, pleine_largeur=True)
         self.pied = g.ajouter("نص التذييل", champ("العنوان والهاتف كما في أسفل الوثائق"),
                               pleine_largeur=True)
+        self.pied_image = g.ajouter("صورة التذييل (تُوضع في الوسط أسفل الوثائق)",
+                                    SelecteurFichier("اختيار صورة التذييل"), pleine_largeur=True)
+        self.l_pied_actuel = QLabel()
+        self.l_pied_actuel.setObjectName("etiquette")
+        g.ajouter("", self.l_pied_actuel, pleine_largeur=True)
+        self.r_pied_image.toggled.connect(self._maj_pied)
         v.addWidget(g)
+        self._maj_pied()
         note = QLabel("تعوّض الترويسةُ والعلامةُ المائية ونصُّ التذييل ما في قوالبك آلياً في كل الوثائق المولدة. "
                       "أفضل ترويسة: صورة عريضة (العرض 5 أضعاف الارتفاع تقريباً). اترك الحقل فارغاً لإبقاء الحالي.")
         note.setObjectName("etiquette")
         note.setWordWrap(True)
         v.addWidget(note)
+
+    def _maj_pied(self, _=None) -> None:
+        image = self.r_pied_image.isChecked()
+        for l in self.findChildren(QLabel):   # عناوين الحقول (buddy) تتبع حقولها
+            if l.buddy() in (self.pied_image, self.l_pied_actuel):
+                l.setVisible(image)
+            elif l.buddy() is self.pied:
+                l.setVisible(not image)
+        for w in (self.pied_image, self.l_pied_actuel):
+            w.setVisible(image)
+        self.pied.setVisible(not image)
+
+    def mode_pied(self) -> str:
+        return "image" if self.r_pied_image.isChecked() else "texte"
 
     def appliquer(self, e: Etablissement) -> tuple[str, str]:
         e.ville_redaction_ar, e.ville_redaction_fr = self.ville_ar.text(), self.ville_fr.text()
@@ -234,3 +271,7 @@ class FormIdentite(QWidget):
         self.telephone.setText(e.telephone)
         self.adresse.setText(e.adresse)
         self.pied.setText(e.pied_page)
+        (self.r_pied_image if e.pied_image_path else self.r_pied_texte).setChecked(True)
+        self.l_pied_actuel.setText("الصورة الحالية: " + Path(e.pied_image_path).name if e.pied_image_path else
+                                   "لم تُختر صورة بعد.")
+        self._maj_pied()

@@ -342,13 +342,14 @@ def champs_convocation(conn, eleves: list[Mapping]) -> tuple[dict[str, str], lis
 
 # ---------- الهوية البصرية ----------
 
-def identite(conn: sqlite3.Connection, dossier: DossierDonnees) -> tuple[Image | None, Image | None, str]:
-    """الترويسة والعلامة المائية والتذييل كما حُددت في إعداد المؤسسة."""
+def identite(conn: sqlite3.Connection, dossier: DossierDonnees) -> tuple[Image | None, Image | None, "str | Image"]:
+    """الترويسة والعلامة المائية والتذييل (نص، أو صورة من الحاسوب: طلب المدير 2026-11-07)."""
     etab = etab_srv.lire_etablissement(conn)
     if etab is None:
         return None, None, ""
     images = []
-    for rel, nom in ((etab.logo_path, "الترويسة"), (etab.filigrane_path, "العلامة المائية")):
+    for rel, nom in ((etab.logo_path, "الترويسة"), (etab.filigrane_path, "العلامة المائية"),
+                     (etab.pied_image_path, "التذييل")):
         if not rel:
             images.append(None)
             continue
@@ -358,7 +359,7 @@ def identite(conn: sqlite3.Connection, dossier: DossierDonnees) -> tuple[Image |
         except Exception as e:  # noqa: BLE001
             raise ErreurDocument(f"تعذرت قراءة صورة {nom} ({chemin.name}). "
                                  "أعد اختيارها من إعداد المؤسسة.") from e
-    return images[0], images[1], etab.pied_page or ""
+    return images[0], images[1], images[2] or etab.pied_page or ""
 
 
 # ---------- التوليد والأرشفة ----------

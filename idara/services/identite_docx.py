@@ -279,10 +279,33 @@ def _paragraphe_texte(texte: str) -> etree._Element:
     return p
 
 
+HAUTEUR_MAX_PIED = int(2.5 * EMU_CM)
+LARGEUR_MAX_PIED = int(17 * EMU_CM)
+
+
+def _paragraphe_image(rid: str, image: Image, id_dessin: int) -> etree._Element:
+    """فقرة في الوسط بصورة مضمّنة (التذييل بصورة)."""
+    cx, cy = ajuster(image.largeur, image.hauteur, LARGEUR_MAX_PIED, HAUTEUR_MAX_PIED)
+    xml = f"""<w:p xmlns:w="{W}" xmlns:wp="{WP}" xmlns:a="{A}" xmlns:pic="{PIC}" xmlns:r="{R}">
+<w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr>
+<w:r><w:rPr><w:noProof/></w:rPr><w:drawing>
+<wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{cx}" cy="{cy}"/>
+<wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="{id_dessin}" name="{ETIQUETTE_PIED}_IMAGE"/>
+<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>
+<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+<pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="pied.png"/><pic:cNvPicPr/></pic:nvPicPr>
+<pic:blipFill><a:blip r:embed="{rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>
+<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm>
+<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>
+</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"""
+    return etree.fromstring(xml)
+
+
 # ---------- التطبيق ----------
 
 def appliquer_identite(contenu: bytes, entete: Image | None = None,
-                       filigrane: Image | None = None, pied: str = "") -> bytes:
+                       filigrane: Image | None = None, pied: "str | Image" = "") -> bytes:
+    """pied: نص التذييل، أو صورة تُوضع في الوسط أسفل الوثيقة."""
     if not (entete or filigrane or pied):
         return contenu
     pk = Paquet(contenu)
@@ -314,7 +337,7 @@ def appliquer_identite(contenu: bytes, entete: Image | None = None,
                 run = next(conteneur.iterancestors(q(W, "r")))
                 p = next(run.iterancestors(q(W, "p")))
                 run.getparent().remove(run)
-                p.addnext(_paragraphe_texte(pied))
+                p.addnext(_pied(pk, nom, racine, pied))
                 pied_pose = True
 
     if filigrane and not filigrane_pose and entete_defaut in racines:
@@ -323,8 +346,15 @@ def appliquer_identite(contenu: bytes, entete: Image | None = None,
         cx, cy = ajuster(filigrane.largeur, filigrane.hauteur, *CADRE_FILIGRANE)
         _premier_paragraphe(racine).append(_ancre_filigrane(rid, cx, cy, _id_libre(racine)))
     if pied and not pied_pose and pied_defaut in racines:
-        racines[pied_defaut].append(_paragraphe_texte(pied))
+        racines[pied_defaut].append(_pied(pk, pied_defaut, racines[pied_defaut], pied))
 
     for nom, racine in racines.items():
         pk.c[nom] = _xml(racine)
     return pk.resultat()
+
+
+def _pied(pk: "Paquet", nom: str, racine, pied: "str | Image") -> etree._Element:
+    if isinstance(pied, Image):
+        rid = pk.ajouter_relation(nom, pk.media(pied.png))
+        return _paragraphe_image(rid, pied, _id_libre(racine))
+    return _paragraphe_texte(pied)

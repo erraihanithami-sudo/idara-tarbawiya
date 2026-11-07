@@ -138,3 +138,24 @@ def test_liste_des_anciennes_versions_valide():
     versions = dc._anciennes_versions()
     for code in dc.MODELES:
         assert dc._empreinte(dc.chemin_defaut(code)) not in versions.get(code, [])
+
+
+@pytest.mark.parametrize("code", ["certificat_scolarite_ancien", "visite_medicale"])
+def test_pied_en_image(pret, dossier, tmp_path, code):
+    """طلب المدير 2026-11-07: التذييل بصورة من الحاسوب بدل النص."""
+    etab = et.lire_etablissement(pret)
+    etab.pied_image_path = et.importer_image(dossier, _image(tmp_path / "تذييل.png", 1800, 200, (10, 30, 90)), "pied")
+    et.enregistrer_etablissement(pret, etab)
+    parties = _generer(pret, dossier, code)
+    assert len([n for n in parties if n.startswith("word/media/idara_")]) == 3   # الترويسة والعلامة والتذييل
+    tout = {n: etree.fromstring(d) for n, d in parties.items() if n.endswith(".xml") and n.startswith("word/")}
+    images_pied = [(n, dp) for n, r in tout.items() for dp in r.iter(f"{{{WP}}}docPr")
+                   if dp.get("name") == "IDARA_PIED_IMAGE"]
+    assert images_pied and "IDARA_PIED" not in [dp.get("name") for r in tout.values() for dp in r.iter(f"{{{WP}}}docPr")]
+    for n, dp in images_pied:
+        ext = dp.getparent().find(f"{{{WP}}}extent")
+        assert int(ext.get("cx")) <= idt.LARGEUR_MAX_PIED and int(ext.get("cy")) <= idt.HAUTEUR_MAX_PIED
+        rid = next(dp.getparent().iter(f"{{{A}}}blip")).get(f"{{{idt.R}}}embed")
+        rels = parties[f"word/_rels/{n.split('/')[1]}.rels"].decode()
+        assert rid in rels
+    assert "مدرسة تجريبية - الهاتف 0500000000" not in m.texte_complet(_zip(parties))

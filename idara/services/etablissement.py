@@ -13,6 +13,7 @@ from idara.data.journal import journaliser
 from idara.services import annee as annee_srv
 
 TYPES = {"independant": "مؤسسة مستقلة", "groupe": "مجموعة مدرسية"}
+MILIEUX = {"urbain": "حضري", "rural": "قروي"}
 EXTENSIONS_IMAGES = {".png", ".jpg", ".jpeg", ".bmp", ".gif"}
 
 
@@ -40,6 +41,8 @@ class Etablissement:
     filigrane_path: str = ""
     pied_page: str = ""
     est_pionniere: str = ""   # «1»: مؤسسة رائدة
+    pied_image_path: str = ""   # التذييل بصورة (يُقدَّم على نص التذييل)
+    milieu: str = ""            # urbain | rural (واجب التأمين المدرسي)
 
     def valider(self) -> None:
         self.nettoyer()
@@ -51,6 +54,8 @@ class Etablissement:
             raise ErreurValidation("المديرية الإقليمية إجبارية.")
         if not self.academie_ar:
             raise ErreurValidation("الأكاديمية الجهوية إجبارية.")
+        if self.milieu and self.milieu not in MILIEUX:
+            raise ErreurValidation("وسط المؤسسة: حضري أو قروي.")
 
     def nettoyer(self) -> None:
         for k, v in asdict(self).items():

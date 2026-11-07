@@ -379,6 +379,13 @@ class PageEtablissement(QWidget):
                 e.logo_path = etab_srv.importer_image(self.f.dossier, logo, "logo")
             if filigrane:
                 e.filigrane_path = etab_srv.importer_image(self.f.dossier, filigrane, "filigrane")
+            if self.f_id.mode_pied() == "image":
+                if self.f_id.pied_image.valeur():
+                    e.pied_image_path = etab_srv.importer_image(self.f.dossier, self.f_id.pied_image.valeur(), "pied")
+                elif not e.pied_image_path:
+                    raise ErreurValidation("اختر صورة التذييل، أو اختر «نص».")
+            else:
+                e.pied_image_path = ""
             e.valider()
             d = self.f_dir.lire()
             d.valider()
@@ -393,6 +400,7 @@ class PageEtablissement(QWidget):
             self.message.setObjectName("info")
             self.message.setText("حُفظت التعديلات.")
             self.f.rafraichir_entete()
+            self.f_id.remplir(e)
         self.message.setStyleSheet("")
         self.message.style().unpolish(self.message)
         self.message.style().polish(self.message)
