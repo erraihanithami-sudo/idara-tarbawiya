@@ -72,10 +72,10 @@ class PageProjet(QWidget):
         v.addLayout(h)
         racine.addWidget(c)
         # 2. لوحة القيادة (يعاد بناؤها)
-        self.c_tableau, tv = carte("لوحة قيادة المشروع")
-        self.tv = tv
+        self.tv = QVBoxLayout()   # محتوى يُعاد بناؤه كاملاً مباشرة في الصفحة (نفس طريقة صفحة الإحصائيات)
+        self.tv.setContentsMargins(0, 0, 0, 0)
         self.contenu_tb: QWidget | None = None   # يُعاد إنشاؤه عند كل تحديث (نفس طريقة صفحة الإحصائيات)
-        racine.addWidget(self.c_tableau)
+        racine.addLayout(self.tv)
         # 3. المستهدفات
         c, v = carte("القيمة المرجعية والمستهدفات (من وثيقة المشروع في مسار)")
         n = QLabel("النسب بالمائة. «محقق يدوياً» لسنة لا معطيات لها في البرنامج (سنة سابقة مثلاً)؛ "
@@ -183,14 +183,18 @@ class PageProjet(QWidget):
         zone = QVBoxLayout(self.contenu_tb)
         zone.setContentsMargins(0, 0, 0, 0)
         zone.setSpacing(14)
+        ct, cv = carte("لوحة قيادة المشروع")
         self.grille = QGridLayout()
         self.grille.setSpacing(12)
-        zone.addLayout(self.grille)
+        cv.addLayout(self.grille)
+        zone.addWidget(ct)
         self.tv.addWidget(self.contenu_tb)
         self.graphs: dict[str, BarresGroupees] = {}
         if not self.ind:
             self.grille.addWidget(Tuile("سجّل المشروع (العنوان والسنوات) لبدء التتبع", "—", theme.GRIS,
                                         "القيادة والتدبير"), 0, 0)
+            zone.activate()
+            self.contenu_tb.setMinimumHeight(zone.totalMinimumSize().height())
             return
         for k, (cle, x) in enumerate(self.ind.items()):
             d = x["derniere"]
