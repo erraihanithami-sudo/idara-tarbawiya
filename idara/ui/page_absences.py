@@ -38,7 +38,10 @@ def png_evolution(evolution: list[dict], largeur: int = 1000, hauteur: int = 380
     buf = QBuffer(ba)
     buf.open(QIODevice.WriteOnly)
     img.save(buf, "PNG")
-    return bytes(ba)
+    buf.close()
+    donnees = bytes(ba)
+    w.deleteLater()
+    return donnees
 
 
 class PageAbsences(QWidget):

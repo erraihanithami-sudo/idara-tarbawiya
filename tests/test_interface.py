@@ -1323,11 +1323,12 @@ def test_absences_mensuelles(app, config_tmp, monkeypatch):
     p.mois.setCurrentIndex(p.mois.findData("2026-10"))
     assert p.s is None and p.generer() is None
     p.jours.setValue(20)
-    p.table.item(0, 3).setText("2")
-    p.table.item(0, 4).setText("3.5")
+    i = next(k for k, x in enumerate(p.lignes) if x["effectif"] >= 1)   # قسم فيه تلميذ على الأقل
+    p.table.item(i, 3).setText("1")
+    p.table.item(i, 4).setText("1.5")
     assert p.enregistrer(), p.message.text()
-    assert p.s["etablissement"]["jours_absence"] == 3.5 and "✓" in p.mois.currentText()
-    p.table.item(0, 4).setText("abc")
+    assert p.s["etablissement"]["jours_absence"] == 1.5 and "✓" in p.mois.currentText()
+    p.table.item(i, 4).setText("abc")
     assert not p.enregistrer() and "أرقام" in p.message.text()
     png = png_evolution(p.evolution)
     assert png and png[:4] == b"\x89PNG"

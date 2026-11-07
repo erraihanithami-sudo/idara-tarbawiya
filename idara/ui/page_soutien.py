@@ -34,7 +34,10 @@ def png_barres(categories: list[str], series, largeur: int = 1000, hauteur: int 
     buf = QBuffer(ba)
     buf.open(QIODevice.WriteOnly)
     img.save(buf, "PNG")
-    return bytes(ba)
+    buf.close()
+    donnees = bytes(ba)
+    w.deleteLater()
+    return donnees
 
 
 def _vider(layout) -> None:
