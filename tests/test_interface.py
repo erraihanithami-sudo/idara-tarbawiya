@@ -354,7 +354,7 @@ def test_page_personnel(app, config_tmp):
             p.classes.item(i).setCheckState(Qt.Checked)
     assert not p.c["nb_eleves"].isEnabled() and "2 تلميذاً" in p.calcul.text()
     # قرار المدير (2026-11-03): معطيات التنظيم التربوي مطلوبة لملف الأستاذ(ة)
-    assert not p.bloc_tanzim.isHidden() and p.bloc_repos.isHidden()
+    assert not p.bloc_tanzim.isHidden() and not p.bloc_insp.isHidden()   # أستاذ: التفتيش ظاهر
     # تصحيح 2026-11-04: النقص لا يمنع الحفظ (أستاذ مستورد من XML دون تفتيش)، بل يُنبَّه إليه بجانب الزر
     pid0 = p.enregistrer()
     assert pid0 is not None and "حُفظ" in p.message_bas.text() and "تاريخ الدرجة" in p.message_bas.text()

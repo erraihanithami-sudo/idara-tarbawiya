@@ -98,8 +98,7 @@ class PageStatistiques(QWidget):
         niv = st.par_niveau(self.f.conn, u)
         self.niveaux = niv
         c, v = carte("البطاقة الإحصائية حسب المستوى")
-        n = QLabel("التوزيع حسب السن مقارنة بالسن النظامي للمستوى (السن في 31 دجنبر من بداية السنة). مؤشر تقديري "
-                   "للتأخر الدراسي من تاريخ الازدياد؛ لوائح مسار المستوردة لا تتضمن التكرار.")
+        n = QLabel("الأقسام والتلاميذ وتوزيعهم حسب الجنس. نسبة التكرار تُضاف لاحقاً (قرار المدير 2026-11-07).")
         n.setObjectName("etiquette")
         n.setWordWrap(True)
         v.addWidget(n)
@@ -108,20 +107,14 @@ class PageStatistiques(QWidget):
         for x in niv:
             b, bv = carte(f"المستوى {x['libelle']}")
             ch = QHBoxLayout()
-            for t in (f"الأقسام: {x['classes']}", f"التلاميذ: {x['eleves']}", f"ذكور: {x['garcons']}", f"إناث: {x['filles']}",
-                      f"متأخرون: {x['age'][1][1] + x['age'][2][1]}"):
+            for t in (f"الأقسام: {x['classes']}", f"التلاميذ: {x['eleves']}"):
                 p = QLabel(t)
                 p.setObjectName("pastille")
                 ch.addWidget(p)
             ch.addStretch()
             bv.addLayout(ch)
-            taux = x["taux_retard"]
-            bv.addWidget(Anneau(x["age"], [theme.SARCELLE, theme.ORANGE, theme.ROSE],
-                                "—" if taux is None else f"⁦{taux:g}%⁩", "نسبة التأخر"))
-            if x["age_inconnu"]:
-                l = QLabel(f"دون تاريخ ازدياد صالح: {x['age_inconnu']}")
-                l.setObjectName("etiquette")
-                bv.addWidget(l)
+            parts = [("ذكور", x["garcons"], x["pct_garcons"]), ("إناث", x["filles"], x["pct_filles"])]
+            bv.addWidget(Anneau(parts, [theme.BLEU, theme.ROSE], str(x["eleves"]), "تلميذاً"))
             v.addWidget(b)
         return c
 

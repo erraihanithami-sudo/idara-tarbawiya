@@ -204,11 +204,18 @@ class PagePersonnel(QWidget):
         bt = QVBoxLayout(self.bloc_tanzim)
         bt.setContentsMargins(0, 0, 0, 0)
         fv.addWidget(self.bloc_tanzim)
-        section("التنظيم التربوي (مطلوب للأساتذة)", [
+        section("التنظيم التربوي", [
             ("تاريخ الدرجة", self.d_tanzim["date_grade"]), ("الرتبة", self.echelon),
-            ("تاريخ الرتبة", self.d_tanzim["date_echelon"]), ("تاريخ المهمة الحالية", self.d_tanzim["date_fonction"]),
+            ("تاريخ الرتبة", self.d_tanzim["date_echelon"]), ("تاريخ المهمة الحالية", self.d_tanzim["date_fonction"])],
+            bt)
+        # التفتيش للأساتذة فقط (قرار المدير 2026-11-07: لا تفتيش ولا أنصاف أيام عطلة لمدير المؤسسة)
+        self.bloc_insp = QWidget()
+        bi = QVBoxLayout(self.bloc_insp)
+        bi.setContentsMargins(0, 0, 0, 0)
+        section("آخر تفتيش", [
             ("آخر نقطة تفتيش", self.note_insp), ("تاريخ آخر تفتيش", self.d_tanzim["date_inspection"]),
-            ("المفتش(ة) الذي منحها", self.inspecteur), ("", self.sans_insp)], bt)
+            ("المفتش(ة) الذي منحها", self.inspecteur), ("", self.sans_insp)], bi)
+        bt.addWidget(self.bloc_insp)
         self.bloc_charge = QWidget()
         bch = QVBoxLayout(self.bloc_charge)
         bch.setContentsMargins(0, 0, 0, 0)
@@ -223,11 +230,6 @@ class PagePersonnel(QWidget):
             g_ch.addWidget(w, (i // 2) * 2 + 1, i % 2)
         bch.addLayout(g_ch)
         bt.addWidget(self.bloc_charge)
-        self.bloc_repos = QWidget()
-        br = QVBoxLayout(self.bloc_repos)
-        br.setContentsMargins(0, 0, 0, 0)
-        section("أنصاف أيام العطلة الأسبوعية", [("صباحاً", self.repos_matin), ("مساءً", self.repos_soir)], br)
-        bt.addWidget(self.bloc_repos)
         self.dates = {k: (self.date_aff if k == "date_affectation" else ChampDate()) for k, _ in rh.DATES_CARRIERE}
         # قرار المدير: المسار المهني (الفائض) لا يظهر لفئة المدير
         self.bloc_carriere = QWidget()
@@ -340,6 +342,9 @@ class PagePersonnel(QWidget):
         for u in unites:
             self.unite.addItem(u, u)
         self.liste.setColumnHidden(1, not unites)   # مؤسسة بلا وحدات: لا فائدة من العمود
+        # مؤسسة مستقلة: لا خانة للوحدة المدرسية (قرار المدير 2026-11-07)
+        self.unite.setVisible(bool(unites))
+        self.etiquettes["الوحدة المدرسية"].setVisible(bool(unites))
         for k in rh.CHAMPS_SUGGERES:
             w, t = self.c[k], self.c[k].currentText()
             w.clear()
@@ -439,7 +444,7 @@ class PagePersonnel(QWidget):
         cat = self.categorie.currentData()
         self.bloc_tanzim.setVisible(cat in ("enseignant", "directeur", "assistant"))
         self.bloc_charge.setVisible(cat == "enseignant")
-        self.bloc_repos.setVisible(cat == "directeur")
+        self.bloc_insp.setVisible(cat == "enseignant")
         if not self.fonction.currentData() and rh.fonction_par_defaut(cat or ""):
             self.fonction.setCurrentIndex(self.fonction.findData(rh.fonction_par_defaut(cat)))
         self.bloc_ens.setVisible(cat in ("enseignant", "educatrice"))

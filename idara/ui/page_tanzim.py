@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
 from idara.services import bureautique
 from idara.services import personnel as rh
+from idara.services import etablissement as et_srv
 from idara.services import tanzim as tz
 from idara.services import textes as tx
 from idara.ui.composants import carte
@@ -48,8 +49,7 @@ class PageTanzim(QWidget):
         self.tables = {}
         for cle, titre, cols in (
                 ("administration", "هيئة الإدارة التربوية",
-                 ["الاسم الكامل", "رقم التأجير", "تاريخ التوظيف", "تاريخ المهمة الحالية", "تاريخ الالتحاق",
-                  "العطلة صباحاً", "العطلة مساءً"]),
+                 ["الاسم الكامل", "رقم التأجير", "تاريخ التوظيف", "تاريخ المهمة الحالية", "تاريخ الالتحاق"]),
                 ("assistants", "المساعدون التربويون", ["الاسم الكامل", "رقم البطاقة الوطنية", "تاريخ الالتحاق"]),
                 ("structure", "البنية التربوية", ["المستوى", "عدد الأفواج", "التلاميذ بكل فوج", "المجموع", "المعدل"]),
                 ("enseignants", "هيئة التدريس",
@@ -91,12 +91,15 @@ class PageTanzim(QWidget):
 
     def rafraichir(self) -> None:
         conn = self.f.conn
+        groupe = et_srv.est_groupe(conn)   # مؤسسة مستقلة: لا عمود للوحدة (قرار المدير 2026-11-07)
+        for cle in ("enseignants", "charges_in", "charges_out"):
+            self.tables[cle].setColumnHidden(0, not groupe)
         for k, v in tz.inspecteurs(conn).items():
             self.insp[k].setText(v)
         d = tz.donnees(conn)
         nom = lambda p: f"{p.prenom_ar} {p.nom_ar}"  # noqa: E731
         self._remplir("administration", [[nom(p), p.ppr, _d(p.date_recrutement), _d(p.date_fonction),
-                                          _d(p.date_affectation), p.repos_matin, p.repos_soir]
+                                          _d(p.date_affectation)]
                                          for p in d["administration"]])
         self._remplir("assistants", [[nom(p), p.cin, _d(p.date_affectation)] for p in d["assistants"]])
         self._remplir("structure", [[s["libelle"], str(len(s["groupes"])),

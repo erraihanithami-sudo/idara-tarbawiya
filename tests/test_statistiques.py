@@ -17,12 +17,8 @@ def test_analyse_et_niveaux(base):  # noqa: F811
     assert niv and sum(n["eleves"] for n in niv) == a2["apres_mouvement"]
     for n in niv:
         assert n["garcons"] + n["filles"] == n["eleves"] and n["classes"] >= 1
-        assert sum(x[1] for x in n["age"]) + n["age_inconnu"] == n["eleves"]
+        assert "age" not in n   # لا تقدير للتكرار من السن (قرار المدير 2026-11-07)
     assert st.par_niveau(base, unite="وحدة غير موجودة") == []
-
-
-def test_age_nominal():
-    assert st._age("2020-03-01", 2026) == 6 and st._age("", 2026) is None and st._age(None, 2026) is None
 
 
 def test_evolution_tarl(base):  # noqa: F811
@@ -36,3 +32,16 @@ def test_evolution_tarl(base):  # noqa: F811
     assert r == [{"niveau": "4AP", "libelle": "الرابع", "pre": 25.0, "post": 75.0, "evolution": 50.0,
                   "effectif_pre": 4, "effectif_post": 4}]
     assert st.evolution_tarl(base, "fr") == []
+
+
+def test_unites_masquees_si_independante(base):  # noqa: F811
+    """مؤسسة مستقلة: لا وحدات في الواجهة (قرار المدير 2026-11-07)."""
+    from idara.services import etablissement as et
+    et.definir_unites(base, ["الوحدة المركزية", "وحدة 2"])
+    e = et.lire_etablissement(base)
+    e.type_etab = "groupe"
+    et.enregistrer_etablissement(base, e)
+    assert et.est_groupe(base) and et.unites(base) == ["الوحدة المركزية", "وحدة 2"]
+    e.type_etab = "independant"
+    et.enregistrer_etablissement(base, e)
+    assert not et.est_groupe(base) and et.unites(base) == [] and len(et.unites(base, toutes=True)) == 2

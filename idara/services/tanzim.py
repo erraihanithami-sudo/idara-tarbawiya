@@ -271,43 +271,6 @@ def _entete(doc, dossier: DossierDonnees, d: dict) -> None:
                 _remplacer_paragraphe(p, "    ".join(f"{lib}: {insp[k] or '—'}" for k, lib in INSPECTEURS.items()))
 
 
-def _ajouter_repos(tbl_admin, admins: list[rh.Personnel]) -> None:
-    """عمودا «أنصاف أيام العطلة الأسبوعية: صباحاً، مساءً» (نسخة PDF من النموذج) في جدول هيئة الإدارة."""
-    grille = tbl_admin.find(qn("w:tblGrid"))
-    cols = grille.findall(qn("w:gridCol"))
-    total = sum(int(g.get(qn("w:w"))) for g in cols)
-    ajout = 1500
-    facteur = (total - 2 * ajout) / total
-    for g in cols:
-        g.set(qn("w:w"), str(int(int(g.get(qn("w:w"))) * facteur)))
-    for _ in range(2):
-        g = OxmlElement("w:gridCol")
-        g.set(qn("w:w"), str(ajout))
-        grille.append(g)
-    for tr in tbl_admin.findall(qn("w:tr")):
-        for tc in _cellules(tr):
-            pr = tc.find(qn("w:tcPr"))
-            w = pr.find(qn("w:tcW")) if pr is not None else None
-            if w is not None and w.get(qn("w:type")) == "dxa":
-                w.set(qn("w:w"), str(int(int(w.get(qn("w:w"))) * facteur)))
-    trs = tbl_admin.findall(qn("w:tr"))
-    # العنوان: خلية تمتد على العمودين
-    tete = copy.deepcopy(_cellules(trs[0])[-1])
-    pr = tete.find(qn("w:tcPr"))
-    pr.find(qn("w:tcW")).set(qn("w:w"), str(2 * ajout))
-    gs = OxmlElement("w:gridSpan")
-    gs.set(qn("w:val"), "2")
-    pr.insert(1, gs)
-    _ecrire(tete, "أنصاف أيام العطلة الأسبوعية (صباحاً / مساءً)")
-    trs[0].append(tete)
-    for tr, p in zip(trs[1:], admins or [None]):
-        for v in ((p.repos_matin, p.repos_soir) if p else ("", "")):
-            tc = copy.deepcopy(_cellules(tr)[-1])
-            tc.find(qn("w:tcPr")).find(qn("w:tcW")).set(qn("w:w"), str(ajout))
-            _ecrire(tc, v or "—")
-            tr.append(tc)
-
-
 def _table_assistants(doc, apres, assistants: list[rh.Personnel], modele_tblpr) -> None:
     """جدول «المساعدون التربويون» (نسخة PDF من النموذج) بعد جدول هيئة الإدارة."""
     titre = doc.add_paragraph()
@@ -365,7 +328,7 @@ def generer(conn, dossier: DossierDonnees) -> Path:
         for tc, v in zip(cs[1:], (f"{p.prenom_ar} {p.nom_ar}", p.ppr, _d(p.date_recrutement), _d(p.date_fonction),
                                   _d(p.date_affectation))):
             _ecrire(tc, v)
-    _ajouter_repos(t_admin, admins)
+    # قرار المدير 2026-11-07: لا أعمدة لأنصاف أيام العطلة الأسبوعية في جدول هيئة الإدارة
     _table_assistants(doc, t_admin, d["assistants"], t_admin.find(qn("w:tblPr")))
     # البنية التربوية
     for tr, s in zip(t_struct.findall(qn("w:tr"))[2:], d["structure"]):

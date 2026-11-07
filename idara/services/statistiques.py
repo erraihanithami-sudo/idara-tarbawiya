@@ -3,23 +3,21 @@
 
 - تحليل التلاميذ: كل من سُجّل هذه السنة (اللائحة الأولية + الوافدون)، ثم المغادرون والمنقطعون والمفصولون،
   والعدد بعد الحركية (من يتابعون دراستهم).
-- البطاقة حسب المستوى: الأقسام والتلاميذ والجنس، وتوزيع التلاميذ حسب السن مقارنة بالسن النظامي للمستوى
-  (السن في 31 دجنبر من بداية السنة الدراسية؛ السن النظامي للأولى ابتدائي 6 سنوات). مؤشر تقديري للتأخر
-  الدراسي من تاريخ الازدياد، لا يعوّض معطى التكرار الذي لا تتضمنه لوائح مسار المستوردة.
+- البطاقة حسب المستوى: الأقسام والتلاميذ والجنس. التكرار لا يُقدَّر من السن (قرار المدير 2026-11-07)، ويُضاف
+  لاحقاً بطريقة أخرى أو يدوياً.
 - تطور التعلمات الأساس: نسبة من بلغوا المستوى المتوقع في كل رائز، حسب المستوى الدراسي.
 """
 
 from __future__ import annotations
 
 import sqlite3
-from datetime import date
 
 from idara.services import annee as annee_srv
 from idara.services import tarl as tarl_srv
 from idara.services import textes as tx
 
 ACTIFS = ("inscrit", "arrive")
-AGE_NORMAL = {"PS1": 4, "PS2": 5, "1AP": 6, "2AP": 7, "3AP": 8, "4AP": 9, "5AP": 10, "6AP": 11}
+ORDRE_NIVEAUX = ["PS1", "PS2", "1AP", "2AP", "3AP", "4AP", "5AP", "6AP"]
 
 
 def _pct(n: int, d: int) -> float | None:
@@ -54,45 +52,22 @@ def analyse_eleves(conn: sqlite3.Connection, unite: str | None = None) -> dict:
             "details": [(lib, n, _pct(n, total)) for lib, n in lignes]}
 
 
-def _age(naissance: str | None, annee_debut: int) -> int | None:
-    try:
-        return annee_debut - int((naissance or "")[:4])
-    except ValueError:
-        return None
-
-
 def par_niveau(conn: sqlite3.Connection, unite: str | None = None) -> list[dict]:
-    aid, lib = _annee(conn)
-    debut = int(lib[:4]) if lib[:4].isdigit() else date.today().year
+    aid, _ = _annee(conn)
     fc, args = _filtre(unite)
     rows = conn.execute(
-        f"SELECT n.code AS niveau, i.classe_id, e.sexe, e.date_naissance FROM inscription i "
+        f"SELECT n.code AS niveau, i.classe_id, e.sexe FROM inscription i "
         f"JOIN classe c ON c.id=i.classe_id JOIN eleve e ON e.id=i.eleve_id LEFT JOIN niveau n ON n.id=i.niveau_id "
         f"WHERE i.annee_id=? AND i.statut IN ('inscrit','arrive'){fc}", [aid, *args]).fetchall()
-    ordre = list(AGE_NORMAL)
+    ordre = ORDRE_NIVEAUX
     res = []
     for niv in sorted({r["niveau"] for r in rows if r["niveau"]}, key=lambda n: ordre.index(n) if n in ordre else 99):
         l = [r for r in rows if r["niveau"] == niv]
-        normal = AGE_NORMAL.get(niv)
-        a_l_heure = retard1 = retard2 = inconnu = 0
-        for r in l:
-            a = _age(r["date_naissance"], debut)
-            if a is None or normal is None:
-                inconnu += 1
-            elif a <= normal:
-                a_l_heure += 1
-            elif a == normal + 1:
-                retard1 += 1
-            else:
-                retard2 += 1
-        connus = len(l) - inconnu
+        g = sum(1 for r in l if r["sexe"] == "M")
+        f = sum(1 for r in l if r["sexe"] == "F")
         res.append({"niveau": niv, "libelle": tx.niveau_ar(niv) if niv in tx.NIVEAUX else niv,
-                    "classes": len({r["classe_id"] for r in l}), "eleves": len(l),
-                    "garcons": sum(1 for r in l if r["sexe"] == "M"), "filles": sum(1 for r in l if r["sexe"] == "F"),
-                    "age": [("في السن النظامي", a_l_heure, _pct(a_l_heure, connus)),
-                            ("متأخر بسنة", retard1, _pct(retard1, connus)),
-                            ("متأخر بسنتين فأكثر", retard2, _pct(retard2, connus))],
-                    "taux_retard": _pct(retard1 + retard2, connus), "age_inconnu": inconnu})
+                    "classes": len({r["classe_id"] for r in l}), "eleves": len(l), "garcons": g, "filles": f,
+                    "pct_garcons": _pct(g, len(l)), "pct_filles": _pct(f, len(l))})
     return res
 
 
@@ -124,7 +99,7 @@ def evolution_tarl(conn: sqlite3.Connection, matiere: str | None = None, unite: 
             c = cumul.setdefault(r["niveau"], {"pre": [0, 0], "post": [0, 0]}).setdefault(r["epreuve"], [0, 0])
             c[0] += ok
             c[1] += 1
-    ordre = list(AGE_NORMAL)
+    ordre = ORDRE_NIVEAUX
     res = []
     for niv in sorted(cumul, key=lambda n: ordre.index(n) if n in ordre else 99):
         pre, post = _pct(*cumul[niv]["pre"]), _pct(*cumul[niv]["post"])

@@ -122,7 +122,16 @@ def definir_unites(conn: sqlite3.Connection, noms: list[str]) -> list[str]:
     return [r[0] for r in conn.execute("SELECT nom_ar FROM unite_scolaire ORDER BY id")]
 
 
-def unites(conn: sqlite3.Connection) -> list[str]:
+def est_groupe(conn: sqlite3.Connection) -> bool:
+    e = lire_etablissement(conn)
+    return bool(e and e.type_etab == "groupe")
+
+
+def unites(conn: sqlite3.Connection, toutes: bool = False) -> list[str]:
+    """الوحدات المدرسية. في المؤسسة المستقلة لا وحدات: كل ما يخص الوحدات يُخفى في الواجهة (قرار المدير
+    2026-11-07). toutes=True يرجع ما هو مسجل في القاعدة مهما كان النوع."""
+    if not toutes and not est_groupe(conn):
+        return []
     return [r[0] for r in conn.execute("SELECT nom_ar FROM unite_scolaire ORDER BY id")]
 
 
