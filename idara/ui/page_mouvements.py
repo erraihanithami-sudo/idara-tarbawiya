@@ -340,7 +340,7 @@ class PageMouvements(QWidget):
                          self.prenom.text(), "F" if self.s_f.isChecked() else "M" if self.s_m.isChecked() else "",
                          d, self.etab.currentText(), self.direction.currentText(), self.academie.currentText(),
                          self.hors.isChecked(), self.niveau.currentText(), self.ref_num.text(), rd,
-                         self.remarques.text(), classe=self.classe.currentData() or "", id=self.mid)
+                         self.remarques.text(), classe_id=self.classe.currentData(), id=self.mid)
         try:
             mid = mv.enregistrer(self.f.conn, m)
         except mv.ErreurMouvement as e:
@@ -422,9 +422,9 @@ class PageMouvements(QWidget):
         self.classe.addItem("غير محدد", None)
         u = self.unite()
         for r in self.f.conn.execute(
-                "SELECT c.code FROM classe c LEFT JOIN unite_scolaire u ON u.id=c.unite_id WHERE c.annee_id=? AND "
-                "(? IS NULL OR u.nom_ar=?) ORDER BY c.code", (a["id"] if a else -1, u, u)):
-            self.classe.addItem(r["code"], r["code"])
+                "SELECT c.id, c.code, u.nom_ar AS unite FROM classe c LEFT JOIN unite_scolaire u ON u.id=c.unite_id "
+                "WHERE c.annee_id=? AND (? IS NULL OR u.nom_ar=?) ORDER BY c.code, u.id", (a["id"] if a else -1, u, u)):
+            self.classe.addItem(r["code"] + (f" ({r['unite']})" if r["unite"] and not u else ""), r["id"])
         self.classe.setCurrentIndex(max(0, self.classe.findData(actuel)))
 
     def unite(self) -> str | None:

@@ -195,7 +195,7 @@ class PageImport(QWidget):
     def analyser(self) -> imp.RapportImport | None:
         self.message.hide()
         try:
-            self.rapport = imp.analyser(self.f.conn, self.fichiers)
+            self.rapport = imp.analyser(self.f.conn, self.fichiers, self.barre_unites.unite)
         except (ErreurMassar, imp.ErreurImport) as e:
             self._message(str(e), erreur=True)
             self.c_rapport.hide()
@@ -339,6 +339,9 @@ class PageImport(QWidget):
     # ---------- الوحدات المدرسية ----------
 
     def _changer_unite(self, u: str | None, rafraichir: bool = True) -> None:
+        if rafraichir and self.rapport is not None:   # التحليل مرتبط بالوحدة: يُعاد بعد تغييرها
+            self.annuler()
+            self._message("تغيرت الوحدة: أعد التحليل قبل الاعتماد.")
         if u:
             self.l_unite.setText(f"اللوائح التي تختارها الآن تخص «{u}»: تُسند أقسامها إلى هذه الوحدة.")
         else:

@@ -72,8 +72,49 @@ def _lieu_existant(conn, nom_ar: str):
     return conn.execute("SELECT * FROM lieu WHERE nom_ar=?", (nom_ar,)).fetchone() if nom_ar else None
 
 
-def analyser(conn: sqlite3.Connection, chemins: list[Path | str]) -> RapportImport:
-    """يقرأ اللوائح ويقارنها بالقاعدة دون أي كتابة."""
+def _unite_id(conn, unite: str | None) -> int | None:
+    if not unite:
+        return None
+    r = conn.execute("SELECT id FROM unite_scolaire WHERE nom_ar=?", (unite,)).fetchone()
+    if r is None:
+        raise ErreurImport("الوحدة المدرسية غير موجودة.")
+    return r["id"]
+
+
+def trouver_classe(conn, annee_id: int, code: str, unite_id: int | None,
+                   codes_liste: set[str] | None = None) -> int | None:
+    """القسم المقصود بالاسم: في المجموعة المدرسية قد يتكرر نفس الاسم في وحدتين (خطأ أبلغ عنه المدير 2026-11-09).
+    مع وحدة: قسم الوحدة، وإلا قسم بلا وحدة بنفس الاسم. دون وحدة: قسم بلا وحدة، وإلا القسم الوحيد بهذا الاسم."""
+    if unite_id is not None:
+        r = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=? AND unite_id=?",
+                         (annee_id, code, unite_id)).fetchone()
+        if r:
+            return r["id"]
+        r = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=? AND unite_id IS NULL",
+                         (annee_id, code)).fetchone()
+        if r is None:
+            return None
+        # قسم بلا وحدة بنفس الاسم: يُعتمد فقط إن كان تلاميذه هم تلاميذ هذه اللائحة (أو كان فارغاً)، وإلا فهو
+        # قسم وحدة أخرى استُورد دون تحديد وحدته، فيُنشأ قسم مستقل.
+        presents = [x[0] for x in conn.execute(
+            "SELECT e.code_massar FROM inscription i JOIN eleve e ON e.id=i.eleve_id WHERE i.classe_id=? AND "
+            "i.statut IN ('inscrit','arrive')", (r["id"],))]
+        if not presents or codes_liste is None:
+            return r["id"]
+        return r["id"] if sum(c in codes_liste for c in presents) * 2 >= len(presents) else None
+    r = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=? AND unite_id IS NULL",
+                     (annee_id, code)).fetchone()
+    if r:
+        return r["id"]
+    rs = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=?", (annee_id, code)).fetchall()
+    if len(rs) > 1:
+        raise ErreurImport(f"القسم {code} موجود في أكثر من وحدة مدرسية: اختر الوحدة التي تخص هذه اللائحة.")
+    return rs[0]["id"] if rs else None
+
+
+def analyser(conn: sqlite3.Connection, chemins: list[Path | str], unite: str | None = None) -> RapportImport:
+    """يقرأ اللوائح ويقارنها بالقاعدة دون أي كتابة. unite: الوحدة التي تخص اللائحة (المجموعة المدرسية)."""
+    unite_id = _unite_id(conn, unite)
     fichiers = [ms.lire_fichier(c) for c in chemins]
     liste = ms.fusionner(fichiers)
     alertes = list(liste.alertes)
@@ -122,9 +163,10 @@ def analyser(conn: sqlite3.Connection, chemins: list[Path | str]) -> RapportImpo
                 an.changements.append(Changement(champ, actuels[champ] or "", nouveau, champ in verrous))
         if annee_id is not None:
             ins = conn.execute(
-                "SELECT c.code FROM inscription i LEFT JOIN classe c ON c.id=i.classe_id "
+                "SELECT c.code, c.unite_id FROM inscription i LEFT JOIN classe c ON c.id=i.classe_id "
                 "WHERE i.eleve_id=? AND i.annee_id=?", (row["id"], annee_id)).fetchone()
-            if ins and ins["code"] and ins["code"] != m.classe:
+            autre_unite = unite_id is not None and ins and ins["unite_id"] not in (None, unite_id)
+            if ins and ins["code"] and (ins["code"] != m.classe or autre_unite):
                 an.ancienne_classe = ins["code"]
                 changements_classe.append(an)
         if any(not c.verrouille for c in an.changements):
@@ -138,14 +180,28 @@ def analyser(conn: sqlite3.Connection, chemins: list[Path | str]) -> RapportImpo
 
     absents = []
     if annee_id is not None and liste.classes:
-        marques = ",".join("?" for _ in liste.classes)
-        for r in conn.execute(
-                f"SELECT i.id, e.code_massar, e.nom_ar, e.prenom_ar, c.code AS classe "
-                f"FROM inscription i JOIN eleve e ON e.id=i.eleve_id JOIN classe c ON c.id=i.classe_id "
-                f"WHERE i.annee_id=? AND i.statut IN ('inscrit','arrive') AND c.code IN ({marques})",
-                (annee_id, *liste.classes)):
-            if r["code_massar"] not in liste.eleves:
-                absents.append(r)
+        ids = []
+        for code in liste.classes:
+            try:
+                cid = trouver_classe(conn, annee_id, code, unite_id, set(liste.eleves))
+            except ErreurImport as e:
+                alertes.append(str(e))
+                continue
+            if cid:
+                ids.append(cid)
+            elif unite_id is not None and conn.execute(
+                    "SELECT 1 FROM classe WHERE annee_id=? AND code=? AND unite_id<>?", (annee_id, code, unite_id)
+            ).fetchone():
+                alertes.append(f"القسم {code} موجود باسمه في وحدة أخرى: سيُنشأ قسم مستقل خاص بـ«{unite}».")
+        if ids:
+            marques = ",".join("?" for _ in ids)
+            for r in conn.execute(
+                    f"SELECT i.id, e.code_massar, e.nom_ar, e.prenom_ar, c.code AS classe "
+                    f"FROM inscription i JOIN eleve e ON e.id=i.eleve_id JOIN classe c ON c.id=i.classe_id "
+                    f"WHERE i.annee_id=? AND i.statut IN ('inscrit','arrive') AND c.id IN ({marques})",
+                    (annee_id, *ids)):
+                if r["code_massar"] not in liste.eleves:
+                    absents.append(r)
 
     return RapportImport(liste, annee, nouvelle_annee, nouveaux, mis_a_jour, inchanges,
                          changements_classe, absents, alertes, [Path(c).name for c in chemins])
@@ -213,12 +269,7 @@ class ResultatImport:
 def appliquer(conn: sqlite3.Connection, dossier: DossierDonnees, rapport: RapportImport,
               unite: str | None = None) -> ResultatImport:
     """unite: في المجموعة المدرسية تُسند أقسام اللائحة إلى هذه الوحدة (طلب المدير 2026-11-07)."""
-    unite_id = None
-    if unite:
-        r = conn.execute("SELECT id FROM unite_scolaire WHERE nom_ar=?", (unite,)).fetchone()
-        if r is None:
-            raise ErreurImport("الوحدة المدرسية غير موجودة.")
-        unite_id = r["id"]
+    unite_id = _unite_id(conn, unite)
     copie = sauvegarde.creer_sauvegarde(dossier, "avant_import")
     liste = rapport.liste
     with conn:
@@ -238,9 +289,9 @@ def appliquer(conn: sqlite3.Connection, dossier: DossierDonnees, rapport: Rappor
 
         classes = {}
         for code in liste.classes:
-            r = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=?", (annee_id, code)).fetchone()
-            classes[code] = r["id"] if r else conn.execute(
-                "INSERT INTO classe(annee_id, code) VALUES (?,?)", (annee_id, code)).lastrowid
+            cid = trouver_classe(conn, annee_id, code, unite_id, set(liste.eleves))
+            classes[code] = cid or conn.execute(
+                "INSERT INTO classe(annee_id, unite_id, code) VALUES (?,?,?)", (annee_id, unite_id, code)).lastrowid
             if unite_id is not None:
                 conn.execute("UPDATE classe SET unite_id=? WHERE id=?", (unite_id, classes[code]))
 
@@ -375,5 +426,8 @@ def affecter_unite(conn: sqlite3.Connection, classe_id: int, unite: str | None) 
         if r is None:
             raise ErreurImport("الوحدة المدرسية غير موجودة.")
         uid = r["id"]
-    with conn:
-        conn.execute("UPDATE classe SET unite_id=? WHERE id=?", (uid, classe_id))
+    try:
+        with conn:
+            conn.execute("UPDATE classe SET unite_id=? WHERE id=?", (uid, classe_id))
+    except sqlite3.IntegrityError:
+        raise ErreurImport("يوجد في هذه الوحدة قسم بنفس الاسم.") from None

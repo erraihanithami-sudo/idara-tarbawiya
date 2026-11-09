@@ -83,7 +83,8 @@ class Mouvement:
     ref_numero: str = ""
     ref_date: str = ""
     remarques: str = ""
-    classe: str = ""          # مغادر سابق يُدرج يدوياً: قسمه (اختياري)
+    classe: str = ""          # تلميذ غير وارد في اللائحة: قسمه (اختياري)، بالاسم
+    classe_id: int | None = None   # أو بالمعرّف (الأدق في المجموعة المدرسية: قد يتكرر الاسم في وحدتين)
     id: int | None = None
 
     def valider(self) -> None:
@@ -139,13 +140,19 @@ def _eleve(conn, mv: Mouvement) -> int:
 
 
 def _classe_id(conn, mv: Mouvement) -> int | None:
+    a = _annee(conn)["id"]
+    if mv.classe_id:
+        if not conn.execute("SELECT 1 FROM classe WHERE id=? AND annee_id=?", (mv.classe_id, a)).fetchone():
+            raise ErreurMouvement("القسم غير موجود في السنة الجارية.")
+        return mv.classe_id
     if not mv.classe.strip():
         return None
-    c = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=?",
-                     (_annee(conn)["id"], mv.classe.strip())).fetchone()
-    if c is None:
+    cs = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=?", (a, mv.classe.strip())).fetchall()
+    if not cs:
         raise ErreurMouvement("القسم غير موجود في السنة الجارية.")
-    return c["id"]
+    if len(cs) > 1:
+        raise ErreurMouvement("يوجد قسم بهذا الاسم في أكثر من وحدة: اختر الوحدة ثم القسم.")
+    return cs[0]["id"]
 
 
 def _eleve_parti(conn, mv: Mouvement, eid: int | None) -> int:

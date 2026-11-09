@@ -29,10 +29,12 @@ def test_import_par_unite_et_recherche(base, dossier, tmp_path):  # noqa: F811
     jbel = el.rechercher(base, "", unite="فرعية الجبل")
     assert centre and jbel and len(centre) + len(jbel) == len(tous)
     assert {r["classe"] for r in centre} == {rep[0]["code"]}
-    # إعادة استيراد اللائحة مع اختيار وحدة: كل أقسامها تُسند إليها
-    r = imp.analyser(base, [classeur(tmp_path / "a2.xlsx", AR)])
+    # إعادة استيراد اللائحة مع اختيار وحدة: كل تلاميذها يصبحون في أقسام هذه الوحدة (قسم الوحدة الأخرى بنفس
+    # الاسم لا يُدمج، بل يُنشأ قسم مستقل)
+    r = imp.analyser(base, [classeur(tmp_path / "a2.xlsx", AR)], "الوحدة المركزية")
     imp.appliquer(base, dossier, r, unite="الوحدة المركزية")
-    assert all(x["unite"] == "الوحدة المركزية" for x in imp.repartition_classes(base) if x["code"] in r.liste.classes)
+    assert len(el.rechercher(base, "", unite="الوحدة المركزية")) == len(tous)
+    assert not el.rechercher(base, "", unite="فرعية الجبل")
     with pytest.raises(imp.ErreurImport, match="غير موجودة"):
         imp.appliquer(base, dossier, r, unite="وحدة مجهولة")
 
@@ -74,3 +76,44 @@ def test_chaque_composant_se_vide(base, dossier, cle):  # noqa: F811
     assert vd.compter(base, cle) == 0
     if cle != "projet":
         assert pe.operations(base, pid)   # المكونات الأخرى لا تُمس
+
+
+UNITE_B = {
+    "PS1-PS2": [("W000000001", "الفرعي", "هند", "F", "2022-01-10", "الدوار")],
+    "4APG-5APG-6APG": [("W000000002", "الفرعي", "عمر", "M", "2015-05-05", "الدوار"),
+                       ("W000000003", "الفرعي", "ليلى", "F", "2016-02-02", "الدوار")],
+}
+
+
+@pytest.mark.parametrize("premier_sans_unite", [False, True])
+def test_memes_noms_de_classes_dans_deux_unites(dossier, conn, tmp_path, premier_sans_unite):
+    """خطأ أبلغ عنه المدير 2026-11-09: أقسام وحدتين بنفس الاسم كانت تُدمج، فتضم لائحة الوحدة تلاميذ المركز."""
+    et.appliquer_configuration_initiale(conn, dossier, et.ConfigurationInitiale(
+        etablissement=et.Etablissement(nom_ar="مدرسة تجريبية", direction_ar="م", academie_ar="أ"),
+        directeur=et.Directeur(nom_ar="المدير", prenom_ar="أحمد", sexe="M"), annee="2026/2027",
+        unites=["المركز", "الفرعية"]))
+    r = imp.analyser(conn, [classeur(tmp_path / "a.xlsx", AR)], None if premier_sans_unite else "المركز")
+    imp.appliquer(conn, dossier, r, None if premier_sans_unite else "المركز")
+    r = imp.analyser(conn, [classeur(tmp_path / "b.xlsx", UNITE_B)], "الفرعية")
+    assert r.nb_eleves == 3 and not r.absents and len(r.nouveaux) == 3
+    imp.appliquer(conn, dossier, r, "الفرعية")
+    rep = imp.repartition_classes(conn)
+    assert len(rep) == 4
+    assert {(x["code"], x["unite"], x["eleves"]) for x in rep if x["unite"] == "الفرعية"} == {
+        ("PS1-PS2", "الفرعية", 1), ("4APG-5APG-6APG", "الفرعية", 2)}
+    assert {x["code_massar"] for x in el.rechercher(conn, "", unite="الفرعية")} == {
+        "W000000001", "W000000002", "W000000003"}
+    assert len(el.rechercher(conn, "")) == 8
+    if premier_sans_unite:   # تصحيح: إعادة استيراد لائحة المركز مع وحدتها
+        r = imp.analyser(conn, [classeur(tmp_path / "a2.xlsx", AR)], "المركز")
+        assert not r.absents
+        imp.appliquer(conn, dossier, r, "المركز")
+    assert {x["code_massar"] for x in el.rechercher(conn, "", unite="المركز")} == {
+        "X000000001", "X000000002", "X000000003", "X000000004", "X000000005"}
+    # إعادة استيراد لائحة الفرعية: لا غائبين ولا تكرار
+    r = imp.analyser(conn, [classeur(tmp_path / "b2.xlsx", UNITE_B)], "الفرعية")
+    assert not r.absents and not r.nouveaux
+    # دون وحدة والاسم في وحدتين: يُطلب اختيار الوحدة
+    r = imp.analyser(conn, [classeur(tmp_path / "b3.xlsx", UNITE_B)])
+    with pytest.raises(imp.ErreurImport, match="أكثر من وحدة"):
+        imp.appliquer(conn, dossier, r)
