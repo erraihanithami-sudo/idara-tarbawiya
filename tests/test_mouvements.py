@@ -152,3 +152,22 @@ def test_niveau_requis_et_repris_de_la_fiche(base, dossier):
     a = _arrive(base, niveau="")  # وافد جديد بلا قسم
     with pytest.raises(mv.ErreurMouvement, match="المستوى"):
         mv.generer_demande(base, dossier, [a])
+
+
+def test_depart_ancien_non_present_dans_la_liste(base, dossier):
+    """طلب المدير 2026-11-09: مغادر لا يرد في اللائحة الحالية يُدرج يدوياً."""
+    with pytest.raises(mv.ErreurMouvement, match="النسب والاسم والنوع"):
+        _parti(base, "Z000000001")
+    with pytest.raises(mv.ErreurMouvement, match="مستواه"):
+        _parti(base, "Z000000001", nom_ar="المغادر", prenom_ar="سعيد", sexe="M", niveau="")
+    with pytest.raises(mv.ErreurMouvement, match="القسم غير موجود"):
+        _parti(base, "Z000000001", nom_ar="المغادر", prenom_ar="سعيد", sexe="M", classe="9-9")
+    classe = base.execute("SELECT code FROM classe LIMIT 1").fetchone()[0]
+    mid = _parti(base, "Z000000001", nom_ar="المغادر", prenom_ar="سعيد", sexe="M", classe=classe)
+    eid = base.execute("SELECT id FROM eleve WHERE code_massar='Z000000001'").fetchone()[0]
+    f = el.fiche(base, eid)
+    assert f["statut"] == "parti" and f["classe"] == classe and f["niveau"] == "4AP"
+    assert [r["id"] for r in mv.lister(base, "parti")] and mv.lire(base, mid)["etablissement"] == "المؤسسة المستقبلة"
+    # لا يظهر غائباً عند إعادة استيراد اللائحة
+    r = imp.analyser(base, [classeur(dossier.racine / "a3.xlsx", AR)])
+    assert "Z000000001" not in [x["code_massar"] for x in r.absents]

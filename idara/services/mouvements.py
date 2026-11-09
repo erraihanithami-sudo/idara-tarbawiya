@@ -83,6 +83,7 @@ class Mouvement:
     ref_numero: str = ""
     ref_date: str = ""
     remarques: str = ""
+    classe: str = ""          # مغادر سابق يُدرج يدوياً: قسمه (اختياري)
     id: int | None = None
 
     def valider(self) -> None:
@@ -122,10 +123,10 @@ def _annee(conn):
 def _eleve(conn, mv: Mouvement) -> int:
     """التلميذ برمز مسار؛ يُنشأ إن كان وافداً جديداً لم يرد بعد في لوائح مسار المستوردة."""
     r = conn.execute("SELECT id, nom_ar, prenom_ar FROM eleve WHERE code_massar=?", (mv.code_massar,)).fetchone()
+    if mv.sens == "parti":
+        return _eleve_parti(conn, mv, r["id"] if r else None)
     if r:
         return r["id"]
-    if mv.sens == "parti":
-        raise ErreurMouvement(f"لا يوجد تلميذ برمز {mv.code_massar} في لوائح المؤسسة.")
     if not (mv.nom_ar and mv.prenom_ar and mv.sexe in ("M", "F")):
         raise ErreurMouvement("تلميذ جديد: النسب والاسم والنوع إجبارية.")
     with conn:
@@ -133,6 +134,34 @@ def _eleve(conn, mv: Mouvement) -> int:
                            (mv.code_massar, mv.nom_ar, mv.prenom_ar, mv.sexe)).lastrowid
         conn.execute("INSERT INTO inscription(eleve_id, annee_id, statut, date_entree, etab_origine) "
                      "VALUES (?,?,'arrive',?,?)", (eid, _annee(conn)["id"], mv.date_mouvement, mv.etablissement))
+    return eid
+
+
+def _eleve_parti(conn, mv: Mouvement, eid: int | None) -> int:
+    """مغادر لا يرد في اللائحة المستوردة (غادر قبل استيرادها): يُدرج يدوياً ويُسجَّل في السنة الجارية ثم يُعلَّم
+    مغادراً (طلب المدير 2026-11-09)."""
+    a = _annee(conn)
+    if eid and conn.execute("SELECT 1 FROM inscription WHERE eleve_id=? AND annee_id=?", (eid, a["id"])).fetchone():
+        return eid
+    code_niv = next((k for k, v in tx.NIVEAUX.items() if v[0] == mv.niveau), None)
+    if eid is None and not (mv.nom_ar and mv.prenom_ar and mv.sexe in ("M", "F")):
+        raise ErreurMouvement(f"لا يوجد تلميذ برمز {mv.code_massar} في اللوائح. لإدراجه مغادراً: النسب والاسم والنوع "
+                              "والمستوى إجبارية.")
+    if code_niv is None:
+        raise ErreurMouvement("مغادر غير وارد في اللائحة الحالية: اختر مستواه الدراسي.")
+    niveau_id = conn.execute("SELECT id FROM niveau WHERE code=?", (code_niv,)).fetchone()
+    classe_id = None
+    if mv.classe.strip():
+        c = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=?", (a["id"], mv.classe.strip())).fetchone()
+        if c is None:
+            raise ErreurMouvement("القسم غير موجود في السنة الجارية.")
+        classe_id = c["id"]
+    with conn:
+        if eid is None:
+            eid = conn.execute("INSERT INTO eleve(code_massar, nom_ar, prenom_ar, sexe, source) VALUES "
+                               "(?,?,?,?,'massar')", (mv.code_massar, mv.nom_ar, mv.prenom_ar, mv.sexe)).lastrowid
+        conn.execute("INSERT INTO inscription(eleve_id, annee_id, classe_id, niveau_id, niveau_confirme, statut) "
+                     "VALUES (?,?,?,?,1,'inscrit')", (eid, a["id"], classe_id, niveau_id[0] if niveau_id else None))
     return eid
 
 

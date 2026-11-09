@@ -578,6 +578,22 @@ def test_page_mouvements(app, config_tmp, monkeypatch):
     p.date_action.setText("20/10/2026")
     assert p.envoi() is not None and "أُرسل الملف" in p.liste.item(0, 1).text()
     assert mv.alertes(f.conn)["envoi"] == []
+    # مغادر سابق غير وارد في اللائحة (طلب المدير 2026-11-09)
+    p.nouveau()
+    p.f_parti.setChecked(True)
+    assert p.classe.isVisibleTo(p) and p.classe.count() > 1
+    p.code.setText("Z000000001")
+    p._chercher_code()
+    assert "غير وارد في اللائحة" in p.info_eleve.text()
+    p.nom.setText("المغادر")
+    p.prenom.setText("سعيد")
+    p.s_m.setChecked(True)
+    p.niveau.setEditText("الرابع")
+    p.classe.setCurrentIndex(1)
+    p.date_mv.setText("01/10/2026")
+    p.etab.setEditText("مدرسة أخرى")
+    assert p.enregistrer() is not None, p.message.text()
+    assert p.liste.rowCount() == 2
     f.close()
 
 

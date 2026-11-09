@@ -140,6 +140,8 @@ class PageMouvements(QWidget):
         self.ref_num = champ(ltr=True)
         self.ref_date = ChampDate()
         self.remarques = champ("اختياري")
+        self.classe = QComboBox()   # مغادر سابق غير وارد في اللائحة: قسمه (اختياري)
+        self.l_classe = etiquette("القسم (مغادر غير وارد في اللائحة)", self.classe)
         self.l_etab = etiquette("المؤسسة الأصلية *", self.etab)
         self.l_ref = etiquette("رقم شهادة المغادرة", self.ref_num)
         g4 = QGridLayout()
@@ -152,7 +154,7 @@ class PageMouvements(QWidget):
                  (etiquette("المديرية الإقليمية", self.direction), self.direction),
                  (etiquette("الأكاديمية الجهوية", self.academie), self.academie),
                  (self.l_ref, self.ref_num), (etiquette("بتاريخ", self.ref_date), self.ref_date),
-                 (etiquette("ملاحظات", self.remarques), self.remarques)]
+                 (etiquette("ملاحظات", self.remarques), self.remarques), (self.l_classe, self.classe)]
         for i, (lab, w) in enumerate(items):
             g4.addWidget(lab, (i // 2) * 2, i % 2)
             g4.addWidget(w, (i // 2) * 2 + 1, i % 2)
@@ -249,6 +251,10 @@ class PageMouvements(QWidget):
 
     def _maj_sens(self) -> None:
         arrive = self.f_arrive.isChecked()
+        self.classe.setVisible(not arrive)
+        self.l_classe.setVisible(not arrive)
+        if not arrive:
+            self._remplir_classes()
         self.l_etab.setText("المؤسسة الأصلية *" if arrive else "المؤسسة المستقبلة *")
         self.l_ref.setText("رقم شهادة المغادرة" if arrive else "رقم مراسلتهم (المرجع)")
 
@@ -260,8 +266,13 @@ class PageMouvements(QWidget):
         code = self.code.text().strip().upper()
         r = self.f.conn.execute("SELECT id FROM eleve WHERE code_massar=?", (code,)).fetchone()
         if not r:
-            self.info_eleve.setText("تلميذ غير موجود في اللوائح: يُنشأ وافداً جديداً (النسب والاسم والنوع إجبارية)."
-                                    if code else "")
+            if not code:
+                self.info_eleve.setText("")
+            elif self.f_arrive.isChecked():
+                self.info_eleve.setText("تلميذ غير موجود في اللوائح: يُنشأ وافداً جديداً (النسب والاسم والنوع إجبارية).")
+            else:
+                self.info_eleve.setText("تلميذ غير وارد في اللائحة الحالية (غادر قبل استيرادها): يُدرج مغادراً. النسب "
+                                        "والاسم والنوع والمستوى إجبارية، والقسم اختياري.")
             return
         f = el.fiche(self.f.conn, r["id"])
         self.nom.setText(f["nom_ar"] or "")
@@ -322,7 +333,8 @@ class PageMouvements(QWidget):
                          self.prenom.text(), "F" if self.s_f.isChecked() else "M" if self.s_m.isChecked() else "",
                          d, self.etab.currentText(), self.direction.currentText(), self.academie.currentText(),
                          self.hors.isChecked(), self.niveau.currentText(), self.ref_num.text(), rd,
-                         self.remarques.text(), id=self.mid)
+                         self.remarques.text(), classe=(self.classe.currentData() or "") if self.f_parti.isChecked()
+                         else "", id=self.mid)
         try:
             mid = mv.enregistrer(self.f.conn, m)
         except mv.ErreurMouvement as e:
@@ -395,3 +407,13 @@ class PageMouvements(QWidget):
 
     def annuler(self) -> bool:
         return self.marquer("dossier_recu_le" if self.sens() == "arrive" else "dossier_envoye_le", annuler=True)
+
+    def _remplir_classes(self) -> None:
+        from idara.services import annee as annee_srv
+        a = annee_srv.annee_courante(self.f.conn)
+        actuel = self.classe.currentData()
+        self.classe.clear()
+        self.classe.addItem("غير محدد", None)
+        for r in self.f.conn.execute("SELECT code FROM classe WHERE annee_id=? ORDER BY code", (a["id"] if a else -1,)):
+            self.classe.addItem(r["code"], r["code"])
+        self.classe.setCurrentIndex(max(0, self.classe.findData(actuel)))
