@@ -320,10 +320,7 @@ class PageImport(QWidget):
 
     def _note(self, i: int) -> None:
         cb = self.table.cellWidget(i, 3)
-        r = next(r for c, r in self.combos.values() if c is cb)
-        note = ("اختر المستوى" if cb.currentData() is None else
-                "السن خارج المعتاد لهذا المستوى: تأكد" if imp.age_hors_norme(cb.currentData(), r["date_naissance"], r["annee"])
-                else "")
+        note = "اختر المستوى" if cb.currentData() is None else ""   # ملاحظة السن حُذفت (قرار المدير 2026-11-09)
         it = QTableWidgetItem(note)
         it.setFlags(it.flags() & ~Qt.ItemIsEditable)
         self.table.setItem(i, 4, it)
