@@ -544,7 +544,8 @@ _LIENS = (("conge", "personnel_id", "رخص"), ("reprise_travail", "personnel_id
           ("document_genere", "personnel_id", "وثائق مولَّدة"),
           ("affectation_equipement", "personnel_id", "تجهيزات مسلَّمة"),
           ("conseil_membre", "personnel_id", "عضوية مجالس"), ("club", "animateur_id", "تأطير أندية"),
-          ("examen_affectation", "personnel_id", "مهام في الامتحان"))
+          ("examen_affectation", "personnel_id", "مهام في الامتحان"),
+          ("pv_prise_service", "personnel_id", "محاضر التحاق"))
 
 
 def liens(conn: sqlite3.Connection, pid: int) -> list[str]:

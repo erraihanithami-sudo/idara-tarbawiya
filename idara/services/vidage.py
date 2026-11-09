@@ -152,6 +152,7 @@ def _vider_personnel(conn) -> int:
                 f"DELETE FROM soutien_eleve WHERE groupe_id IN {groupes}",
                 f"DELETE FROM soutien_groupe WHERE id IN {groupes}",
                 f"DELETE FROM examen_affectation WHERE personnel_id IN {p}",
+                f"DELETE FROM pv_prise_service WHERE personnel_id IN {p}",
                 f"DELETE FROM personnel WHERE id IN {p}"):
         conn.execute(sql)
     return n

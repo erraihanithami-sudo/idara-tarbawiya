@@ -47,6 +47,7 @@ from idara.ui.page_inscriptions import PageInscriptions
 from idara.ui.page_absences import PageAbsences
 from idara.ui.page_soutien import PageSoutien
 from idara.ui.page_projet import PageProjet
+from idara.ui.page_pv_rh import PagePvRh
 from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
@@ -454,7 +455,7 @@ SECTIONS = [
                   ("تتبع السلوك", "تتبع سلوكات التلاميذ"), ("أولياء الأمور", "معلومات أولياء الأمور"),
                   ("التلاميذ القدامى", "التلاميذ القدامى (ما قبل مسار)"), ("الاستيراد من مسار", "الاستيراد من مسار")]),
     ("الموارد البشرية", [("الموارد البشرية", "معلومات الأطر"), ("تدبير الفائض", "تدبير الفائض"),
-                         ("الرخص", "الرخص")]),
+                         ("الرخص", "الرخص"), ("محاضر الموارد البشرية", "المحاضر")]),
     ("التدبير التربوي", [("التنظيم التربوي", "التنظيم التربوي"), ("الأندية والأنشطة", "الحياة المدرسية"), ("التعلمات الأساس", "تتبع التعلمات الأساس"),
                          ("الدعم التربوي", "الدعم التربوي"), ("الريادة", "المدرسة الرائدة")]),
     ("التدبير المالي والمادي", [("التسجيلات", "تدبير التسجيلات"), ("الجرد", "الجرد"),
@@ -610,7 +611,8 @@ MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "
              "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون", "مجالس الأقسام": "مجلس قسم محضر",
              "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص",
              "الدعم التربوي": "دعم متعثرين تعثر معالجة سجل",
-             "مشروع المؤسسة": "مشروع مؤشرات عمليات خطة العمل مسار حصيلة"}
+             "مشروع المؤسسة": "مشروع مؤشرات عمليات خطة العمل مسار حصيلة",
+             "محاضر الموارد البشرية": "محضر التحاق دخول خروج توقيع"}
 
 
 class BarreLaterale(QFrame):
@@ -679,6 +681,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_absences = PageAbsences(self)
         self.page_soutien = PageSoutien(self)
         self.page_projet = PageProjet(self)
+        self.page_pv_rh = PagePvRh(self)
         self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
@@ -689,7 +692,7 @@ class FenetrePrincipale(QMainWindow):
                       "دليل الاستخدام": self.page_guide, "الإحصائيات": self.page_stats,
                       "التسجيلات": self.page_inscriptions, "تتبع الغياب": self.page_absences,
                       "الدعم التربوي": self.page_soutien,
-                      "مشروع المؤسسة": self.page_projet}
+                      "مشروع المؤسسة": self.page_projet, "محاضر الموارد البشرية": self.page_pv_rh}
         from idara.ui import vidage_ui
         vidage_ui.installer(self)   # تفريغ كل مكوّن من صفحته (طلب المدير 2026-11-07)
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة

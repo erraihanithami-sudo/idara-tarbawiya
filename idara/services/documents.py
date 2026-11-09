@@ -81,6 +81,16 @@ MODELES: dict[str, DefModele] = {d.code: d for d in [
     DefModele("pv_reprise", "محضر استئناف العمل", "ar", _COMMUNS + _RH + (
         "sayyid", "prenom", "nom", "ppr", "cin", "cadre", "grade", "istaanafa", "date_reprise", "duree", "du",
         "au", "fonction", "adresse", "telephone", "autres_contacts", "cas_N")),
+    # محاضر الموارد البشرية (طلب المدير 2026-11-09)
+    DefModele("pv_prise_service", "محضر الالتحاق بالعمل", "ar", _COMMUNS + (
+        "ana_mouwaqqi", "sayyid", "nom_complet", "ppr", "cin", "naissance", "cadre", "mission", "hadara",
+        "date_prise", "reference", "ancien_lieu", "adresse", "date_redaction", "al_mouani", "cas_N")),
+    DefModele("pv_entree_sortie", "محضر الدخول / الخروج", "ar", _COMMUNS + (
+        "annee", "titre_pv", "concerne", "code_etab", "commune", "date_pv", "page", "r_N", "nom_N", "ppr_N",
+        "cin_N", "cadre_N", "matiere_N", "tel_N", "adresse_N", "obs_N")),
+    DefModele("pv_non_signataires", "لائحة من لم يوقعوا محضر الدخول / الخروج", "ar", _COMMUNS + (
+        "annee", "les_personnels", "titre_pv", "code_etab", "commune", "date_pv", "r_N", "nom_N", "ppr_N",
+        "cin_N", "cadre_N", "matiere_N", "tel_N", "adresse_N", "motif_N")),
     # حركية التلاميذ
     DefModele("demande_dossier", "طلب وثائق مدرسية (داخل الإقليم)", "ar", _COMMUNS + _MV + (
         "reference", "rappel", "tadhkir", "rt_N")),
@@ -476,6 +486,12 @@ def exemple(conn: sqlite3.Connection, code: str, sexe: str = "M"):
         try:
             return conges.exemple(conn, code, sexe), None
         except conges.ErreurConge as e:
+            raise ErreurDocument(str(e)) from e
+    if code in ("pv_prise_service", "pv_entree_sortie", "pv_non_signataires"):
+        from idara.services import pv_rh  # تفادي الاستيراد الدائري
+        try:
+            return pv_rh.exemple(conn, code, sexe)
+        except pv_rh.ErreurPV as e:
             raise ErreurDocument(str(e)) from e
     raise ErreurDocument(f"قالب غير معروف: {code}")
 

@@ -1523,3 +1523,32 @@ def test_mouvements_par_unite_et_quitter(app, config_tmp):
     f.b_quitter.click()
     with pytest.raises(sqlite3.ProgrammingError):
         f.conn.execute("SELECT 1")
+
+
+def test_pv_ressources_humaines(app, config_tmp, monkeypatch):
+    """طلب المدير 2026-11-09: محضر الالتحاق، ومحضرا الدخول والخروج مع لائحة من لم يوقعوا."""
+    from idara.services import bureautique
+    from idara.services import personnel as rh
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    for i in range(3):
+        rh.enregistrer(f.conn, rh.Personnel(
+            nom_ar="التجريبي", prenom_ar=f"أستاذ{i}", sexe="M", categorie="enseignant", ppr=f"765432{i}",
+            cin=f"AB{i}", cadre=rh.CADRES[0], fonction="التدريس", matiere="عربية", adresse="حي", telephone="0600"))
+    f.aller_a("محاضر الموارد البشرية")
+    p = f.page_pv_rh
+    assert p.personnel.count() == 4 and p.cas.count() == 12
+    assert p.enregistrer_prise() is None and "اختر الموظف" in p.message.text()
+    p.personnel.setCurrentIndex(1)
+    p.cas.setCurrentIndex(5)
+    p.reference.setText("رقم 1 بتاريخ 01/07/2026")
+    p.date_prise.setText("01/09/2026")
+    assert p.enregistrer_prise() is not None, p.message.text()
+    assert p.t_prises.rowCount() == 1
+    assert p.t_sign.rowCount() == 3
+    p.date_pv.setText("01/09/2026")
+    p.cocher(1, "رخصة مرضية")
+    r = p.generer_collectif()
+    assert r is not None, p.message.text()
+    assert "آخر المحاضر" in p.l_collectifs.text()
+    f.close()
