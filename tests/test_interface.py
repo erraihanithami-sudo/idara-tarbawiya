@@ -148,7 +148,7 @@ def test_navigation_deroulante(app, config_tmp):
     titres = [t for t, _ in SECTIONS]
     assert titres[:8] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي",
                           "التدبير المالي والمادي", "التقييم", "مشروع المؤسسة", "تسليم المهام"]
-    assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص"]
+    assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص", "المحاضر"]
     assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
                                          "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة"]
     assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
@@ -1258,7 +1258,7 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     f = _fenetre_avec_eleves(config_tmp)
     # عدّاد الصفحات الفرعية بجانب كل قسم
     i = [t for t, _ in SECTIONS].index("الموارد البشرية")
-    assert f.boutons[i].l_badge.text() == "3" and not f.boutons[i].l_badge.isHidden()
+    assert f.boutons[i].l_badge.text() == "4" and not f.boutons[i].l_badge.isHidden()
     # البحث
     assert f.filtrer_nav("رخص") == ["الرخص"] and not f.boutons[i].isHidden()
     assert all(b.isHidden() for k, b in enumerate(f.boutons) if k != i)
@@ -1534,7 +1534,7 @@ def test_pv_ressources_humaines(app, config_tmp, monkeypatch):
     for i in range(3):
         rh.enregistrer(f.conn, rh.Personnel(
             nom_ar="التجريبي", prenom_ar=f"أستاذ{i}", sexe="M", categorie="enseignant", ppr=f"765432{i}",
-            cin=f"AB{i}", cadre=rh.CADRES[0], fonction="التدريس", matiere="عربية", adresse="حي", telephone="0600"))
+            cin=f"AB{i}", cadre=rh.CADRES[0], fonction="التدريس", matiere="عربية", adresse="حي", telephone="0612345678"))
     f.aller_a("محاضر الموارد البشرية")
     p = f.page_pv_rh
     assert p.personnel.count() == 4 and p.cas.count() == 12
