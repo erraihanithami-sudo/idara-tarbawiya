@@ -45,7 +45,7 @@ COMPOSANTS = [
     Composant("personnel", "الموارد البشرية",
               "الموظفون (عدا المدير) وما يخصهم: الرخص، إسناد الأقسام، عضوية المجالس، الحراسة، الدعم.",
               "SELECT COUNT(*) FROM personnel WHERE id NOT IN (SELECT personnel_id FROM mandat_directeur)"),
-    Composant("anciens", "التلاميذ القدامى",
+    Composant("anciens", "التلاميذ القدامى (ما قبل مسار)",
               "ملفات التلاميذ القدامى (ما قبل مسار) المدرجة أو المستوردة.",
               "SELECT COUNT(*) FROM eleve WHERE source='avant_massar'"),
     Composant("activites", "الأندية والأنشطة",

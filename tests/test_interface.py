@@ -1480,3 +1480,46 @@ def test_unites_et_vidage(app, config_tmp):
     assert lignes["eleves"].vider(confirmer=True) is not None and vd.compter(f.conn, "eleves") == 0
     assert not lignes["eleves"].bouton.isEnabled()
     f.close()
+
+
+def test_mouvements_par_unite_et_quitter(app, config_tmp):
+    """طلب المدير 2026-11-09: حركية التلاميذ حسب الوحدة، «(ما قبل مسار)»، وزر إقفال البرنامج."""
+    import sqlite3
+    from idara.services import import_eleves as imp
+    from idara.services import mouvements as mv
+    f = _fenetre_avec_eleves(config_tmp)
+    rep = imp.repartition_classes(f.conn)
+    imp.affecter_unite(f.conn, rep[0]["id"], "الوحدة المركزية")
+    code = f.conn.execute("SELECT e.code_massar FROM inscription i JOIN eleve e ON e.id=i.eleve_id WHERE i.classe_id=?",
+                          (rep[0]["id"],)).fetchone()[0]
+    mv.enregistrer(f.conn, mv.Mouvement("parti", code, date_mouvement="2026-10-01", etablissement="مدرسة أخرى"))
+    f.aller_a("حركية التلاميذ")
+    p = f.page_mouvements
+    assert list(p.barre_unites.boutons) == [None, "الوحدة المركزية", "وحدة فرعية"]
+    p.r_parti.setChecked(True)
+    p.rafraichir()
+    assert p.liste.rowCount() == 1
+    p.barre_unites.boutons["وحدة فرعية"].click()
+    assert p.liste.rowCount() == 0 and "مغادرون لم يُرسل" not in p.alertes.text()
+    assert p.classe.count() == 1    # لا أقسام مسندة لهذه الوحدة
+    p.barre_unites.boutons["الوحدة المركزية"].click()
+    assert p.liste.rowCount() == 1 and p.classe.count() == 2
+    # وافد جديد في وحدة دون قسم: يُطلب القسم
+    p.nouveau()
+    p.f_arrive.setChecked(True)
+    p.code.setText("Y000000077")
+    p.nom.setText("الوافد")
+    p.prenom.setText("هبة")
+    p.s_f.setChecked(True)
+    p.date_mv.setText("02/10/2026")
+    p.etab.setEditText("مدرسة أصلية")
+    assert p.enregistrer() is None and "اختر قسمه" in p.message.text()
+    p.classe.setCurrentIndex(1)
+    assert p.enregistrer() is not None, p.message.text()
+    p.r_arrive.setChecked(True)
+    p.rafraichir()
+    assert p.liste.rowCount() == 1
+    assert f.boutons_pages["التلاميذ القدامى"].l_texte.text() == "التلاميذ القدامى (ما قبل مسار)"
+    f.b_quitter.click()
+    with pytest.raises(sqlite3.ProgrammingError):
+        f.conn.execute("SELECT 1")

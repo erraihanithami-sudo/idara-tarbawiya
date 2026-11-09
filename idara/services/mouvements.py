@@ -132,9 +132,20 @@ def _eleve(conn, mv: Mouvement) -> int:
     with conn:
         eid = conn.execute("INSERT INTO eleve(code_massar, nom_ar, prenom_ar, sexe, source) VALUES (?,?,?,?,'massar')",
                            (mv.code_massar, mv.nom_ar, mv.prenom_ar, mv.sexe)).lastrowid
-        conn.execute("INSERT INTO inscription(eleve_id, annee_id, statut, date_entree, etab_origine) "
-                     "VALUES (?,?,'arrive',?,?)", (eid, _annee(conn)["id"], mv.date_mouvement, mv.etablissement))
+        conn.execute("INSERT INTO inscription(eleve_id, annee_id, classe_id, statut, date_entree, etab_origine) "
+                     "VALUES (?,?,?,'arrive',?,?)", (eid, _annee(conn)["id"], _classe_id(conn, mv),
+                                                     mv.date_mouvement, mv.etablissement))
     return eid
+
+
+def _classe_id(conn, mv: Mouvement) -> int | None:
+    if not mv.classe.strip():
+        return None
+    c = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=?",
+                     (_annee(conn)["id"], mv.classe.strip())).fetchone()
+    if c is None:
+        raise ErreurMouvement("القسم غير موجود في السنة الجارية.")
+    return c["id"]
 
 
 def _eleve_parti(conn, mv: Mouvement, eid: int | None) -> int:
@@ -150,12 +161,7 @@ def _eleve_parti(conn, mv: Mouvement, eid: int | None) -> int:
     if code_niv is None:
         raise ErreurMouvement("مغادر غير وارد في اللائحة الحالية: اختر مستواه الدراسي.")
     niveau_id = conn.execute("SELECT id FROM niveau WHERE code=?", (code_niv,)).fetchone()
-    classe_id = None
-    if mv.classe.strip():
-        c = conn.execute("SELECT id FROM classe WHERE annee_id=? AND code=?", (a["id"], mv.classe.strip())).fetchone()
-        if c is None:
-            raise ErreurMouvement("القسم غير موجود في السنة الجارية.")
-        classe_id = c["id"]
+    classe_id = _classe_id(conn, mv)
     with conn:
         if eid is None:
             eid = conn.execute("INSERT INTO eleve(code_massar, nom_ar, prenom_ar, sexe, source) VALUES "
@@ -200,13 +206,27 @@ _SELECT = ("SELECT m.*, e.code_massar, e.nom_ar, e.prenom_ar, e.sexe FROM mouvem
            "JOIN eleve e ON e.id=m.eleve_id")
 
 
-def lister(conn: sqlite3.Connection, sens: str | None = None, texte: str = "") -> list[sqlite3.Row]:
+def eleves_unite(conn: sqlite3.Connection, unite: str | None) -> set[int] | None:
+    """تلاميذ وحدة مدرسية (قسمهم في السنة الجارية). None: المؤسسة كاملة (طلب المدير 2026-11-09)."""
+    if not unite:
+        return None
+    a = _annee(conn)
+    return {r[0] for r in conn.execute(
+        "SELECT i.eleve_id FROM inscription i JOIN classe c ON c.id=i.classe_id JOIN unite_scolaire u ON "
+        "u.id=c.unite_id WHERE i.annee_id=? AND u.nom_ar=?", (a["id"], unite))}
+
+
+def lister(conn: sqlite3.Connection, sens: str | None = None, texte: str = "",
+           unite: str | None = None) -> list[sqlite3.Row]:
     a = _annee(conn)
     sql, args = _SELECT + " WHERE m.annee_id=?", [a["id"]]
     if sens:
         sql += " AND m.sens=?"
         args.append(sens)
     lignes = conn.execute(sql + " ORDER BY m.date_mouvement DESC, e.nom_ar", args).fetchall()
+    ids = eleves_unite(conn, unite)
+    if ids is not None:
+        lignes = [r for r in lignes if r["eleve_id"] in ids]
     cible = normaliser(texte)
     if cible:
         lignes = [r for r in lignes if any(cible in normaliser(x) for x in (
@@ -234,13 +254,14 @@ def etat(r: sqlite3.Row, le: date | None = None) -> str:
     return "لم يُطلب الملف"
 
 
-def alertes(conn: sqlite3.Connection, le: date | None = None) -> dict[str, list[sqlite3.Row]]:
+def alertes(conn: sqlite3.Connection, le: date | None = None,
+            unite: str | None = None) -> dict[str, list[sqlite3.Row]]:
     le = le or date.today()
     limite = (le - timedelta(days=DELAI_RELANCE)).isoformat()
     return {
-        "envoi": [r for r in lister(conn, "parti") if not r["dossier_envoye_le"]],
-        "demande": [r for r in lister(conn, "arrive") if not r["demande1_le"] and not r["dossier_recu_le"]],
-        "relance": [r for r in lister(conn, "arrive") if r["demande1_le"] and not r["dossier_recu_le"]
+        "envoi": [r for r in lister(conn, "parti", unite=unite) if not r["dossier_envoye_le"]],
+        "demande": [r for r in lister(conn, "arrive", unite=unite) if not r["demande1_le"] and not r["dossier_recu_le"]],
+        "relance": [r for r in lister(conn, "arrive", unite=unite) if r["demande1_le"] and not r["dossier_recu_le"]
                     and (r["demande2_le"] or r["demande1_le"]) <= limite],
     }
 
@@ -390,13 +411,17 @@ def exemple(conn, code: str) -> dict[str, str]:
     return v
 
 
-def sorties_sans_transfert(conn: sqlite3.Connection, texte: str = "") -> list[sqlite3.Row]:
+def sorties_sans_transfert(conn: sqlite3.Connection, texte: str = "",
+                           unite: str | None = None) -> list[sqlite3.Row]:
     """المنقطعون والمفصولون في السنة الجارية (لا ملف يُرسل)."""
     a = _annee(conn)
     lignes = conn.execute(
         "SELECT e.id AS eleve_id, e.code_massar, e.nom_ar, e.prenom_ar, i.statut, i.date_sortie, i.motif_sortie "
         "FROM inscription i JOIN eleve e ON e.id=i.eleve_id WHERE i.annee_id=? AND i.statut IN ('interrompu','exclu') "
         "ORDER BY i.date_sortie DESC", (a["id"],)).fetchall()
+    ids = eleves_unite(conn, unite)
+    if ids is not None:
+        lignes = [r for r in lignes if r["eleve_id"] in ids]
     cible = normaliser(texte)
     if cible:
         lignes = [r for r in lignes if any(cible in normaliser(x) for x in (

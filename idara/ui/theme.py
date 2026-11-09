@@ -93,6 +93,9 @@ QPushButton#sousnav {{ border: 0; border-radius: 8px; min-height: 38px; backgrou
 QPushButton#sousnav QLabel {{ background: transparent; }}
 QPushButton#sousnav:checked {{ background: {NAV_ACTIF}; border-right: 3px solid {NAV_ACCENT}; }}
 QPushButton#sousnav:hover:!checked {{ background: {NAV_SURVOL}; }}
+QPushButton#navQuitter {{ border: 1px solid {NAV_BORD}; border-radius: 10px; min-height: 42px; background: transparent;
+    color: {NAV_TEXTE}; font-weight: 600; }}
+QPushButton#navQuitter:hover {{ background: #B4235A; color: #FFFFFF; border-color: #B4235A; }}
 QScrollArea#defilNav, QWidget#navigation {{ background: transparent; border: 0; }}
 QScrollArea#defilNav > QWidget#qt_scrollarea_viewport {{ background: transparent; }}
 QRadioButton {{ min-height: 36px; }}

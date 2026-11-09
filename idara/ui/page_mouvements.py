@@ -37,6 +37,10 @@ class PageMouvements(QWidget):
         racine.setSpacing(16)
         racine.addWidget(entete("حركية التلاميذ", "الوافدون وطلب ملفاتهم، والمغادرون وإرسال ملفاتهم. "
                                                   "كل مراسلة تُسجل في الصادر وتُولد من نماذجكم."))
+        # المجموعة المدرسية: زر لكل وحدة يعرض كل مكونات الصفحة لتلاميذها (طلب المدير 2026-11-09)
+        from idara.ui.unites import BarreUnites
+        self.barre_unites = BarreUnites(lambda: self.f.conn, self._changer_unite)
+        racine.addWidget(self.barre_unites)
         self.alertes = QLabel()
         self.alertes.setObjectName("alerte")
         self.alertes.setWordWrap(True)
@@ -141,7 +145,7 @@ class PageMouvements(QWidget):
         self.ref_date = ChampDate()
         self.remarques = champ("اختياري")
         self.classe = QComboBox()   # مغادر سابق غير وارد في اللائحة: قسمه (اختياري)
-        self.l_classe = etiquette("القسم (مغادر غير وارد في اللائحة)", self.classe)
+        self.l_classe = etiquette("القسم (تلميذ غير وارد في اللائحة)", self.classe)
         self.l_etab = etiquette("المؤسسة الأصلية *", self.etab)
         self.l_ref = etiquette("رقم شهادة المغادرة", self.ref_num)
         g4 = QGridLayout()
@@ -184,8 +188,9 @@ class PageMouvements(QWidget):
         return "arrive" if self.r_arrive.isChecked() else "parti" if self.r_parti.isChecked() else "autres"
 
     def rafraichir(self) -> None:
+        self.barre_unites.actualiser()
         try:
-            a = mv.alertes(self.f.conn)
+            a = mv.alertes(self.f.conn, unite=self.unite())
         except mv.ErreurMouvement as e:
             message(self.message, str(e), True)
             return
@@ -209,7 +214,7 @@ class PageMouvements(QWidget):
 
     def chercher(self) -> None:
         if self.sens() == "autres":
-            lignes = mv.sorties_sans_transfert(self.f.conn, self.recherche.text())
+            lignes = mv.sorties_sans_transfert(self.f.conn, self.recherche.text(), self.unite())
             self.liste.setRowCount(len(lignes))
             for i, r in enumerate(lignes):
                 it = cellule(f"{r['prenom_ar']} {r['nom_ar']} · {r['motif_sortie'] or '—'}", None)
@@ -221,7 +226,7 @@ class PageMouvements(QWidget):
             return
         self.b_annuler.setVisible(True)
         try:
-            lignes = mv.lister(self.f.conn, self.sens(), self.recherche.text())
+            lignes = mv.lister(self.f.conn, self.sens(), self.recherche.text(), self.unite())
         except mv.ErreurMouvement:
             lignes = []
         self.liste.setRowCount(len(lignes))
@@ -251,10 +256,7 @@ class PageMouvements(QWidget):
 
     def _maj_sens(self) -> None:
         arrive = self.f_arrive.isChecked()
-        self.classe.setVisible(not arrive)
-        self.l_classe.setVisible(not arrive)
-        if not arrive:
-            self._remplir_classes()
+        self._remplir_classes()
         self.l_etab.setText("المؤسسة الأصلية *" if arrive else "المؤسسة المستقبلة *")
         self.l_ref.setText("رقم شهادة المغادرة" if arrive else "رقم مراسلتهم (المرجع)")
 
@@ -329,12 +331,16 @@ class PageMouvements(QWidget):
         except ValueError:
             message(self.message, "أحد التواريخ غير صحيح.", True)
             return None
+        code = self.code.text().strip().upper()
+        if self.unite() and not self.classe.currentData() and not self.f.conn.execute(
+                "SELECT 1 FROM eleve WHERE code_massar=?", (code,)).fetchone():
+            message(self.message, f"تلميذ غير وارد في اللوائح: اختر قسمه من أقسام «{self.unite()}».", True)
+            return None
         m = mv.Mouvement("arrive" if self.f_arrive.isChecked() else "parti", self.code.text(), self.nom.text(),
                          self.prenom.text(), "F" if self.s_f.isChecked() else "M" if self.s_m.isChecked() else "",
                          d, self.etab.currentText(), self.direction.currentText(), self.academie.currentText(),
                          self.hors.isChecked(), self.niveau.currentText(), self.ref_num.text(), rd,
-                         self.remarques.text(), classe=(self.classe.currentData() or "") if self.f_parti.isChecked()
-                         else "", id=self.mid)
+                         self.remarques.text(), classe=self.classe.currentData() or "", id=self.mid)
         try:
             mid = mv.enregistrer(self.f.conn, m)
         except mv.ErreurMouvement as e:
@@ -414,6 +420,16 @@ class PageMouvements(QWidget):
         actuel = self.classe.currentData()
         self.classe.clear()
         self.classe.addItem("غير محدد", None)
-        for r in self.f.conn.execute("SELECT code FROM classe WHERE annee_id=? ORDER BY code", (a["id"] if a else -1,)):
+        u = self.unite()
+        for r in self.f.conn.execute(
+                "SELECT c.code FROM classe c LEFT JOIN unite_scolaire u ON u.id=c.unite_id WHERE c.annee_id=? AND "
+                "(? IS NULL OR u.nom_ar=?) ORDER BY c.code", (a["id"] if a else -1, u, u)):
             self.classe.addItem(r["code"], r["code"])
         self.classe.setCurrentIndex(max(0, self.classe.findData(actuel)))
+
+    def unite(self) -> str | None:
+        return self.barre_unites.unite if hasattr(self, "barre_unites") else None
+
+    def _changer_unite(self, _u) -> None:
+        self._remplir_classes()
+        self.rafraichir()
