@@ -92,3 +92,26 @@ def test_journal(conn):
     op = dernieres_operations(conn, 1)[0]
     assert op["action"] == "ajout" and op["cible_id"] == 7
     assert "تجريبي" in op["details"]
+
+
+def test_migration_0030_avec_donnees(tmp_path):
+    """خطأ أبلغ عنه المدير 2026-11-09: إعادة بناء جدول الأقسام فشلت على قاعدة فيها تلاميذ (FOREIGN KEY)."""
+    import shutil
+    from idara.data import db
+    anciennes = tmp_path / "m"
+    anciennes.mkdir()
+    for n, _, f in db.lister_migrations():
+        if n < 30:
+            shutil.copy(f, anciennes / f.name)
+    conn = db.connecter(tmp_path / "b.sqlite")
+    db.migrer(conn, anciennes)
+    with conn:
+        conn.execute("INSERT INTO annee_scolaire(libelle, code_court, est_courante) VALUES ('2026/2027','2627',1)")
+        conn.execute("INSERT INTO classe(annee_id, code) VALUES (1, '1APG-1')")
+        conn.execute("INSERT INTO eleve(code_massar, nom_ar, prenom_ar, source) VALUES ('X000000001','أ','ب','massar')")
+        conn.execute("INSERT INTO inscription(eleve_id, annee_id, classe_id) VALUES (1, 1, 1)")
+    assert "0030_classe_par_unite" in " ".join(db.migrer(conn))
+    assert conn.execute("SELECT classe_id FROM inscription").fetchone()[0] == 1
+    assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    assert not conn.execute("PRAGMA foreign_key_check").fetchall()
+    conn.close()
