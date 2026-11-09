@@ -401,6 +401,8 @@ def generer(conn: sqlite3.Connection, dossier: DossierDonnees, code: str,
     except moteur.ErreurModele as e:
         raise ErreurDocument(str(e)) from e
     contenu = appliquer_identite(contenu, *identite(conn, dossier))
+    if not pages:   # وثيقة من صفحة واحدة: تُضبط حتى لا تنتقل أسطرها الأخيرة إلى صفحة ثانية
+        contenu = moteur.compacter(contenu)
 
     maintenant = datetime.now()
     a = annee_srv.annee_courante(conn)

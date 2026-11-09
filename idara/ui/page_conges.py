@@ -197,6 +197,8 @@ class PageConges(QWidget):
         fv.addWidget(self.titre)
         self.personnel = QComboBox()
         self.personnel.currentIndexChanged.connect(lambda _: self._maj_prolongations())
+        self.personnel.currentIndexChanged.connect(lambda _: self._maj_adresse())
+        self._adresse_auto = ""
         self.type = QComboBox()
         self.type.currentIndexChanged.connect(lambda _: self._maj_type())
         self.prolongation = QComboBox()
@@ -380,6 +382,16 @@ class PageConges(QWidget):
         else:
             self.fin.setText("")
 
+    def _maj_adresse(self) -> None:
+        """عنوان الإقامة خلال الرخصة: عنوان الموظف في ملفه افتراضياً، ويُعدَّل يدوياً عند الاقتضاء."""
+        if self.cid is not None or not hasattr(self, "adresse"):
+            return
+        pid = self.personnel.currentData()
+        r = self.f.conn.execute("SELECT adresse FROM personnel WHERE id=?", (pid,)).fetchone() if pid else None
+        if self.adresse.text().strip() in ("", self._adresse_auto):
+            self._adresse_auto = (r["adresse"] if r else "") or ""
+            self.adresse.setText(self._adresse_auto)
+
     def nouveau(self) -> None:
         self.cid = None
         self.liste.clearSelection()
@@ -389,6 +401,8 @@ class PageConges(QWidget):
                   self.deposant, self.deposant_cin, self.rem_cert, self.debut, self.recu_le, self.naissance,
                   self.horaire):
             w.clear()
+        self._adresse_auto = ""
+        self._maj_adresse()
         self.date_demande.definir(date.today().isoformat())
         self.duree.setValue(1)
         self.duree_cert.setValue(0)

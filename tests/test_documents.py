@@ -251,3 +251,21 @@ def test_vacances_exige_identite_francaise(dossier, conn, champ_dir, champ_etab,
         dc.champs_attestation_vacances(conn, dc._eleve_exemple(), "5AP", "2026-07-07", "2026-08-31")
     # المعاينة تبقى ممكنة
     assert dc.exemple(conn, "attestation_vacances")[0]["du"] == f"07/07/{__import__('datetime').date.today().year}"
+
+
+def test_compacter_une_page(pret, dossier):
+    """طلب المدير 2026-11-09: ورقة الإرسال ووصل الرخصة ومحضر الاستئناف كانت تخرج في صفحتين."""
+    import zipfile
+    from lxml import etree
+    for code in ("recu_certificat", "bordereau_envoi", "pv_reprise", "demande_remplacement"):
+        valeurs, pages = dc.exemple(pret, code, "F")
+        doc = dc.generer(pret, dossier, code, valeurs, pages, essai=True)
+        x = etree.fromstring(zipfile.ZipFile(doc.chemin).read("word/document.xml"))
+        w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+        mar = x.find(f"{w}body/{w}sectPr/{w}pgMar")
+        assert int(mar.get(f"{w}top")) <= m.MARGE_MAX and int(mar.get(f"{w}bottom")) <= m.MARGE_MAX
+        corps = [e for e in x.find(f"{w}body") if e.tag != f"{w}sectPr"]
+        dernier = corps[-1]
+        assert not any(b.get(f"{w}type") == "page" for b in dernier.iter(f"{w}br")), code
+    v, _ = dc.exemple(pret, "bordereau_envoi")
+    assert v["numero"] == ""   # رقم الإرسال يكتبه المدير بيده

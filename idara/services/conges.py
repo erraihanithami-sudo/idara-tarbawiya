@@ -434,6 +434,8 @@ def _type(conn, c: Conge) -> str:
 def valeurs_demande(conn, c: Conge, numero: str, historique: list | None = None,
                     p: rh.Personnel | None = None) -> dict[str, str]:
     p = p or rh.lire(conn, c.personnel_id)
+    if not (c.adresse_conge or "").strip():   # افتراضياً: عنوان الموظف في ملفه (قرار المدير 2026-11-09)
+        c.adresse_conge = p.adresse
     t = _type(conn, c)
     v = _communs(conn)
     v.update(_personnel_valeurs(conn, p, ("ppr", "cin", "cadre", "fonction", "cycle", "matiere", "niveau",
@@ -499,7 +501,8 @@ def valeurs_bordereau(conn, pieces: list[tuple[str, int]], numero: str, le: str,
     if any(int(n) < 1 for _, n in pieces):
         raise ErreurConge("عدد النسخ يبدأ من 1.")
     v = _communs(conn)
-    v.update({"date_redaction": tx.date_ar(le), "numero": _isoler(numero), "date_enregistrement": tx.date_ar(le),
+    # رقم الإرسال يُترك فارغاً ويكتبه المدير بيده (قرار المدير 2026-11-09)
+    v.update({"date_redaction": tx.date_ar(le), "numero": "", "date_enregistrement": tx.date_ar(le),
               "dest_bureau": v[bureau]})
     for i in range(1, 9):
         if i <= len(pieces):

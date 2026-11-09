@@ -36,7 +36,7 @@ ETIQUETTE_PIED = "IDARA_PIED"
 ETIQUETTE_FILIGRANE = "IDARA_FILIGRANE"
 
 EMU_CM = 360000
-HAUTEUR_MAX_ENTETE = int(3.2 * EMU_CM)       # لا تتجاوز الترويسة 3.2 سم
+HAUTEUR_MAX_ENTETE = int(2.6 * EMU_CM)       # لا تتجاوز الترويسة 2.6 سم (3.2 كانت تدفع آخر الأسطر إلى صفحة ثانية)
 CADRE_FILIGRANE = (int(14 * EMU_CM), int(14 * EMU_CM))  # للقوالب التي لا علامة لها
 
 _PARTIE = re.compile(r"^word/(document|header\d+|footer\d+)\.xml$")

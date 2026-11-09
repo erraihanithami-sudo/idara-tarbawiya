@@ -280,3 +280,102 @@ def texte_complet(chemin: Path | bytes) -> str:
                 if t.strip():
                     lignes.append(t)
     return "\n".join(lignes)
+
+
+# ---------- ضبط الوثيقة في صفحة واحدة (طلب المدير 2026-11-09) ----------
+
+MARGE_MAX = 680        # 1.2 سم (twips): الهامشان العلوي والسفلي
+ENTETE_MAX = 284       # 0.5 سم: بُعد الترويسة والتذييل عن حافة الصفحة
+TAILLE_VIDE = 12       # 6 نقط: حجم الأسطر الفارغة الفاصلة
+INTERLIGNE_MAX = 276   # تباعد الأسطر 1.15
+ESPACE_MAX = 120       # 6 نقط قبل الفقرة وبعدها
+
+
+def _paragraphe_vide(p, saut_ok: bool = False) -> bool:
+    """saut_ok: سطر لا يحمل إلا فاصل صفحة يُعد فارغاً (في آخر الوثيقة يصنع صفحة ثانية بيضاء)."""
+    if any((t.text or "").strip() for t in p.iter(_q(W, "t"))):
+        return False
+    for tag in ((W, "drawing"), (W, "pict"), (MC, "AlternateContent"), (W, "object"), (W, "sectPr"),
+                (W, "fldSimple"), (W, "instrText")):
+        if next(p.iter(_q(*tag)), None) is not None:
+            return False
+    return saut_ok or not any(br.get(_q(W, "type")) == "page" for br in p.iter(_q(W, "br")))
+
+
+def _resserrer(p) -> None:
+    """سطر فارغ فاصل: يُصغَّر حجمه وتُلغى المسافات قبله وبعده."""
+    ppr = p.find(_q(W, "pPr"))
+    if ppr is None:
+        ppr = etree.SubElement(p, _q(W, "pPr"))
+        p.remove(ppr)
+        p.insert(0, ppr)
+    sp = ppr.find(_q(W, "spacing"))
+    if sp is None:
+        sp = etree.SubElement(ppr, _q(W, "spacing"))
+    sp.set(_q(W, "before"), "0")
+    sp.set(_q(W, "after"), "0")
+    sp.set(_q(W, "line"), "240")
+    sp.set(_q(W, "lineRule"), "auto")
+    for conteneur in [ppr] + list(p.iter(_q(W, "r"))):
+        rpr = conteneur.find(_q(W, "rPr"))
+        if rpr is None:
+            rpr = etree.SubElement(conteneur, _q(W, "rPr"))
+            if conteneur.tag == _q(W, "r"):
+                conteneur.remove(rpr)
+                conteneur.insert(0, rpr)
+        for tag in ("sz", "szCs"):
+            e = rpr.find(_q(W, tag))
+            if e is None:
+                e = etree.SubElement(rpr, _q(W, tag))
+            e.set(_q(W, "val"), str(TAILLE_VIDE))
+
+
+def _a_cadres_flottants(body) -> bool:
+    if next(body.iter(_q(MC, "AlternateContent")), None) is not None:
+        return True
+    if next(body.iter(_q(W, "pict")), None) is not None:
+        return True
+    return any(a.find(_q(WP, "docPr")) is None or a.find(_q(WP, "docPr")).get("name") != "IDARA_ENTETE"
+               for a in body.iter(_q(WP, "anchor")))
+
+
+def compacter(contenu: bytes) -> bytes:
+    """يضبط وثيقة من صفحة واحدة حتى لا تنتقل آخر أسطرها إلى صفحة ثانية في Word:
+    هامشان علوي وسفلي لا يتجاوزان 1.2 سم، وترويسة وتذييل قريبان من الحافة، وحذف الأسطر الفارغة في آخر
+    الوثيقة، وتصغير الأسطر الفارغة الفاصلة داخلها، وتباعد أسطر لا يتجاوز 1.15. لا يمس النصوص ولا الصور."""
+    infos, contenus = _lire_parties(contenu)
+    racine = etree.fromstring(contenus["word/document.xml"])
+    body = racine.find(_q(W, "body"))
+    for sect in racine.iter(_q(W, "sectPr")):
+        mar = sect.find(_q(W, "pgMar"))
+        if mar is None:
+            continue
+        for att, maxi in (("top", MARGE_MAX), ("bottom", MARGE_MAX), ("header", ENTETE_MAX), ("footer", ENTETE_MAX)):
+            v = mar.get(_q(W, att))
+            if v is not None and v.lstrip("-").isdigit() and abs(int(v)) > maxi:
+                mar.set(_q(W, att), str(maxi if int(v) > 0 else -maxi))
+    enfants = [e for e in body if e.tag != _q(W, "sectPr")]
+    # الأسطر الفارغة في آخر الوثيقة (يبقى سطر واحد بعد جدول، فـWord يشترطه)
+    while enfants and enfants[-1].tag == _q(W, "p") and _paragraphe_vide(enfants[-1], saut_ok=True):
+        if len(enfants) > 1 and enfants[-2].tag == _q(W, "tbl"):
+            _resserrer(enfants[-1])
+            break
+        body.remove(enfants.pop())
+    # الأسطر الفارغة الفاصلة وتباعد الأسطر: فقط في الوثائق دون إطارات نصية عائمة، لأن مواضع تلك الإطارات
+    # مرتبطة بالأسطر الفارغة (محضر الاستئناف مثلاً)
+    if _a_cadres_flottants(body):
+        contenus["word/document.xml"] = _xml(racine)
+        return _ecrire(infos, contenus)
+    for e in enfants:
+        if e.tag == _q(W, "p") and _paragraphe_vide(e):
+            _resserrer(e)
+    # تباعد الأسطر لا يتجاوز 1.15، والمسافة بعد الفقرة لا تتجاوز 6 نقط
+    for sp in body.iter(_q(W, "spacing")):
+        if sp.get(_q(W, "lineRule"), "auto") == "auto" and int(sp.get(_q(W, "line"), "0") or 0) > INTERLIGNE_MAX:
+            sp.set(_q(W, "line"), str(INTERLIGNE_MAX))
+        for att in ("after", "before"):
+            v = sp.get(_q(W, att))
+            if v and v.isdigit() and int(v) > ESPACE_MAX:
+                sp.set(_q(W, att), str(ESPACE_MAX))
+    contenus["word/document.xml"] = _xml(racine)
+    return _ecrire(infos, contenus)
