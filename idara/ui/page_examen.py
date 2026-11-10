@@ -15,7 +15,7 @@ from idara.services import docs_examen as de
 from idara.services import evaluation as ev
 from idara.services import examens as exs
 from idara.services import textes as tx
-from idara.ui.composants import carte
+from idara.ui.composants import bouton, carte
 from idara.ui.formulaires import champ
 from idara.ui.page_pedagogie import _grille, _page
 from idara.ui.saisie import cellule, message, tableau
@@ -214,7 +214,12 @@ class PageExamen(QWidget):
         self.l_cands.setObjectName("sousTitre")
         self.l_cands.setWordWrap(True)
         v.addWidget(self.l_cands)
-        self.cands = tableau(["رقم الامتحان", "الاسم الكامل", "الرمز", "القاعة", "القسم"], etirer=1)
+        aide_c = QLabel("المنقطعون والمفصولون والمغادرون مستبعدون آلياً. قبل توليد الوثائق احذف كل تلميذ انقطع "
+                        "ولم يُسجَّل انقطاعه في البرنامج (زر الحذف أمامه): يُعاد ترقيم الباقين وتوزيعهم على القاعات.")
+        aide_c.setObjectName("etiquette")
+        aide_c.setWordWrap(True)
+        v.addWidget(aide_c)
+        self.cands = tableau(["رقم الامتحان", "الاسم الكامل", "الرمز", "القاعة", "القسم", ""], etirer=1)
         self.cands.setMinimumHeight(240)
         v.addWidget(self.cands)
         racine.addWidget(c)
@@ -330,7 +335,11 @@ class PageExamen(QWidget):
         for i, c in enumerate(cs):
             for j, v in enumerate((str(c["numero"]), c["nom"], c["code_massar"] or "", c["salle_nom"] or "",
                                    c["classe"] or "")):
-                self.cands.setItem(i, j, cellule(v))
+                self.cands.setItem(i, j, cellule(v, c["id"] if j == 0 else None))
+            b = bouton("حذف")
+            b.setToolTip(f"حذف {c['nom']} من لائحة المترشحين")
+            b.clicked.connect(lambda _=False, cid=c["id"], nom=c["nom"]: self.supprimer_candidat(cid, nom))
+            self.cands.setCellWidget(i, 5, b)
         ss = exs.salles(self.f.conn, self.eid)
         self.l_cands.setText(f"{len(cs)} مترشحاً" + (f"، الأرقام {cs[0]['numero']}–{cs[-1]['numero']}" if cs else "")
                              + (" · " + "، ".join(f"{s['nom']}: {s['n']}" for s in ss) if ss else ""))
@@ -421,6 +430,10 @@ class PageExamen(QWidget):
             return None
         return self._faire(lambda: exs.preparer_local(self.f.conn, self.eid),
                            "حُضّرت لائحة المترشحين من تلاميذ السادس.")
+
+    def supprimer_candidat(self, cid: int, nom: str = ""):
+        return self._faire(lambda: exs.supprimer_candidat(self.f.conn, self.eid, cid),
+                           f"حُذف {nom} من لائحة المترشحين." if nom else "حُذف المترشح.")
 
     def importer_provincial(self, chemin: Path | None = None):
         if not self.enregistrer():

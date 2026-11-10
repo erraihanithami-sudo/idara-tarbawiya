@@ -65,10 +65,13 @@ def test_recu_numerote_et_donnees_requises(conn, dossier, ex):
     o2 = asso.enregistrer(conn, asso.Operation(ex, "2025-10-02", "recette", "caisse", 50, _r(conn, "هبات"),
                                                tiers="محسن"))
     assert "رقم 02/25-26" in texte(da.generer_piece(conn, dossier, o2, "recu"))
-    with pytest.raises(asso.ErreurAssociation, match="وثائق مرقمة"):
+    with pytest.raises(asso.OperationProtegee, match="وثائق مرقمة"):
         asso.supprimer(conn, o)
     with pytest.raises(da.ErreurDocAssociation, match="لا تخص"):
         da.generer_piece(conn, dossier, o, "bon_caisse")
+    # الحذف بتأكيد صريح يحذف الوثيقة المرقمة معها (طلب المدير 2026-11-10)
+    asso.supprimer(conn, o2, forcer=True)
+    assert not conn.execute("SELECT 1 FROM piece_association WHERE operation_id=?", (o2,)).fetchone()
 
 
 def test_depense_caisse_trois_pieces(conn, dossier, ex):

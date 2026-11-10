@@ -200,3 +200,18 @@ def test_association_et_export(conn, ex, tmp_path):
     wb = openpyxl.load_workbook(f)
     assert wb.sheetnames == ["اليومية", "سجل البنك", "سجل الصندوق", "تنفيذ الميزانية", "الحصيلة"]
     assert wb["سجل الصندوق"].cell(5, 8).value == 3300 and wb["اليومية"].sheet_view.rightToLeft
+
+
+def test_supprimer_exercice(conn, ex):
+    """طلب المدير 2026-11-10: حذف سنة مالية بعملياتها، ومنقول الموالية يُحيَّن من التي قبلها."""
+    r = _rub(conn, "معدات وعتاد مكتبي")
+    e2 = asso.ouvrir_exercice(conn, "najah", "2026/2027", "2026-09-01", "2027-08-31")
+    asso.enregistrer(conn, asso.Operation(e2, "2026-10-02", "depense", "banque", 1000, r, "فاتورة"))
+    e3 = asso.ouvrir_exercice(conn, "najah", "2027/2028", "2027-09-01", "2028-08-31")
+    assert asso.report(conn, e3)["banque"] == 49000
+    asso.supprimer_exercice(conn, e2)
+    assert [e["id"] for e in asso.exercices(conn)] == [e3, ex]
+    assert asso.report(conn, e3)["banque"] == 50000     # من رصيد السنة التي قبلها
+    assert not conn.execute("SELECT 1 FROM operation_financiere WHERE exercice_id=?", (e2,)).fetchone()
+    asso.supprimer_exercice(conn, ex)                    # أول سنة: الموالية تحتفظ بمنقولها وتصير قابلة للتعديل
+    assert asso.report(conn, e3)["banque"] == 50000 and asso.peut_modifier_report(conn, e3)

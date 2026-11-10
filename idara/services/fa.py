@@ -7,7 +7,8 @@
 تُحسب السنوات مواسمَ دراسية، كل موسم بسنة، بما فيه الموسم الجاري (قرار المدير 2026-11-01).
 الترتيب تنازلي بمجموع النقط؛ عند التساوي: الأقدمية العامة، ثم بالمديرية، ثم بالمؤسسة، ثم السن،
 والأصغر سناً هو الفائض (قرار المدير). المستثنون: المبرزون، وحاملو الدكتوراه بخمس سنوات على الأقل بهذه الصفة.
-الفائض: من يبقى بعد إسناد حصة كاملة لعدد الأساتذة الذي تفرضه البنية التربوية (يُدخله المدير لكل مادة).
+الفائض: من يبقى بعد إسناد حصة كاملة لعدد الأساتذة الذي تفرضه البنية التربوية.
+يُرتَّب جميع الأساتذة معاً بغض النظر عن مادة التدريس (قرار المدير 2026-11-10)، بعدد مناصب واحد للمؤسسة.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from idara.services import annee as annee_srv
 from idara.services import personnel as rh
 
 DUREE_DOCTORAT = 5
+TOUS = "جميع المواد"   # ترتيب واحد لكل الأساتذة (قرار المدير 2026-11-10)
 
 
 class ErreurFa(ValueError):
@@ -100,7 +102,7 @@ def postes_requis(conn: sqlite3.Connection) -> dict[str, int]:
 
 
 def definir_postes(conn: sqlite3.Connection, matiere: str, nombre: int | None) -> None:
-    if matiere not in rh.MATIERES:
+    if matiere not in rh.MATIERES and matiere != TOUS:
         raise ErreurFa("مادة غير معروفة.")
     a = annee_srv.annee_courante(conn)
     if a is None:
@@ -117,16 +119,16 @@ def definir_postes(conn: sqlite3.Connection, matiere: str, nombre: int | None) -
 
 
 def calculer(conn: sqlite3.Connection, le: date | None = None) -> tuple[list[Groupe], list[rh.Personnel]]:
-    """يرجع المجموعات حسب المادة، والأساتذة بلا مادة (لا يمكن ترتيبهم)."""
+    """يرجع مجموعة واحدة (جميع الأساتذة بغض النظر عن المادة)، ولائحة فارغة للأساتذة بلا مادة (للتوافق)."""
     le = le or date.today()
     cour = saison_courante(conn)
     requis = postes_requis(conn)
     profs = rh.lister(conn, categorie="enseignant")
-    sans_matiere = [p for p in profs if not p.matiere]
+    sans_matiere: list[rh.Personnel] = []   # لم يعد شرطاً: الترتيب واحد لكل المواد
     groupes = []
-    for m in rh.MATIERES:
+    for m in [TOUS]:
         g = Groupe(m, requis.get(m))
-        for p in (x for x in profs if x.matiere == m):
+        for p in profs:
             l = Ligne(p)
             manque = [lib for k, lib in _REQUIS if not getattr(p, k)]
             ex = exemption(p, le)

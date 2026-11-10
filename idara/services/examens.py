@@ -180,6 +180,33 @@ def preparer_local(conn, eid: int) -> int:
     return len(rows)
 
 
+def supprimer_candidat(conn, eid: int, cid: int) -> None:
+    """يحذف مترشحاً من اللائحة قبل توليد الوثائق (قد يكون انقطع دون أن يُسجَّل ذلك في البرنامج، طلب المدير
+    2026-11-10). في المحلي يُعاد ترقيم الباقين تباعاً من الرقم الأول وتوزيعهم على القاعات حسب طاقتها؛ في الإقليمي
+    تبقى أرقام المديرية كما هي."""
+    ex = conn.execute("SELECT * FROM examen WHERE id=?", (eid,)).fetchone()
+    if ex is None:
+        raise ErreurExamen("الامتحان غير موجود.")
+    with conn:
+        if not conn.execute("DELETE FROM examen_candidat WHERE id=? AND examen_id=?", (cid, eid)).rowcount:
+            raise ErreurExamen("المترشح غير موجود.")
+        if ex["type"] != "local":
+            return
+        reste = [r[0] for r in conn.execute("SELECT id FROM examen_candidat WHERE examen_id=? ORDER BY numero", (eid,))]
+        salles_ = {r["numero"]: r["id"] for r in conn.execute(
+            "SELECT id, numero FROM examen_salle WHERE examen_id=?", (eid,))}
+        cap = ex["capacite"]
+        for k, c in enumerate(reste):   # أرقام مؤقتة سالبة لتفادي تكرار الرقم أثناء إعادة الترقيم
+            conn.execute("UPDATE examen_candidat SET numero=? WHERE id=?", (-(k + 1), c))
+        for k, c in enumerate(reste):
+            conn.execute("UPDATE examen_candidat SET numero=?, salle_id=? WHERE id=?",
+                         (ex["premier_numero"] + k, salles_.get(k // cap + 1), c))
+        n_salles = math.ceil(len(reste) / cap) if reste else 0
+        for num, sid in salles_.items():
+            if num > n_salles:
+                conn.execute("DELETE FROM examen_salle WHERE id=?", (sid,))
+
+
 @dataclass
 class RapportListe:
     n: int

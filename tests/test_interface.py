@@ -437,6 +437,7 @@ def test_page_personnel(app, config_tmp):
 
 
 def test_page_fa(app, config_tmp):
+    from idara.services import fa as fa_srv
     from idara.services import personnel as rh
     f = _fenetre_avec_eleves(config_tmp)
     for prenom, recrut, etab, naiss in (("الأقدم", "2003-09-16", "2010-09-01", "1978-01-01"),
@@ -444,17 +445,18 @@ def test_page_fa(app, config_tmp):
         rh.enregistrer(f.conn, rh.Personnel(nom_ar="التجريبي", prenom_ar=prenom, sexe="M", categorie="enseignant",
                                             matiere="عربية", date_naissance=naiss, date_recrutement=recrut,
                                             date_affectation_direction=recrut, date_affectation=etab))
-    rh.enregistrer(f.conn, rh.Personnel(nom_ar="ن", prenom_ar="بلا_مادة", sexe="F", categorie="enseignant"))
+    rh.enregistrer(f.conn, rh.Personnel(nom_ar="ن", prenom_ar="بلا_مادة", sexe="F", categorie="enseignant",
+                                        date_naissance="1998-01-01", date_recrutement="2024-09-16",
+                                        date_affectation_direction="2024-09-16", date_affectation="2024-09-16"))
     f.aller_a("تدبير الفائض")
     p = f.page_fa
-    c = p.cartes["عربية"]
-    assert c.table.rowCount() == 2 and c.postes.value() == -1
+    assert list(p.cartes) == [fa_srv.TOUS]   # ترتيب واحد بغض النظر عن المادة (قرار المدير 2026-11-10)
+    c = p.cartes[fa_srv.TOUS]
+    assert c.table.rowCount() == 3 and c.postes.value() == -1
     assert "حدد عدد الأساتذة" in c.etat.text()
-    assert "بلا_مادة" in p.message.text()
-    c.postes.setValue(1)
-    assert "الفائض: الأحدث التجريبي" in c.etat.text()
-    assert c.table.item(1, 7).text() == "فائض" and c.table.item(0, 0).text() == "1"
-    assert p.cartes["فرنسية"].table.rowCount() == 0
+    c.postes.setValue(2)
+    assert "الفائض: بلا_مادة ن" in c.etat.text()
+    assert c.table.item(2, 8).text() == "فائض" and c.table.item(0, 0).text() == "1"
     f.close()
 
 
@@ -745,6 +747,10 @@ def test_association_formulaire_et_report(app, config_tmp):
     e2 = p.ouvrir(dict(libelle="2027", debut="2027-01-01", fin="2027-12-31"))
     assert e2 and p.chiffres["banque"].text() == "12 500.00"
     assert not p.modifier_report(dict(banque="1", caisse="0")) and "2026" in p.message.text()
+    # حذف سنة مالية (طلب المدير 2026-11-10)
+    assert p.b_suppr_exercice.isEnabled()
+    assert not p.supprimer_exercice(confirmer=False) and p.exercice.count() == 2
+    assert p.supprimer_exercice(confirmer=True) and p.exercice.count() == 1
     f.close()
 
 
@@ -1100,6 +1106,11 @@ def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
     assert f.page_courante() == "الامتحان" and not p.b_local.isHidden() and "جدولة المواد" in p.l_manquants.text()
     p.premier.setValue(11)
     assert p.preparer_local() and p.cands.rowCount() >= 1 and p.cands.item(0, 0).text() == "11"
+    n = p.cands.rowCount()
+    if n > 1:   # زر الحذف أمام كل مترشح (طلب المدير 2026-11-10)
+        p.cands.cellWidget(0, 5).click()
+        assert p.cands.rowCount() == n - 1 and p.cands.item(0, 0).text() == "11"
+        p.preparer_local()
     p.mats.cellWidget(0, 0).setEditText("اللغة العربية")
     p.mats.setItem(0, 1, QTableWidgetItem("10/06/2027"))
     p.mats.setItem(0, 2, QTableWidgetItem("08:30"))

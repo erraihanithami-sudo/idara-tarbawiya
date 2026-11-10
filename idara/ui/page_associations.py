@@ -269,8 +269,12 @@ class PageAssociations(QWidget):
         self.b_report = QPushButton("تعديل المنقول")
         self.b_report.setToolTip("المنقول من السنة السابقة (محضر تسليم المهام أو كشف الحساب): لأول سنة مالية في التطبيق")
         self.b_report.clicked.connect(lambda: self.modifier_report())
+        self.b_suppr_exercice = bouton("حذف السنة المالية")
+        self.b_suppr_exercice.setToolTip("يحذف السنة المالية المختارة بكل عملياتها ووثائقها (بعد نسخة احتياطية)")
+        self.b_suppr_exercice.clicked.connect(lambda: self.supprimer_exercice())
         h.addWidget(self.b_ouvrir)
         h.addWidget(self.b_report)
+        h.addWidget(self.b_suppr_exercice)
         h.addStretch()
         cv.addLayout(h)
         h = QHBoxLayout()   # وثائق الدليل المسطري في سطر مستقل حتى لا تتجاوز الصفحة عرضها
@@ -498,6 +502,7 @@ class PageAssociations(QWidget):
             message(self.message, "ابدأ بفتح السنة المالية الأولى، مع المنقول من السنة السابقة "
                                   "(من محضر تسليم المهام أو كشف الحساب).")
         self.b_report.setEnabled(actif)
+        self.b_suppr_exercice.setEnabled(actif)
         e = asso.exercice(self.f.conn, self.eid) if actif else None
         if e:
             auj = date.today().isoformat()
@@ -699,16 +704,54 @@ class PageAssociations(QWidget):
             self.l_pieces.setText("")
         self.b_pieces.setEnabled(bool(types))
 
-    def supprimer(self) -> bool:
+    def _confirmer(self, titre: str, texte: str, confirmer: bool | None) -> bool:
+        if confirmer is not None:
+            return confirmer
+        from PySide6.QtWidgets import QMessageBox
+        return QMessageBox.question(self, titre, texte, QMessageBox.Yes | QMessageBox.No,
+                                    QMessageBox.No) == QMessageBox.Yes
+
+    def supprimer(self, confirmer: bool | None = None) -> bool:
+        """حذف العملية المحددة؛ العملية التي لها وثائق مرقمة أو ملف صرف تُحذف بعد تأكيد صريح (طلب المدير
+        2026-11-10)."""
         if self.op_id is None:
             return False
         try:
             asso.supprimer(self.f.conn, self.op_id)
+        except asso.OperationProtegee as e:
+            if not self._confirmer("حذف العملية", f"{e}\n\nهل تحذفها مع ذلك؟", confirmer):
+                return False
+            try:
+                asso.supprimer(self.f.conn, self.op_id, forcer=True)
+            except asso.ErreurAssociation as e2:
+                message(self.message, str(e2), True)
+                return False
         except asso.ErreurAssociation as e:
             message(self.message, str(e), True)
             return False
         self._changer_exercice()
         message(self.message, "حُذفت العملية.")
+        return True
+
+    def supprimer_exercice(self, confirmer: bool | None = None) -> bool:
+        if self.eid is None:
+            message(self.message, "لا سنة مالية محددة.", True)
+            return False
+        lib = self.exercice.currentText()
+        if not self._confirmer("حذف السنة المالية",
+                               f"ستُحذف السنة المالية {lib} بكل عملياتها ووثائقها المرقمة وميزانيتها وملفات الصرف "
+                               "الخاصة بها. تُحفظ قبل ذلك نسخة احتياطية كاملة. هل تتابع؟", confirmer):
+            return False
+        from idara.services import sauvegarde
+        try:
+            sauvegarde.creer_sauvegarde(self.f.dossier, "avant_suppression_exercice")
+            asso.supprimer_exercice(self.f.conn, self.eid)
+        except (asso.ErreurAssociation, OSError) as e:
+            message(self.message, f"تعذر الحذف: {e}", True)
+            return False
+        self.eid = None
+        self.rafraichir()
+        message(self.message, f"حُذفت السنة المالية {lib}.")
         return True
 
     def _selection_budget(self) -> None:

@@ -367,23 +367,48 @@ def enregistrer(conn, op: Operation) -> int:
     return op.id
 
 
-def supprimer(conn, op_id: int) -> None:
+class OperationProtegee(ErreurAssociation):
+    """عملية لها وثائق مرقمة أو ملف صرف: تُحذف فقط بتأكيد صريح (forcer=True)."""
+
+
+def supprimer(conn, op_id: int, forcer: bool = False) -> None:
+    """forcer: حذف عملية صدرت لها وثائق مرقمة أو ترتبط بملف صرف (طلب المدير 2026-11-10): تُحذف وثائقها المرقمة
+    من سجل الوثائق، ويعود ملف الصرف غير مؤدى."""
     r = conn.execute("SELECT * FROM operation_financiere WHERE id=?", (op_id,)).fetchone()
     if r is None:
         raise ErreurAssociation("العملية غير موجودة.")
-    if conn.execute("SELECT 1 FROM piece_association WHERE operation_id=?", (op_id,)).fetchone():
-        raise ErreurAssociation("صدرت لهذه العملية وثائق مرقمة (وصل أو سند): لا تُحذف. "
-                                "صحح الخطأ بعملية معاكسة مع ذكر السبب في البيان.")
+    if not forcer and conn.execute("SELECT 1 FROM piece_association WHERE operation_id=?", (op_id,)).fetchone():
+        raise OperationProtegee("صدرت لهذه العملية وثائق مرقمة (وصل أو سند). حذفها يحذف معها هذه الوثائق من السجل.")
     lie = _achat_lie(conn, op_id)
-    if lie:
-        raise ErreurAssociation(f"هذه العملية أداء ملف الصرف «{lie}»: لا تُحذف من هنا.")
+    if lie and not forcer:
+        raise OperationProtegee(f"هذه العملية أداء ملف الصرف «{lie}». حذفها يُرجع الملف غير مؤدى.")
     if r["rubrique_id"] == _rubrique_report(conn, exercice(conn, r["exercice_id"])["type"]):
         raise ErreurAssociation("المنقول لا يُحذف: عدّله بزر «تعديل المنقول» (أول سنة مالية) أو يُحيَّن آلياً.")
     if _premier_negatif(conn, r["exercice_id"], sauf=op_id):
         raise ErreurAssociation("حذف هذا المدخول يجعل الرصيد سالباً بعده: احذف المصاريف المرتبطة أولاً.")
     with conn:
+        conn.execute("DELETE FROM piece_association WHERE operation_id=?", (op_id,))
+        conn.execute("UPDATE achat SET operation_id=NULL WHERE operation_id=?", (op_id,))
         conn.execute("DELETE FROM operation_financiere WHERE id=?", (op_id,))
         _propager(conn, r["exercice_id"])
+
+
+def supprimer_exercice(conn, eid: int) -> None:
+    """يحذف سنة مالية بكل عملياتها ووثائقها وملفات الصرف والميزانية (طلب المدير 2026-11-10). منقول السنة
+    الموالية يُحيَّن من رصيد السنة التي قبلها، وإن لم تكن قبلها سنة يبقى كما هو (ويصير قابلاً للتعديل)."""
+    precedent, suivant = _voisin(conn, eid, "precedent"), _voisin(conn, eid, "suivant")
+    with conn:
+        achats = [r[0] for r in conn.execute("SELECT id FROM achat WHERE exercice_id=?", (eid,))]
+        if achats:
+            ids = ",".join(str(a) for a in achats)
+            for t in ("achat_offre", "achat_article", "numero_achat"):
+                conn.execute(f"DELETE FROM {t} WHERE achat_id IN ({ids})")
+            conn.execute(f"DELETE FROM achat WHERE id IN ({ids})")
+        for t in ("piece_association", "don_nature", "prevision", "operation_financiere"):
+            conn.execute(f"DELETE FROM {t} WHERE exercice_id=?", (eid,))
+        conn.execute("DELETE FROM exercice WHERE id=?", (eid,))
+        if precedent is not None and suivant is not None:
+            _propager(conn, precedent)
 
 
 def operations(conn, eid: int, registre: str | None = None) -> list[sqlite3.Row]:

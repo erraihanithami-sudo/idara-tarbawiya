@@ -160,7 +160,7 @@ def main(sortie: Path) -> None:
                                             matiere="عربية", date_naissance=naiss, date_recrutement=recrut,
                                             date_affectation_direction=direc, date_affectation=etab))
     f.aller_a("تدبير الفائض")
-    f.page_fa.cartes["عربية"].postes.setValue(3)
+    f.page_fa.cartes[next(iter(f.page_fa.cartes))].postes.setValue(3)
     photo(f, "23_fa")
     # الرخص
     from idara.services import conges as cg

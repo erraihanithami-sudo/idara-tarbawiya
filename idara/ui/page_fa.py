@@ -27,7 +27,7 @@ class CarteMatiere(QWidget):
         lay.addWidget(c)
         haut = QHBoxLayout()
         haut.setSpacing(8)
-        t = QLabel(f"مادة التدريس: {matiere}")
+        t = QLabel("جميع الأساتذة (بغض النظر عن مادة التدريس)" if matiere == fa.TOUS else f"مادة التدريس: {matiere}")
         t.setObjectName("titreCarte")
         haut.addWidget(t)
         haut.addStretch()
@@ -42,7 +42,7 @@ class CarteMatiere(QWidget):
         self.etat = QLabel()
         self.etat.setWordWrap(True)
         v.addWidget(self.etat)
-        self.table = tableau(["الرتبة", "الاسم", "العامة", "المديرية", "المؤسسة ×2",
+        self.table = tableau(["الرتبة", "الاسم", "المادة", "العامة", "المديرية", "المؤسسة ×2",
                               "المجموع", "الازدياد", "النتيجة"], etirer=1)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         v.addWidget(self.table)
@@ -61,7 +61,7 @@ class CarteMatiere(QWidget):
         self.table.setRowCount(len(lignes))
         for i, l in enumerate(lignes):
             complet = l.resultat != "incomplet"
-            vals = [l.rang or "—", f"{l.p.prenom_ar} {l.p.nom_ar}",
+            vals = [l.rang or "—", f"{l.p.prenom_ar} {l.p.nom_ar}", l.p.matiere or "—",
                     l.generale if complet else "—", l.direction if complet else "—",
                     f"{l.etablissement} × 2 = {2 * l.etablissement}" if complet else "—",
                     l.total if complet else "—",
@@ -75,7 +75,7 @@ class CarteMatiere(QWidget):
         self.table.setMinimumHeight(self.table.horizontalHeader().sizeHint().height() + 30
                                     + 40 * max(1, len(lignes)))
         if g is None or not g.lignes:
-            texte, nom = "لا أساتذة عاملون في هذه المادة.", "etiquette"
+            texte, nom = "لا أساتذة عاملون.", "etiquette"
         elif g.requis is None:
             texte, nom = "حدد عدد الأساتذة اللازم لتحديد الفائض. الترتيب أسفله محسوب.", "alerte"
         elif g.incomplets:
@@ -84,7 +84,7 @@ class CarteMatiere(QWidget):
         elif g.fa:
             texte, nom = "الفائض: " + "، ".join(f"{l.p.prenom_ar} {l.p.nom_ar}" for l in g.fa), "alerte"
         else:
-            texte, nom = "لا فائض في هذه المادة.", "ok"
+            texte, nom = "لا فائض.", "ok"
         self.etat.setObjectName(nom)
         self.etat.setText(texte)
         self.etat.style().unpolish(self.etat)
@@ -112,7 +112,7 @@ class PageFa(QWidget):
         self.message.setWordWrap(True)
         self.message.hide()
         racine.addWidget(self.message)
-        self.cartes = {m: CarteMatiere(self, m) for m in fa.rh.MATIERES}
+        self.cartes = {fa.TOUS: CarteMatiere(self, fa.TOUS)}   # ترتيب واحد (قرار المدير 2026-11-10)
         for c in self.cartes.values():
             racine.addWidget(c)
         b = QPushButton("فتح ملفات الأساتذة")

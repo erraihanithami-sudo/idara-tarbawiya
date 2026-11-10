@@ -41,6 +41,18 @@ def test_local_depuis_les_eleves_du_sixieme(base):  # noqa: F811
     assert [s["nom"] for s in exs.salles(base, ex["id"])] == ["القاعة 1", "القاعة 2"]
     with pytest.raises(exs.ErreurExamen, match="الإقليمي"):
         exs.importer_provincial(base, ex["id"], Path("x.xlsx"))
+    # حذف تلميذ انقطع دون تسجيل ذلك (طلب المدير 2026-11-10): إعادة الترقيم والتوزيع على القاعات
+    exs.supprimer_candidat(base, ex["id"], cs[0]["id"])
+    reste = exs.candidats(base, ex["id"])
+    assert [(c["numero"], c["salle_nom"], c["nom"]) for c in reste] == [(101, "القاعة 1", cs[1]["nom"])]
+    assert [s["nom"] for s in exs.salles(base, ex["id"])] == ["القاعة 1"]
+    with pytest.raises(exs.ErreurExamen, match="غير موجود"):
+        exs.supprimer_candidat(base, ex["id"], cs[0]["id"])
+    # المنقطع لا يدخل اللائحة
+    with base:
+        base.execute("UPDATE inscription SET statut='interrompu', date_sortie='2026-10-01' WHERE eleve_id="
+                     "(SELECT id FROM eleve WHERE code_massar=?)", (cs[0]["code_massar"],))
+    assert exs.preparer_local(base, ex["id"]) == 1
     _matieres(base, ex["id"])
     assert [m["debut"] for m in exs.matieres(base, ex["id"])] == ["08:30", "10:30", "08:30"]
     with pytest.raises(exs.ErreurExamen, match="قبل ساعة البداية"):
