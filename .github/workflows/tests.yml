@@ -39,6 +39,10 @@ jobs:
         if: always()
         timeout-minutes: 15
         run: python outils/captures.py rapports/captures > rapports/captures.txt 2>&1 || cat rapports/captures.txt
+      - name: قياس البطء على مؤسسة كبيرة
+        if: always()
+        timeout-minutes: 15
+        run: python outils/profil_ui.py rapports/profil_ui.txt > rapports/profil_ui_sortie.txt 2>&1 || cat rapports/profil_ui_sortie.txt
       - name: نشر التقرير في فرع rapports
         if: always()
         run: |
