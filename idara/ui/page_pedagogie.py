@@ -19,7 +19,7 @@ from idara.services import vie_scolaire as vs
 from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui import theme
-from idara.ui.saisie import ChampDate, cellule, message, tableau
+from idara.ui.saisie import ChampDate, TableauRapide, cellule, message, tableau
 
 VERT, ROUGE = QColor(theme.VERT), QColor(theme.ROUGE_TEXTE)
 
@@ -658,7 +658,7 @@ class PageRiyada(QWidget):
         self.infos_auto.setWordWrap(True)
         self.infos_auto.setObjectName("sousTitre")
         v.addWidget(self.infos_auto)
-        self.pieces = QTableWidget(0, 3)
+        self.pieces = TableauRapide(0, 3)
         self.pieces.setHorizontalHeaderLabels(["الوثيقة", "متوفرة", "ملاحظات"])
         self.pieces.verticalHeader().setVisible(False)
         self.pieces.setWordWrap(True)

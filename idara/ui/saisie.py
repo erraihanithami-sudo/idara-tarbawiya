@@ -108,8 +108,47 @@ def message(label: QLabel, texte: str, erreur: bool = False) -> None:
     label.show()
 
 
+class TableauRapide(QTableWidget):
+    """جدول لا يعيد حساب عرض الأعمدة عند كل خانة (بلاغ المدير 2026-11-10: توقف البرنامج مع 347 تلميذاً).
+
+    الأعمدة «على قدر المحتوى» كانت تُحسب من جديد بعد كل setItem، فملء 350 سطراً × 6 أعمدة يأخذ 5 ثوان أو أكثر.
+    عند تغيير عدد الأسطر تُجمَّد هذه الأعمدة، ثم يُحسب عرضها مرة واحدة بعد انتهاء الملء."""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self._modes: list | None = None
+
+    def setRowCount(self, n: int) -> None:   # noqa: N802 (اسم Qt)
+        self.suspendre()
+        super().setRowCount(n)
+
+    def insertRow(self, r: int) -> None:   # noqa: N802
+        self.suspendre()
+        super().insertRow(r)
+
+    def suspendre(self) -> None:
+        if self._modes is not None:
+            return
+        h = self.horizontalHeader()
+        self._modes = [h.sectionResizeMode(i) for i in range(self.columnCount())]
+        for i, m in enumerate(self._modes):
+            if m == QHeaderView.ResizeToContents:
+                h.setSectionResizeMode(i, QHeaderView.Interactive)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self.reprendre)
+
+    def reprendre(self) -> None:
+        if self._modes is None:
+            return
+        h = self.horizontalHeader()
+        modes, self._modes = self._modes, None
+        for i, m in enumerate(modes):
+            if i < self.columnCount() and m == QHeaderView.ResizeToContents:
+                h.setSectionResizeMode(i, m)
+
+
 def tableau(colonnes: list[str], etirer: int = 1) -> QTableWidget:
-    t = QTableWidget(0, len(colonnes))
+    t = TableauRapide(0, len(colonnes))
     t.setHorizontalHeaderLabels(colonnes)
     t.verticalHeader().setVisible(False)
     t.verticalHeader().setDefaultSectionSize(40)

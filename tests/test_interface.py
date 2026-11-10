@@ -1563,3 +1563,28 @@ def test_pv_ressources_humaines(app, config_tmp, monkeypatch):
     assert r is not None, p.message.text()
     assert "آخر المحاضر" in p.l_collectifs.text()
     f.close()
+
+
+def test_tableau_rapide_suspend_puis_retablit_les_largeurs(app):
+    """بلاغ 2026-11-10: ملء جدول كبير كان يعيد حساب عرض الأعمدة بعد كل خانة."""
+    import time
+
+    from PySide6.QtWidgets import QApplication, QHeaderView, QTableWidgetItem
+
+    from idara.ui.saisie import tableau
+    t = tableau(["أ", "ب", "ج", "د"])
+    h = t.horizontalHeader()
+    assert h.sectionResizeMode(0) == QHeaderView.ResizeToContents
+    debut = time.perf_counter()
+    t.setRowCount(400)
+    assert h.sectionResizeMode(0) == QHeaderView.Interactive     # مجمّد أثناء الملء
+    for i in range(400):
+        for j in range(4):
+            t.setItem(i, j, QTableWidgetItem(f"خانة طويلة نسبياً {i}-{j}"))
+    assert time.perf_counter() - debut < 3
+    QApplication.processEvents()
+    assert h.sectionResizeMode(0) == QHeaderView.ResizeToContents   # يُستعاد بعد الملء
+    assert h.sectionResizeMode(1) == QHeaderView.Stretch
+    t.insertRow(0)
+    QApplication.processEvents()
+    assert h.sectionResizeMode(2) == QHeaderView.ResizeToContents

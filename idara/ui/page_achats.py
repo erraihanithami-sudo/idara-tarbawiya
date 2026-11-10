@@ -16,7 +16,7 @@ from idara.services import bureautique
 from idara.services import textes as tx
 from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
-from idara.ui.saisie import ChampDate, cellule, message, tableau
+from idara.ui.saisie import ChampDate, TableauRapide, cellule, message, tableau
 
 TYPE = "najah"
 COURTS = {"demande_devis": "طلب عرض أثمان", "modele_devis": "نموذج عرض الأثمان", "invitations": "دعوات اللجنة",
@@ -64,7 +64,7 @@ def _combo_services() -> QComboBox:
 
 
 def _table_edit(colonnes: list[str], lignes: int, etirer: int = 0) -> QTableWidget:
-    t = QTableWidget(lignes, len(colonnes))
+    t = TableauRapide(lignes, len(colonnes))
     t.setHorizontalHeaderLabels(colonnes)
     t.verticalHeader().setVisible(False)
     t.setEditTriggers(QAbstractItemView.AllEditTriggers)

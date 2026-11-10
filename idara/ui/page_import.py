@@ -15,6 +15,7 @@ from idara.services import textes as tx
 from idara.services.massar import ErreurMassar
 from idara.ui.composants import carte, entete
 from idara.ui.unites import BarreUnites
+from idara.ui.saisie import TableauRapide
 
 MAX_LIGNES = 40
 
@@ -110,7 +111,7 @@ class PageImport(QWidget):
         self.choix_classe.currentIndexChanged.connect(self._remplir_table)
         hc.addWidget(self.choix_classe, 1)
         nv.addLayout(hc)
-        self.table = QTableWidget(0, 5)
+        self.table = TableauRapide(0, 5)
         self.table.setHorizontalHeaderLabels(["الرمز", "الاسم", "تاريخ الازدياد", "المستوى", "ملاحظة"])
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(48)
@@ -136,7 +137,7 @@ class PageImport(QWidget):
         a3.setObjectName("etiquette")
         a3.setWordWrap(True)
         uv.addWidget(a3)
-        self.t_unites = QTableWidget(0, 3)
+        self.t_unites = TableauRapide(0, 3)
         self.t_unites.setHorizontalHeaderLabels(["القسم", "الوحدة المدرسية", "التلاميذ"])
         self.t_unites.verticalHeader().setVisible(False)
         self.t_unites.verticalHeader().setDefaultSectionSize(46)
