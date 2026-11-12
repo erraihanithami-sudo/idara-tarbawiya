@@ -13,10 +13,10 @@ from PySide6.QtGui import QFont, QFontDatabase
 # appliquer() تعوّضها بقيم المظهر المختار وتعيد بناء ورقة الأنماط. كل الألوان المكتوب بها نص تحترم
 # تباين 4.5:1 على خلفيتها (مختبر في tests/test_theme.py).
 # ---------------------------------------------------------------------------
-from idara.ui.palettes import NOMS_THEMES, PALETTES  # noqa: E402
+from idara.ui.palettes import NOMS_THEMES, PALETTES, THEME_DEFAUT  # noqa: E402
 
-THEME_ACTUEL = "classique"
-globals().update(PALETTES["classique"])
+THEME_ACTUEL = THEME_DEFAUT
+globals().update(PALETTES[THEME_DEFAUT])
 DORE = "#C9A04A"   # الخط الذهبي في البطاقات
 
 DOSSIER_POLICES = Path(__file__).resolve().parent.parent / "resources" / "fonts"
@@ -24,15 +24,36 @@ POLICE_PREFEREE = "IBM Plex Sans Arabic"
 POLICES_SECOURS = ["Segoe UI", "Tahoma", "Arial"]
 
 
+_FAMILLES_CHARGEES: list[str] | None = None
+
+
+def familles_chargees() -> list[str]:
+    """الخطوط المرفقة (تُحمَّل مرة واحدة)."""
+    global _FAMILLES_CHARGEES
+    from PySide6.QtGui import QGuiApplication
+    if QGuiApplication.instance() is None:   # قبل إنشاء التطبيق لا يمكن تحميل الخطوط (ولا نحفظ النتيجة)
+        return []
+    if _FAMILLES_CHARGEES is None:
+        _FAMILLES_CHARGEES = []
+        if DOSSIER_POLICES.exists():
+            for f in sorted(DOSSIER_POLICES.glob("*.ttf")):
+                fid = QFontDatabase.addApplicationFont(str(f))
+                if fid >= 0:
+                    _FAMILLES_CHARGEES += QFontDatabase.applicationFontFamilies(fid)
+    return _FAMILLES_CHARGEES
+
+
+def police_titres() -> str | None:
+    """خط العناوين الخاص بالمظهر (أميري في المظهر المغربي) إن كان مرفقاً ومختلفاً عن خط الواجهة."""
+    t = globals().get("POLICE_TITRE")
+    return t if t and t != globals().get("POLICE") and t in familles_chargees() else None
+
+
 def charger_police() -> QFont:
-    """يحمّل الخط المرفق إن وُجد، وإلا يستعمل خطوط Windows العربية."""
-    familles = []
-    if DOSSIER_POLICES.exists():
-        for f in sorted(DOSSIER_POLICES.glob("*.ttf")):
-            fid = QFontDatabase.addApplicationFont(str(f))
-            if fid >= 0:
-                familles += QFontDatabase.applicationFontFamilies(fid)
-    famille = POLICE_PREFEREE if POLICE_PREFEREE in familles else POLICES_SECOURS[0]
+    """يحمّل خط المظهر المختار إن كان مرفقاً، وإلا الخط الافتراضي، وإلا خطوط Windows العربية."""
+    familles = familles_chargees()
+    voulu = globals().get("POLICE") or POLICE_PREFEREE
+    famille = next((f for f in (voulu, POLICE_PREFEREE) if f in familles), POLICES_SECOURS[0])
     police = QFont(famille, 10)
     police.setFamilies([famille, *POLICES_SECOURS])
     return police
@@ -67,7 +88,7 @@ QLineEdit, QComboBox, QDateEdit {{
 QComboBox::drop-down {{ border: 0; width: 30px; }}
 QComboBox QAbstractItemView {{ background: {BLANC}; selection-background-color: {VERT_CLAIR};
     selection-color: {VERT_FONCE}; }}
-QLineEdit:focus, QComboBox:focus, QDateEdit:focus {{ border: 2px solid {VERT}; }}
+QLineEdit:focus, QComboBox:focus, QDateEdit:focus {{ border: 2px solid {FOCUS}; }}
 QPushButton {{
     background: {BLANC}; border: 1px solid {BORDURE_CHAMP}; border-radius: 10px;
     padding: 0 18px; min-height: 42px; }}
@@ -102,10 +123,10 @@ QRadioButton {{ min-height: 36px; }}
 QRadioButton::indicator, QCheckBox::indicator {{ width: 18px; height: 18px; }}
 QTableWidget, QTableView, QListWidget, QPlainTextEdit, QTextEdit {{
     background: {BLANC}; border: 1px solid {BORDURE_CHAMP}; border-radius: 6px; gridline-color: {BORDURE_CARTE}; }}
-QHeaderView::section {{ background: {PLATRE}; color: {MARINE}; font-weight: 600; padding: 6px 8px;
+QHeaderView::section {{ background: {ENTETE_FOND}; color: {ENTETE_TEXTE}; font-weight: 600; padding: 6px 8px;
     border: 0; border-bottom: 2px solid {BORDURE_CHAMP}; border-left: 1px solid {BORDURE_CARTE}; }}
 QTableWidget::item:selected, QListWidget::item:selected {{ background: {VERT_CLAIR}; color: {MARINE}; }}
-QPlainTextEdit:focus, QTextEdit:focus {{ border: 2px solid {VERT}; }}
+QPlainTextEdit:focus, QTextEdit:focus {{ border: 2px solid {FOCUS}; }}
 QTabWidget#sections > QTabBar {{ border-bottom: 1px solid {BORDURE_CARTE}; }}
 QScrollArea#defilNav QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
 QScrollArea#defilNav QScrollBar::handle:vertical {{ background: {NAV_TEXTE2}; border-radius: 4px; min-height: 30px; }}
@@ -129,13 +150,51 @@ QLineEdit#rechercheNav:focus {{ border: 2px solid {NAV_ACCENT}; }}
 #numero {{ background: {NAV_ACCENT}; color: #1A1A1A; border-radius: 13px; font-weight: 700; }}
 #pastille {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; border-radius: 10px; padding: 2px 10px;
     font-weight: 600; font-size: 9pt; }}
+""" + feuille_maghribi()
+
+
+def feuille_maghribi() -> str:
+    """لمسات إضافية خاصة بالمظاهر ذات العناوين المزخرفة (المغربي): خط أميري، خط ذهبي، زوايا أنعم."""
+    if not TITRE_SOULIGNE:
+        return ""
+    titre = police_titres()
+    fam = f'font-family: "{titre}";' if titre else ""
+    return f"""
+#titrePage {{ {fam} font-size: 24pt; font-weight: 700; color: {VERT_FONCE};
+    border-bottom: 2px solid {TITRE_SOULIGNE}; padding-bottom: 4px; }}
+#etapeTitre {{ {fam} font-size: 19pt; }}
+#navTitre {{ {fam} font-size: 15pt; }}
+#titreCarte {{ color: {VERT_FONCE}; }}
+#carte, #tuile {{ border-radius: 16px; border: 1px solid {BORDURE_CARTE}; }}
+#tuile {{ border-top: 3px solid {TITRE_SOULIGNE}; }}
+#chiffre {{ color: {VERT_FONCE}; }}
+QPushButton {{ border-radius: 11px; color: {VERT_FONCE}; font-weight: 600; }}
+QPushButton:hover {{ background: {VERT_CLAIR}; border-color: {TITRE_SOULIGNE}; }}
+QPushButton#principal {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1E6B4A, stop:1 {VERT});
+    color: {BLANC}; border: 1px solid {VERT_FONCE}; }}
+QPushButton#principal:hover {{ background: {VERT_FONCE}; border-color: {TITRE_SOULIGNE}; }}
+QPushButton#nav, QPushButton#sousnav {{ color: {NAV_TEXTE}; }}
+QPushButton#nav:checked {{ border-right: 4px solid {NAV_ACCENT}; }}
+QLineEdit, QComboBox, QDateEdit {{ border-radius: 10px; }}
+QLineEdit:hover, QComboBox:hover, QDateEdit:hover {{ border-color: {TITRE_SOULIGNE}; }}
+QTableWidget, QTableView {{ border-radius: 12px; alternate-background-color: #FBF8F1;
+    selection-background-color: {VERT_CLAIR}; }}
+QTableWidget::item:selected, QTableView::item:selected {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; }}
+QHeaderView::section {{ border-left: 1px solid #164B39; border-bottom: 2px solid {TITRE_SOULIGNE}; padding: 8px; }}
+QTabBar::tab:selected {{ border-bottom: 3px solid {TITRE_SOULIGNE}; }}
+#pastille {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; border: 1px solid #E8D49C; }}
+QScrollBar:vertical {{ background: transparent; width: 11px; margin: 3px; }}
+QScrollBar::handle:vertical {{ background: #D8CCB2; border-radius: 5px; min-height: 30px; }}
+QScrollBar::handle:vertical:hover {{ background: {TITRE_SOULIGNE}; }}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+QToolTip {{ background: {VERT_FONCE}; color: #FFFFFF; border: 1px solid {TITRE_SOULIGNE}; padding: 5px; }}
 """
 
 
 def appliquer(nom: str) -> str:
     """يفعّل مظهراً ويرجع ورقة الأنماط المناسبة له (المظهر غير المعروف ← الأصلي)."""
     global THEME_ACTUEL, FEUILLE_STYLE
-    THEME_ACTUEL = nom if nom in PALETTES else "classique"
+    THEME_ACTUEL = nom if nom in PALETTES else THEME_DEFAUT
     globals().update(PALETTES[THEME_ACTUEL])
     FEUILLE_STYLE = feuille()
     return FEUILLE_STYLE

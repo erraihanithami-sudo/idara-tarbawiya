@@ -15,3 +15,8 @@ def test_contraste_palettes(nom):
 def test_palettes_completes():
     cles = set(PALETTES["classique"])
     assert all(set(p) == cles for p in PALETTES.values()) and set(NOMS_THEMES) == set(PALETTES)
+
+
+def test_maghribi_par_defaut():
+    from idara.ui.palettes import THEME_DEFAUT
+    assert THEME_DEFAUT == "maghribi" and PALETTES["maghribi"]["POLICE_TITRE"] == "Amiri"

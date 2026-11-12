@@ -303,7 +303,7 @@ def main(sortie: Path) -> None:
     f.aller_a("محاضر نهاية الأسدوس")
     photo(f, "47_deliberations")
     # المظاهر والصفحات الجديدة (اقتراح المدير 2026-11-06)
-    for nom in ("marine", "violet", "classique"):
+    for nom in ("marine", "violet", "classique", "maghribi"):
         f.appliquer_theme(nom)
         f.aller_a("لوحة القيادة")
         photo(f, f"50_theme_{nom}_tableau")

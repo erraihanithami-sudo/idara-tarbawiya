@@ -1282,7 +1282,7 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     # المظهر: يُطبَّق ويُحفظ، والشريط الجانبي يُعاد بناؤه
     f.aller_a("إعداد المؤسسة")
     c = f.page_etab.choix_theme
-    assert c.count() == 3
+    assert c.count() == 4
     c.setCurrentIndex(c.findData("marine"))
     assert theme.THEME_ACTUEL == "marine" and config_srv.lire_config()["theme"] == "marine"
     assert theme.NAV_FOND in f.styleSheet() and f.page_courante() == "إعداد المؤسسة"
@@ -1292,6 +1292,8 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     assert theme.THEME_ACTUEL == "violet"
     c.setCurrentIndex(c.findData("classique"))
     assert theme.THEME_ACTUEL == "classique"
+    c.setCurrentIndex(c.findData("maghribi"))
+    assert theme.THEME_ACTUEL == "maghribi" and theme.NAV_TEXTE_ACTIF == "#0B3B2C"
     # الدليل
     f.aller_a("دليل الاستخدام")
     g = f.page_guide

@@ -48,8 +48,14 @@ def creer_application(argv=None) -> QApplication:
     app = QApplication.instance() or QApplication(argv or sys.argv)
     app.setApplicationName(NOM_APPLICATION)
     app.setLayoutDirection(Qt.RightToLeft)
-    app.setFont(theme.charger_police())
-    app.setStyleSheet(theme.appliquer(config_srv.lire_config().get("theme", "classique")))   # المظهر المختار
+    cfg = config_srv.lire_config()
+    if not cfg.get("theme_maghribi_applique"):
+        # المظهر المغربي يُفعَّل مرة واحدة عند التحديث (طلب المدير 2026-11-12)، ثم يبقى اختياره حراً
+        config_srv.ecrire_config(theme=theme.THEME_DEFAUT, theme_maghribi_applique=True)
+        cfg = config_srv.lire_config()
+    theme.appliquer(cfg.get("theme", theme.THEME_DEFAUT))   # المظهر المختار
+    app.setFont(theme.charger_police())   # بعد المظهر: لكل مظهر خطه
+    app.setStyleSheet(theme.appliquer(theme.THEME_ACTUEL))   # بعد تحميل الخطوط (خط العناوين)
     return app
 
 
