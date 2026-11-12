@@ -1663,3 +1663,55 @@ def test_annees_scolaires_archive_et_consultation(app, config_tmp):
     assert d.table.rowCount() == 3
     d.close()
     f.close()
+
+
+def test_page_passation(app, config_tmp, monkeypatch):
+    """محضر تسليم المهام (نموذج المدير 2026-11-12): المحاور، الإدخال اليدوي، الاستيراد، والتوليد."""
+    import openpyxl
+    from PySide6.QtCore import Qt
+
+    from idara.services import bureautique
+    from idara.services import passation as ps
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("تسليم المهام")
+    p = f.page_passation
+    assert f.page_courante() == "تسليم المهام" and p.liste.count() == len(ps.SECTIONS)
+    assert p.cle == "etablissement" and p.editeurs["nom"].text() == "مدرسة تجريبية"
+    p.editeurs["cercle"].setText("الدائرة التجريبية")
+    p.liste.setCurrentRow([s.cle for s in ps.SECTIONS].index("eleves"))      # الانتقال يحفظ المحور السابق
+    assert ps.lire(f.conn, "etablissement")["champs"]["cercle"] == "الدائرة التجريبية"
+    assert p.table is not None and sum(int(p.table.item(i, 1).text()) for i in range(p.table.rowCount())) == 5
+    p.table.item(0, 2).setText("5")
+    p.actualiser()
+    assert p.table.item(0, 2).text() == "5" and not p.b_actualiser.isHidden()
+    # لائحة الكتب: إضافة سطر، استيراد من Excel، حذف
+    p.liste.setCurrentRow([s.cle for s in ps.SECTIONS].index("livres"))
+    assert not p.b_importer.isHidden() and p.table.rowCount() == 0
+    p.ajouter_ligne()
+    p.table.item(0, 0).setText("كتاب يدوي")
+    p.table.item(0, 1).setText("02")
+    wb = openpyxl.Workbook()
+    wb.active.append(["العنوان", "العدد"])
+    wb.active.append(["كتاب مستورد", 3])
+    wb.save(config_tmp / "kutub.xlsx")
+    assert p.importer(str(config_tmp / "kutub.xlsx")) == 1
+    assert [l[0] for l in ps.lire(f.conn, "livres")["lignes"]] == ["كتاب يدوي", "كتاب مستورد"]
+    p.table.selectRow(0)
+    p.supprimer_lignes()
+    p.enregistrer()
+    assert [l[0] for l in ps.lire(f.conn, "livres")["lignes"]] == ["كتاب مستورد"]
+    # إخفاء محور وتغيير موضعه
+    p.liste.item(p.liste.currentRow()).setCheckState(Qt.Unchecked)
+    assert dict((s.cle, a) for s, a in ps.sections(f.conn))["livres"] is False
+    p.deplacer(-1)
+    assert [s.cle for s, _ in ps.sections(f.conn)].index("livres") == \
+        [s.cle for s in ps.SECTIONS].index("livres") - 1 and p.cle == "livres"
+    p.retablir()
+    assert all(a for _, a in ps.sections(f.conn))
+    p.date_pv.setText("25/07/2026")
+    chemin = p.generer()
+    assert chemin is not None and chemin.exists() and ouverts == [chemin], p.message.text()
+    assert ps.lire(f.conn, "_general")["champs"]["date_pv"] == "2026-07-25"
+    f.close()

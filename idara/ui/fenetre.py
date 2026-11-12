@@ -46,6 +46,7 @@ from idara.ui.page_statistiques import PageStatistiques
 from idara.ui.page_inscriptions import PageInscriptions
 from idara.ui.page_absences import PageAbsences
 from idara.ui.page_soutien import PageSoutien
+from idara.ui.page_passation import PagePassation
 from idara.ui.page_projet import PageProjet
 from idara.ui.page_pv_rh import PagePvRh
 from idara.ui.page_examen import PageDeliberations, PageExamen
@@ -495,11 +496,6 @@ A_VENIR = {
     "استثمار النتائج": (
         ["تحليل نتائج المراقبة المستمرة والامتحان حسب المستويات والمواد، وتحديد حاجيات الدعم."],
         ["نموذج تقرير استثمار النتائج الذي تعتمدونه إن وُجد."]),
-    "تسليم المهام": (
-        ["محضر تسليم المهام الإدارية: يُحيَّن آلياً من معطيات المؤسسة (التلاميذ، الموظفون، الجرد، الجمعيات)، "
-         "والمحاور اختيارية.",
-         "محضر تسليم المهام المالية لجمعية النجاح موجود في صفحتها (الملحق 25)."],
-        ["نموذج محضر تسليم المهام المعتمد عندكم."]),
 }
 
 
@@ -612,7 +608,8 @@ MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "
              "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص",
              "الدعم التربوي": "دعم متعثرين تعثر معالجة سجل",
              "مشروع المؤسسة": "مشروع مؤشرات عمليات خطة العمل مسار حصيلة",
-             "محاضر الموارد البشرية": "محضر التحاق دخول خروج توقيع"}
+             "محاضر الموارد البشرية": "محضر التحاق دخول خروج توقيع",
+             "تسليم المهام": "محضر تسليم المهام المدير الجديد السابق مفاتيح أختام بنايات"}
 
 
 class BarreLaterale(QFrame):
@@ -682,6 +679,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_soutien = PageSoutien(self)
         self.page_projet = PageProjet(self)
         self.page_pv_rh = PagePvRh(self)
+        self.page_passation = PagePassation(self)
         self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
@@ -692,7 +690,8 @@ class FenetrePrincipale(QMainWindow):
                       "دليل الاستخدام": self.page_guide, "الإحصائيات": self.page_stats,
                       "التسجيلات": self.page_inscriptions, "تتبع الغياب": self.page_absences,
                       "الدعم التربوي": self.page_soutien,
-                      "مشروع المؤسسة": self.page_projet, "محاضر الموارد البشرية": self.page_pv_rh}
+                      "مشروع المؤسسة": self.page_projet, "محاضر الموارد البشرية": self.page_pv_rh,
+                      "تسليم المهام": self.page_passation}
         from idara.ui import vidage_ui
         vidage_ui.installer(self)   # تفريغ كل مكوّن من صفحته (طلب المدير 2026-11-07)
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
