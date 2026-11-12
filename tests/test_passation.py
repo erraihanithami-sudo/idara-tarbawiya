@@ -115,3 +115,11 @@ def test_generer_le_proces_verbal(base, dossier):  # noqa: F811
         ps.activer(base, s.cle, False)
     with pytest.raises(ps.ErreurPassation, match="لا محور"):
         ps.generer(base, dossier)
+
+
+def test_eleves_sans_unite_comptes(base):  # noqa: F811
+    """أقسام لم تُسند إلى وحداتها بعد (حالة رصدها اختبار الواجهة): لا يضيع أي تلميذ من العدد."""
+    from idara.services import etablissement as et
+    et.definir_unites(base, ["الوحدة المركزية", "فرعية الجبل"])
+    l = ps.lire(base, "eleves")["lignes"]
+    assert len(l) == 1 and int(l[0][1]) == int(ps.lire(base, "ressources")["champs"]["nb_eleves"]) > 0

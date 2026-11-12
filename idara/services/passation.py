@@ -265,9 +265,16 @@ def _auto_ressources(conn) -> dict:
 def _auto_eleves(conn) -> dict:
     eff = _effectifs(conn)
     us = _unites(conn)
-    if len(us) == 1 and us[0][0] is None:
-        return {"lignes": [[us[0][1], str(sum(eff.values())), "", "", "", "", ""]]}
-    return {"lignes": [[nom, str(eff.get(uid, 0)), "", "", "", "", ""] for uid, nom in us]}
+    vide = ["", "", "", "", ""]
+    sans_unite = sum(n for u, n in eff.items() if u is None or u not in {x for x, _ in us})
+    if (len(us) == 1 and us[0][0] is None) or sans_unite == sum(eff.values()):
+        # مؤسسة مستقلة، أو أقسام لم تُسند بعد إلى وحداتها: سطر واحد للمؤسسة
+        e = etab_srv.lire_etablissement(conn)
+        return {"lignes": [[e.nom_ar if e else us[0][1], str(sum(eff.values()))] + vide]}
+    lignes = [[nom, str(eff.get(uid, 0))] + vide for uid, nom in us]
+    if sans_unite:
+        lignes.append(["أقسام غير مسندة إلى وحدة", str(sans_unite)] + vide)
+    return {"lignes": lignes}
 
 
 def _situation(p: rh.Personnel) -> str:
