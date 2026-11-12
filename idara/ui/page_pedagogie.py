@@ -597,8 +597,9 @@ class PageRiyada(QWidget):
         self.annee, self.phase = QComboBox(), QComboBox()
         # ---- حساب ISA2 من نتائج الروائز (صيغة المدير 2026-11-12) ----
         c, v = carte("حساب مؤشر التحكم في التعلمات ISA2 من نتائج الروائز")
-        f = QLabel(f"Ind = [(3×A + 2×B + 1×C) / 3] × 100   ؛   ISA2 = α × Ind   ؛   α = {isa_srv.ALPHA:g}    —    "
-                   "A: تحكم تام، B: تحكم مقنع، C: تحكم ضعيف. ISA0: الرائز القبلي، ISA1: الرائز البعدي.")
+        f = QLabel("طريقة الحساب: \u2066Ind = [(3*A + 2*B + 1*C) / 3] * 100\u2069 ثم "
+                   f"\u2066ISA2 = {isa_srv.ALPHA:g} * Ind\u2069 — A: تحكم تام، B: تحكم مقنع، C: تحكم ضعيف "
+                   "(نسب التلاميذ). ISA0: الرائز القبلي، ISA1: الرائز البعدي.")
         f.setObjectName("info")
         f.setWordWrap(True)
         v.addWidget(f)
@@ -784,8 +785,12 @@ class PageRiyada(QWidget):
             if k is not None and k.total:
                 o = self.isa_srv.objectif(k.isa)
                 calc = [str(k.total), f"{k.ind:.2f}%", f"{k.isa:.2f}%",
-                        f"{o['cible_min']:.2f}% – {o['cible_max']:.2f}%  ({o['objectif']})"]
-            for j, it in enumerate(fixe + [cellule(x) for x in vals] + [cellule(x) for x in calc]):
+                        f"من {o['cible_min']:.2f}% إلى {o['cible_max']:.2f}%"]
+            items = fixe + [cellule(x) for x in vals] + [cellule(x) for x in calc]
+            if k is not None and k.total:
+                items[8].setToolTip(f"الفئة: {o['categorie']} — التطور المرتقب من {o['min']} إلى {o['max']} نقطة "
+                                    f"— الهدف حسب الجدول: {o['objectif']}")
+            for j, it in enumerate(items):
                 if j not in (2, 3, 4):
                     it.setFlags(it.flags() & ~Qt.ItemIsEditable)
                 self.comptes.setItem(i, j, it)

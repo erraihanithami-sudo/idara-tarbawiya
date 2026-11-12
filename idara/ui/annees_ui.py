@@ -15,7 +15,7 @@ def libelle_bouton(conn) -> str:
     a = annee_srv.annee_courante(conn)
     if not a:
         return "السنة الدراسية: —"
-    return f"السنة الدراسية {a['libelle']}" + ("  ·  أرشيف" if annee_srv.en_consultation(conn) else "") + "  ▾"
+    return f"السنة الدراسية {a['libelle']}" + ("  ·  أرشيف" if annee_srv.en_consultation(conn) else "")
 
 
 class BandeauArchive(QWidget):

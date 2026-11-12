@@ -987,7 +987,8 @@ def test_page_riyada_isa2_calcule(app, config_tmp, monkeypatch, tmp_path):
     assert m == "ar"
     fic = _fichier(tmp_path / "post.xlsx", cl, [("A", "A", "B"), ("B", "C", "B"), ("C", "A", "B")])
     assert p.importer_resultats([fic]) and "3 تلميذاً" in p.message.text()
-    assert p.comptes.item(0, 7).text() == f"{isa_srv.Calcul(1, 1, 1).isa:.2f}%" and "OB" in p.comptes.item(0, 8).text()
+    assert p.comptes.item(0, 7).text() == f"{isa_srv.Calcul(1, 1, 1).isa:.2f}%" and "إلى" in p.comptes.item(0, 8).text() \
+        and "OB" in p.comptes.item(0, 8).toolTip()
     p.phase_r.setCurrentIndex(p.phase_r.findData(-1))   # الرائز القبلي يدوياً
     p.comptes.item(0, 2).setText("0")
     p.comptes.item(0, 3).setText("1")
