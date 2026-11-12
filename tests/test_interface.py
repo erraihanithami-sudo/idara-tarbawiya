@@ -1698,7 +1698,8 @@ def test_page_passation(app, config_tmp, monkeypatch):
     wb.save(config_tmp / "kutub.xlsx")
     assert p.importer(str(config_tmp / "kutub.xlsx")) == 1
     assert [l[0] for l in ps.lire(f.conn, "livres")["lignes"]] == ["كتاب يدوي", "كتاب مستورد"]
-    p.table.selectRow(0)
+    from idara.ui.saisie import selectionner
+    selectionner(p.table, 0)
     p.supprimer_lignes()
     p.enregistrer()
     assert [l[0] for l in ps.lire(f.conn, "livres")["lignes"]] == ["كتاب مستورد"]
