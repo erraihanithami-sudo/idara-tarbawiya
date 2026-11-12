@@ -710,7 +710,15 @@ class FenetrePrincipale(QMainWindow):
         self._disposition = h
         self.barre = self._barre_laterale()
         h.addWidget(self.barre)
-        h.addWidget(self.pile, 1)
+        from idara.ui.annees_ui import BandeauArchive
+        droite = QWidget()
+        dv = QVBoxLayout(droite)
+        dv.setContentsMargins(0, 0, 0, 0)
+        dv.setSpacing(0)
+        self.bandeau_archive = BandeauArchive(self)   # الاطلاع على سنة ماضية (طلب المدير 2026-11-12)
+        dv.addWidget(self.bandeau_archive)
+        dv.addWidget(self.pile, 1)
+        h.addWidget(droite, 1)
         self.setCentralWidget(centre)
         self.aller(0)
 
@@ -745,6 +753,16 @@ class FenetrePrincipale(QMainWindow):
         noms.addWidget(self.nom_etab)
         tete.addLayout(noms, 1)
         v.addLayout(tete)
+        # السنة الدراسية المفتوحة: فتح سنة جديدة أو الاطلاع على السنوات الماضية (طلب المدير 2026-11-12)
+        self.b_annee = QPushButton()
+        self.b_annee.setObjectName("boutonAnnee")
+        self.b_annee.setCursor(Qt.PointingHandCursor)
+        self.b_annee.setToolTip("السنوات الدراسية: فتح سنة جديدة، أو الاطلاع على معطيات سنة ماضية")
+        self.b_annee.clicked.connect(lambda: self.gerer_annees())
+        ra = QHBoxLayout()
+        ra.setContentsMargins(14, 0, 14, 10)
+        ra.addWidget(self.b_annee)
+        v.addLayout(ra)
         # البحث في الصفحات (اقتراح المدير 2026-11-06)
         self.recherche = QLineEdit()
         self.recherche.setObjectName("rechercheNav")
@@ -832,8 +850,10 @@ class FenetrePrincipale(QMainWindow):
         return barre
 
     def rafraichir_entete(self) -> None:
+        from idara.ui.annees_ui import libelle_bouton
         e = etab_srv.lire_etablissement(self.conn)
         self.nom_etab.setText(e.nom_ar if e else "")
+        self.b_annee.setText(libelle_bouton(self.conn))
         n = len(sauvegarde.lister_sauvegardes(self.dossier))
         self.etat_sauvegarde.setText(f"النسخ الاحتياطية المحفوظة: {n}")
 
@@ -916,6 +936,26 @@ class FenetrePrincipale(QMainWindow):
         if res:
             self.recherche.clear()
             self.aller_a(res[0])
+
+    # ---------- السنوات الدراسية ----------
+    def gerer_annees(self):
+        from idara.ui.annees_ui import DialogueAnnees
+        d = DialogueAnnees(self)
+        d.open()
+        return d
+
+    def changer_annee(self, libelle: str) -> None:
+        annee_srv.consulter(self.conn, libelle)
+        self.annee_changee()
+
+    def annee_changee(self) -> None:
+        """بعد تغيير السنة المفتوحة: الشريط، والتنبيه، وإعادة تحميل الصفحة الحالية."""
+        self.rafraichir_entete()
+        self.bandeau_archive.actualiser()
+        courante = self.page_courante()
+        if courante:
+            self._rafraichir(courante)
+        self.tableau.rafraichir()
 
     # ---------- المظهر ----------
     def appliquer_theme(self, nom: str) -> None:

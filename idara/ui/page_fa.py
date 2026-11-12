@@ -115,9 +115,17 @@ class PageFa(QWidget):
         self.cartes = {fa.TOUS: CarteMatiere(self, fa.TOUS)}   # ترتيب واحد (قرار المدير 2026-11-10)
         for c in self.cartes.values():
             racine.addWidget(c)
+        h = QHBoxLayout()
+        b = QPushButton("توليد محضر الفائض + توقيعات الأساتذة (Word)")
+        b.setObjectName("principal")
+        b.setToolTip("الصفحة الأولى: المحضر والترتيب والنتيجة؛ الصفحة الثانية: توقيعات الأساتذة العاملين بعد الاطلاع.")
+        b.clicked.connect(lambda: self.generer_pv())
+        h.addWidget(b)
         b = QPushButton("فتح ملفات الأساتذة")
         b.clicked.connect(lambda: self.f.aller_a("الموارد البشرية"))
-        racine.addWidget(b, 0, Qt.AlignRight)
+        h.addWidget(b)
+        h.addStretch()
+        racine.addLayout(h)
         racine.addStretch()
         self.rafraichir()
 
@@ -142,3 +150,18 @@ class PageFa(QWidget):
                 self.message.hide()
         finally:
             self.chargement = False
+
+    def generer_pv(self):
+        """محضر الفائض مع صفحة التوقيعات (طلب المدير 2026-11-12)."""
+        from idara.services import bureautique
+        try:
+            p = fa.generer_pv(self.f.conn, self.f.dossier)
+        except fa.ErreurFa as e:
+            message(self.message, str(e), True)
+            return None
+        message(self.message, f"وُلّد المحضر: {p.name}")
+        try:
+            bureautique.ouvrir(p)
+        except Exception:  # noqa: BLE001 — الفتح اختياري
+            pass
+        return p

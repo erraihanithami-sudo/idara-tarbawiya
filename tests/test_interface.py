@@ -436,8 +436,10 @@ def test_page_personnel(app, config_tmp):
     f.close()
 
 
-def test_page_fa(app, config_tmp):
+def test_page_fa(app, config_tmp, monkeypatch):
+    from idara.services import bureautique
     from idara.services import fa as fa_srv
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
     from idara.services import personnel as rh
     f = _fenetre_avec_eleves(config_tmp)
     for prenom, recrut, etab, naiss in (("الأقدم", "2003-09-16", "2010-09-01", "1978-01-01"),
@@ -457,6 +459,8 @@ def test_page_fa(app, config_tmp):
     c.postes.setValue(2)
     assert "الفائض: بلا_مادة ن" in c.etat.text()
     assert c.table.item(2, 8).text() == "فائض" and c.table.item(0, 0).text() == "1"
+    pv = p.generer_pv()   # المحضر + صفحة التوقيعات (طلب المدير 2026-11-12)
+    assert pv and pv.exists() and "وُلّد المحضر" in p.message.text()
     f.close()
 
 
@@ -968,6 +972,34 @@ def test_page_riyada(app, config_tmp, monkeypatch):
     f.close()
 
 
+def test_page_riyada_isa2_calcule(app, config_tmp, monkeypatch, tmp_path):
+    """حساب ISA2 من نتائج الروائز (صيغة المدير 2026-11-12): التحميل، الإدخال اليدوي، التقرير."""
+    from idara.services import bureautique
+    from idara.services import isa as isa_srv
+    from tests.test_isa import _fichier
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("الريادة")
+    p = f.page_riyada
+    assert p.comptes.rowCount() >= 3 and p.phase_r.currentData() == 0
+    cl, m = p.comptes.item(0, 0).data(Qt.UserRole)
+    assert m == "ar"
+    fic = _fichier(tmp_path / "post.xlsx", cl, [("A", "A", "B"), ("B", "C", "B"), ("C", "A", "B")])
+    assert p.importer_resultats([fic]) and "3 تلميذاً" in p.message.text()
+    assert p.comptes.item(0, 7).text() == f"{isa_srv.Calcul(1, 1, 1).isa:.2f}%" and "OB" in p.comptes.item(0, 8).text()
+    p.phase_r.setCurrentIndex(p.phase_r.findData(-1))   # الرائز القبلي يدوياً
+    p.comptes.item(0, 2).setText("0")
+    p.comptes.item(0, 3).setText("1")
+    p.comptes.item(0, 4).setText("2")
+    assert p.enregistrer_comptes()
+    assert isa_srv.resultats(f.conn, "2026/2027")[cl]["ar"][-1].total == 3
+    p.comptes.item(0, 2).setText("x")
+    assert not p.enregistrer_comptes() and "أرقاماً" in p.message.text()
+    assert p.rapport_isa() and len(ouverts) == 1
+    f.close()
+
+
 def test_bouton_ouvrir_exercice(app, config_tmp, monkeypatch):
     """النقر على «فتح سنة مالية جديدة» (لا الاستدعاء المباشر): زر Qt يمرر checked=False."""
     from PySide6.QtWidgets import QDialog
@@ -1111,6 +1143,10 @@ def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
         p.cands.cellWidget(0, 5).click()
         assert p.cands.rowCount() == n - 1 and p.cands.item(0, 0).text() == "11"
         p.preparer_local()
+    cb = p.mats.cellWidget(0, 0)   # مقترحات المواد بترتيب المدير، مع إمكانية الكتابة (2026-11-12)
+    assert [cb.itemText(i) for i in range(cb.count())] == list(exs.MATIERES_SUGGEREES) and cb.isEditable()
+    assert exs.MATIERES_SUGGEREES[:2] == ("اللغة العربية", "التربية الإسلامية")
+    assert p.mats.columnWidth(0) == 210 and p.mats.columnWidth(2) == 170
     p.mats.cellWidget(0, 0).setEditText("اللغة العربية")
     p.mats.setItem(0, 1, QTableWidgetItem("10/06/2027"))
     p.mats.setItem(0, 2, QTableWidgetItem("08:30"))
@@ -1590,3 +1626,27 @@ def test_tableau_rapide_suspend_puis_retablit_les_largeurs(app):
     t.insertRow(0)
     QApplication.processEvents()
     assert h.sectionResizeMode(2) == QHeaderView.ResizeToContents
+
+
+def test_annees_scolaires_archive_et_consultation(app, config_tmp):
+    """فتح سنة جديدة مع الأرشفة، والاطلاع على السنوات الماضية (طلب المدير 2026-11-12)."""
+    from idara.services import annee as an
+    from idara.services import sauvegarde
+    f = _fenetre_avec_eleves(config_tmp)
+    assert "2026/2027" in f.b_annee.text() and f.bandeau_archive.isHidden()
+    d = f.gerer_annees()
+    assert d.table.rowCount() == 1 and "السنة الجارية" in d.table.item(0, 3).text()
+    n = len(sauvegarde.lister_sauvegardes(f.dossier))
+    assert d.nouvelle("2025/2026", confirmer=False)          # سنة سابقة للتجريب
+    assert len(sauvegarde.lister_sauvegardes(f.dossier)) == n + 1
+    assert "2025/2026" in f.b_annee.text() and "أرشيف" in f.b_annee.text()
+    assert not f.bandeau_archive.isHidden() and "2026/2027" in f.bandeau_archive.texte.text()
+    f.aller_a("التلاميذ")
+    f.bandeau_archive.revenir()
+    assert an.annee_courante(f.conn)["libelle"] == "2026/2027" and f.bandeau_archive.isHidden()
+    assert not d.nouvelle("2026/2027", confirmer=False) and "موجودة" in d.message.text()
+    assert d.nouvelle("2027/2028", confirmer=False) and f.bandeau_archive.isHidden()
+    assert d.consulter("2026/2027") and not f.bandeau_archive.isHidden()
+    assert d.table.rowCount() == 3
+    d.close()
+    f.close()

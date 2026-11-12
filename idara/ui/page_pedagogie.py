@@ -592,13 +592,57 @@ class PageRiyada(QWidget):
                                      "مؤشر ISA2 (نسبة التحكم في التعلمات الأساس) حسب مراحل التعليم الصريح كما يظهر في "
                                      "مسار، ومراسلة الأساتذة بنتائج المرحلة، وملف شارة الريادة، والتقرير التركيبي.")
         self.setLayout(racine)
-        c, v = carte("مؤشر ISA2 حسب المراحل")
+        from idara.services import isa as isa_srv
+        self.isa_srv = isa_srv
         self.annee, self.phase = QComboBox(), QComboBox()
+        # ---- حساب ISA2 من نتائج الروائز (صيغة المدير 2026-11-12) ----
+        c, v = carte("حساب مؤشر التحكم في التعلمات ISA2 من نتائج الروائز")
+        f = QLabel(f"Ind = [(3×A + 2×B + 1×C) / 3] × 100   ؛   ISA2 = α × Ind   ؛   α = {isa_srv.ALPHA:g}    —    "
+                   "A: تحكم تام، B: تحكم مقنع، C: تحكم ضعيف. ISA0: الرائز القبلي، ISA1: الرائز البعدي.")
+        f.setObjectName("info")
+        f.setWordWrap(True)
+        v.addWidget(f)
+        self.phase_r = QComboBox()
+        for p in isa_srv.PHASES:
+            self.phase_r.addItem(f"{isa_srv.libelle_phase(p)} ({isa_srv.code_isa(p)})", p)
+        self.phase_r.setCurrentIndex(1)
+        self.phase_r.currentIndexChanged.connect(lambda _: self.charger_comptes())
+        v.addLayout(_grille([("السنة", self.annee), ("المرحلة / الرائز", self.phase_r)]))
+        h = QHBoxLayout()
+        for lib, fn, prin in (("تحميل ملف النتائج (Excel)", lambda: self.choisir_resultats(), True),
+                              ("حفظ الأعداد", lambda: self.enregistrer_comptes(), False),
+                              ("تقرير المؤشر وتحديد الهدف (Word)", lambda: self.rapport_isa(), True)):
+            b = QPushButton(lib)
+            if prin:
+                b.setObjectName("principal")
+            b.clicked.connect(fn)
+            h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        aide = QLabel("الملف: سطر لكل تلميذ برقمه في مسار، وعمود لكل مادة فيه مستوى التحكم (A/B/C أو «تحكم تام/مقنع/"
+                      "ضعيف» أو النقطة). يمكن أيضاً كتابة أعداد التلاميذ في كل مستوى مباشرة في الجدول ثم «حفظ الأعداد».")
+        aide.setObjectName("sousTitre")
+        aide.setWordWrap(True)
+        v.addWidget(aide)
+        self.comptes = QTableWidget(0, 9)
+        self.comptes.setHorizontalHeaderLabels(["القسم", "المادة", "A تام", "B مقنع", "C ضعيف", "المجموع", "Ind",
+                                                "المؤشر", "الهدف المقترح"])
+        self.comptes.verticalHeader().setVisible(False)
+        self.comptes.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        hh = self.comptes.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(8, QHeaderView.Stretch)
+        self.comptes.setMinimumHeight(320)
+        v.addWidget(self.comptes)
+        racine.addWidget(c)
+
+        c, v = carte("مؤشر ISA2 حسب المراحل (إدخال مباشر للنسب كما في مسار)")
         for p in range(0, 7):
             self.phase.addItem(ry.libelle_phase(p), p)
+        # السنة: مشتركة بين الحساب والإدخال المباشر
         self.annee.currentIndexChanged.connect(lambda _: self.charger())
         self.phase.currentIndexChanged.connect(lambda _: self.charger_saisie())
-        v.addLayout(_grille([("السنة", self.annee), ("المرحلة", self.phase)]))
+        v.addLayout(_grille([("المرحلة", self.phase)]))
         self.saisie = QTableWidget(0, 4)
         self.saisie.setHorizontalHeaderLabels(["القسم", "العربية %", "الفرنسية %", "الرياضيات %"])
         self.saisie.verticalHeader().setVisible(False)
@@ -716,9 +760,69 @@ class PageRiyada(QWidget):
         self.charger()
 
     def charger(self) -> None:
+        self.charger_comptes()
         self.charger_saisie()
         self._evolution()
         self._dossier()
+
+    # ---------- ISA2 من نتائج الروائز ----------
+
+    def charger_comptes(self) -> None:
+        a, p = self.annee.currentText(), self.phase_r.currentData()
+        if not a:
+            self.comptes.setRowCount(0)
+            return
+        d = self.isa_srv.resultats(self.f.conn, a)
+        cls = sorted(set(self.ry.classes(self.f.conn, a)) | set(d))
+        lignes = [(cl, m) for cl in cls for m in self.isa_srv.MATIERES]
+        self.comptes.setRowCount(len(lignes))
+        for i, (cl, m) in enumerate(lignes):
+            k = d.get(cl, {}).get(m, {}).get(p)
+            fixe = [cellule(cl.replace("-", ""), (cl, m)), cellule(self.isa_srv.MATIERES[m])]
+            vals = ["", "", ""] if k is None else [str(k.a), str(k.b), str(k.c)]
+            calc = ["", "", "", ""]
+            if k is not None and k.total:
+                o = self.isa_srv.objectif(k.isa)
+                calc = [str(k.total), f"{k.ind:.2f}%", f"{k.isa:.2f}%",
+                        f"{o['cible_min']:.2f}% – {o['cible_max']:.2f}%  ({o['objectif']})"]
+            for j, it in enumerate(fixe + [cellule(x) for x in vals] + [cellule(x) for x in calc]):
+                if j not in (2, 3, 4):
+                    it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+                self.comptes.setItem(i, j, it)
+
+    def enregistrer_comptes(self):
+        a, p = self.annee.currentText(), self.phase_r.currentData()
+
+        def fn():
+            for i in range(self.comptes.rowCount()):
+                cl, m = self.comptes.item(i, 0).data(Qt.UserRole)
+                v = [(self.comptes.item(i, j).text().strip() if self.comptes.item(i, j) else "") for j in (2, 3, 4)]
+                self.isa_srv.enregistrer(self.f.conn, a, cl, m, p, *v)
+        r = self._faire(fn, f"حُفظت أعداد {self.isa_srv.libelle_phase(p)} وحُسب المؤشر.")
+        self.charger()
+        return r
+
+    def choisir_resultats(self) -> None:
+        fs, _ = QFileDialog.getOpenFileNames(self, f"نتائج {self.phase_r.currentText()}", "", "Excel (*.xlsx)")
+        if fs:
+            self.importer_resultats([Path(x) for x in fs])
+
+    def importer_resultats(self, chemins: list[Path]):
+        a, p = self.annee.currentText(), self.phase_r.currentData()
+        r = self._faire(lambda: self.isa_srv.importer(self.f.conn, a, p, chemins), "")
+        if not r:
+            return None
+        self.charger()
+        txt = (f"حُمّلت نتائج {r.eleves} تلميذاً ({self.isa_srv.libelle_phase(p)}): {r.lignes} سطراً (قسم × مادة)، "
+               "وحُسب المؤشر.")
+        if r.alertes:
+            txt += "\nتنبيهات: " + "؛ ".join(r.alertes[:5]) + (" ..." if len(r.alertes) > 5 else "")
+        message(self.message, txt, bool(r.alertes))
+        return r
+
+    def rapport_isa(self):
+        r = self._faire(lambda: self.isa_srv.generer_rapport(self.f.conn, self.f.dossier, self.annee.currentText()), "")
+        return self._ouvrir(r) if r else None
 
     def charger_saisie(self) -> None:
         a = self.annee.currentText()
@@ -782,7 +886,7 @@ class PageRiyada(QWidget):
     def _faire(self, fn, succes: str):
         try:
             r = fn()
-        except (self.ry.ErreurRiyada, ValueError) as e:
+        except (self.ry.ErreurRiyada, self.isa_srv.ErreurIsa, ValueError) as e:
             message(self.message, str(e) or "قيمة غير صحيحة.", True)
             return None
         if succes:

@@ -279,6 +279,10 @@ def main(sortie: Path) -> None:
     for ph, vals in ((0, {"ar": 55, "fr": 60.5, "ma": 58}), (1, {"ar": 62, "fr": 75.94, "ma": 64}),
                      (3, {"ar": 66, "fr": 65.51, "ma": 70})):
         ryx.enregistrer_isa(f.conn, an_, cl_, ph, vals)
+    from idara.services import isa as isax
+    for ph, n in ((-1, (3, 8, 12)), (0, (6, 9, 8)), (1, (9, 8, 6))):
+        for m in isax.MATIERES:
+            isax.enregistrer(f.conn, an_, cl_, m, ph, *n)
     f.aller_a("الريادة")
     photo(f, "41_riyada")
     from idara.services import conseils_etab as cex
@@ -311,6 +315,14 @@ def main(sortie: Path) -> None:
         photo(f, f"51_theme_{nom}_statistiques")
         f.aller_a("دليل الاستخدام")
         photo(f, f"52_theme_{nom}_guide")
+    # السنوات الدراسية (طلب المدير 2026-11-12)
+    d_an = f.gerer_annees()
+    d_an.nouvelle("2025/2026", confirmer=False)
+    photo(d_an, "60_annees_dialogue")
+    d_an.close()
+    f.aller_a("لوحة القيادة")
+    photo(f, "61_annee_archive_bandeau")
+    f.bandeau_archive.revenir()
     f.aller_a("التسجيلات")
     photo(f, "54_inscriptions")
     f.aller_a("تتبع الغياب")

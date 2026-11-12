@@ -40,7 +40,7 @@ COMPOSANTS = [
               "معدلات التلاميذ المستوردة من مسار، ومعطيات مجالس الأقسام ومحاضر نهاية الأسدوس.",
               "SELECT COUNT(*) FROM resultat"),
     Composant("tarl", "التعلمات الأساس",
-              "نتائج روائز الموضعة المستوردة والمستويات المتوقعة ومسارات المجموعات.",
+              "نتائج روائز الموضعة المستوردة والمستويات المتوقعة ومسارات المجموعات، وأعداد مستويات التحكم (ISA2).",
               "SELECT COUNT(*) FROM niveau_apprentissage"),
     Composant("personnel", "الموارد البشرية",
               "الموظفون (عدا المدير) وما يخصهم: الرخص، إسناد الأقسام، عضوية المجالس، الحراسة، الدعم.",
@@ -173,7 +173,7 @@ def _executer(conn, cle: str, unite: str | None) -> int:
         return n
     tables = {
         "resultats": ["resultat", "conseil_niveau", "isa_classe", "deliberation"],
-        "tarl": ["niveau_apprentissage", "tarl_parcours", "niveau_attendu"],
+        "tarl": ["niveau_apprentissage", "tarl_parcours", "niveau_attendu", "isa_resultat"],
         "activites": ["club_membre", "activite", "club"],
         "absences": ["absence_classe", "absence_mois"],
         "frais": ["frais_inscription"],

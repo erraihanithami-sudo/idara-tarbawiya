@@ -122,3 +122,18 @@ def test_toutes_matieres_un_seul_classement(base):
     assert fa.postes_requis(base) == {}
     with pytest.raises(fa.ErreurFa):
         fa.definir_postes(base, "الرياضيات", 1)
+
+
+def test_pv_fa_avec_page_signatures(base, dossier):
+    """محضر الفائض، وفي الصفحة الثانية توقيعات الأساتذة العاملين (نموذج المدير 2026-11-12)."""
+    from tests.test_docs_association import texte
+    prof(base, "الأقدم", "2003-09-16", "2003-09-16", "2010-09-01")
+    prof(base, "الأحدث", "2020-09-16", "2020-09-16", "2023-09-01", naissance="1995-01-01")
+    with pytest.raises(fa.ErreurFa, match="عدد المناصب"):
+        fa.generer_pv(base, dossier, date(2026, 11, 12))
+    fa.definir_postes(base, fa.TOUS, 1)
+    t = texte(fa.generer_pv(base, dossier, date(2026, 11, 12), "اطلع الجميع"))
+    assert "محضر تحديد الفائض بالمؤسسة" in t and "2026/2027" in t and "فائض" in t
+    assert "الأستاذ(ة) الفائض(ة): التجريبي الأحدث" in t and "اطلع الجميع" in t
+    assert "توقيعات السيدات الأستاذات والأساتذة بعد الاطلاع" in t and "رقم التأجير" in t and "التوقيع" in t
+    assert t.count("التجريبي الأقدم") == 2   # في المحضر وفي صفحة التوقيعات

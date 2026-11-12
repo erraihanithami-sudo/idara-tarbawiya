@@ -137,6 +137,10 @@ QScrollArea#defilNav QScrollBar::add-page:vertical, QScrollArea#defilNav QScroll
 #navSous {{ color: {NAV_TEXTE2}; font-size: 9pt; background: transparent; }}
 #badge {{ background: {BADGE_FOND}; color: {BADGE_TEXTE}; border-radius: 9px; padding: 1px 8px;
     font-size: 8.5pt; font-weight: 600; }}
+QPushButton#boutonAnnee {{ background: {BADGE_FOND}; color: {BADGE_TEXTE}; border: 0; border-radius: 12px;
+    min-height: 36px; font-weight: 700; }}
+QPushButton#boutonAnnee:hover {{ border: 2px solid {NAV_ACCENT}; }}
+#bandeauArchive {{ background: {ROUGE_CLAIR}; border-bottom: 2px solid {ROUGE}; }}
 QLineEdit#rechercheNav {{ background: {RECHERCHE_FOND}; color: {RECHERCHE_TEXTE}; border: 1px solid {NAV_TEXTE2};
     border-radius: 12px; min-height: 40px; }}
 QLineEdit#rechercheNav:focus {{ border: 2px solid {NAV_ACCENT}; }}

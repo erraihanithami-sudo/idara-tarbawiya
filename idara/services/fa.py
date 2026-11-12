@@ -160,3 +160,96 @@ def calculer(conn: sqlite3.Connection, le: date | None = None) -> tuple[list[Gro
 def nombre_classes(conn: sqlite3.Connection) -> int:
     """للمساعدة على تقدير عدد المناصب: عدد أقسام السنة الجارية."""
     return len(rh.classes_annee(conn))
+
+
+# ---------- محضر الفائض وتوقيعات الأساتذة (طلب المدير 2026-11-12) ----------
+
+RESULTATS = {"maintenu": "باق بالمؤسسة", "fa": "فائض", "exempte": "مستثنى", "incomplet": "معطيات ناقصة", "": "—"}
+
+
+def generer_pv(conn: sqlite3.Connection, dossier, le: date | None = None, observations: str = ""):
+    """الصفحة الأولى: محضر تحديد الفائض (الترتيب والنتيجة). الصفحة الثانية: توقيعات الأساتذة العاملين بعد الاطلاع
+    (نموذج المدير: ر.ت، الاسم الكامل، رقم التأجير، التوقيع)."""
+    from datetime import datetime
+
+    from idara.services import documents as dc
+    from idara.services import etablissement as etab_srv
+    from idara.services import textes as tx
+    from idara.services.docs_association import _cellule, _nouveau, _ombre, para, saut_page, tableau
+    from docx.shared import Cm
+
+    le = le or date.today()
+    try:
+        c = dc.champs_communs(conn)
+    except dc.ErreurDocument as e:
+        raise ErreurFa(str(e)) from None
+    groupes, _ = calculer(conn, le)
+    g = next((x for x in groupes if x.matiere == TOUS), None)
+    if g is None or not g.lignes:
+        raise ErreurFa("لا أساتذة عاملين في ملفات الموارد البشرية.")
+    if g.requis is None:
+        raise ErreurFa("حدد أولاً عدد الأساتذة الذي تفرضه البنية التربوية (عدد المناصب) في صفحة تدبير الفائض.")
+    a = annee_srv.annee_courante(conn)
+    e = etab_srv.lire_etablissement(conn)
+    d = _nouveau()
+    for l in ("المملكة المغربية", "وزارة التربية الوطنية والتعليم الأولي والرياضة",
+              f"الأكاديمية الجهوية للتربية والتكوين: {e.academie_ar}" if e and e.academie_ar else "",
+              f"المديرية الإقليمية: {e.direction_ar}" if e and e.direction_ar else "",
+              f"المؤسسة: {c['etablissement']}"):
+        if l:
+            para(d, l, gras=True, taille=12, apres=0)
+    para(d, apres=6)
+    para(d, "محضر تحديد الفائض بالمؤسسة", gras=True, taille=20, centre=True, apres=0)
+    para(d, f"برسم الموسم الدراسي {a['libelle']}", centre=True, taille=14, apres=8)
+    para(d, f"في يوم {tx.date_longue_ar(le.isoformat())}، وتطبيقاً لمقتضيات المذكرة الإطار المنظمة لتدبير الفائض "
+            f"والخصاص، تم بمؤسسة {c['etablissement']} ترتيب الأساتذة العاملين بها حسب المعايير التالية: نقطة عن كل "
+            "سنة من تاريخ التوظيف، ونقطة عن كل سنة بالمديرية الإقليمية، ونقطتان عن كل سنة بالمؤسسة الحالية (كل موسم "
+            "دراسي بسنة، بما فيه الموسم الجاري). وعند التساوي: الأقدمية العامة، ثم بالمديرية، ثم بالمؤسسة، ثم السن "
+            "(الأصغر سناً هو الفائض). ويُستثنى المبرزون وحاملو الدكتوراه منذ خمس سنوات على الأقل.", taille=12, apres=4)
+    para(d, f"عدد الأساتذة الذي تفرضه البنية التربوية: {g.requis}، وعدد الأساتذة العاملين: {len(g.lignes)}.",
+         gras=True, taille=12, apres=6)
+    entetes = ("الرتبة", "الاسم الكامل", "رقم التأجير", "الأقدمية العامة", "بالمديرية", "بالمؤسسة (×2)",
+               "المجموع", "النتيجة")
+    t = tableau(d, 1 + len(g.lignes), len(entetes), largeurs=[1.4, 4.4, 2.2, 1.9, 1.8, 2.0, 1.7, 2.6])
+    for j, lib in enumerate(entetes):
+        _cellule(t.cell(0, j), lib, gras=True, taille=11)
+        _ombre(t.cell(0, j))
+    for i, l in enumerate(g.lignes, start=1):
+        complet = l.resultat != "incomplet"
+        vals = (str(l.rang or "—"), f"{l.p.nom_ar} {l.p.prenom_ar}".strip(), l.p.ppr or "",
+                str(l.generale) if complet else "—", str(l.direction) if complet else "—",
+                str(2 * l.etablissement) if complet else "—", str(l.total) if complet else "—",
+                RESULTATS.get(l.resultat, l.resultat) + (f" ({l.motif})" if l.resultat == "exempte" else ""))
+        for j, v in enumerate(vals):
+            _cellule(t.cell(i, j), v, taille=11, gras=l.resultat == "fa", centre=j != 1)
+    para(d, apres=6)
+    fa_ = g.fa
+    if g.incomplets:
+        para(d, "تنبيه: معطيات ناقصة لـ: " + "، ".join(f"{l.p.nom_ar} {l.p.prenom_ar}" for l in g.incomplets)
+             + " (الترتيب غير نهائي).", taille=11, apres=4)
+    para(d, "النتيجة: " + ("الأستاذ(ة) الفائض(ة): " + "، ".join(f"{l.p.nom_ar} {l.p.prenom_ar}" for l in fa_)
+                           if fa_ else "لا يوجد فائض بالمؤسسة برسم هذا الموسم."), gras=True, taille=13, apres=6)
+    if observations.strip():
+        para(d, "ملاحظات: " + " ".join(observations.split()), taille=12, apres=6)
+    para(d, f"{c['ville']} في: {tx.date_ar(le)}", apres=10)
+    para(d, c["mudir_moassasa"], gras=True, centre=True, apres=0)
+
+    # الصفحة الثانية: توقيعات الأساتذة العاملين (نموذج المدير)
+    saut_page(d)
+    profs = rh.lister(conn, categorie="enseignant")
+    para(d, f"المؤسسة: {c['etablissement']}", gras=True, taille=12, apres=4)
+    para(d, "توقيعات السيدات الأستاذات والأساتذة بعد الاطلاع", gras=True, taille=18, centre=True, apres=0)
+    para(d, f"على محضر تحديد الفائض برسم الموسم الدراسي {a['libelle']}", centre=True, taille=13, apres=8)
+    t = tableau(d, 1 + len(profs), 4, largeurs=[1.4, 7.0, 3.4, 5.6])
+    for j, lib in enumerate(("ر.ت", "الاسم الكامل", "رقم التأجير", "التوقيع")):
+        _cellule(t.cell(0, j), lib, gras=True, taille=13)
+        _ombre(t.cell(0, j))
+    for i, p in enumerate(profs, start=1):
+        for j, v in enumerate((f"{i:02d}", f"{p.nom_ar} {p.prenom_ar}".strip(), p.ppr or "", "")):
+            _cellule(t.cell(i, j), v, taille=13, centre=j != 1)
+        t.rows[i].height = Cm(1.2)
+    rep = dossier.archives / a["libelle"].replace("/", "-") / "الموارد البشرية"
+    rep.mkdir(parents=True, exist_ok=True)
+    chemin = rep / f"{datetime.now():%Y%m%d_%H%M%S}_محضر الفائض.docx"
+    d.save(chemin)
+    return chemin

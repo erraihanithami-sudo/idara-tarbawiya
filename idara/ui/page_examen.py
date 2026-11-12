@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QPushButton,
+from PySide6.QtWidgets import (QHeaderView, QAbstractItemView, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QPushButton,
                                QSpinBox, QTableWidgetItem, QWidget)
 
 from idara.services import bureautique
@@ -226,11 +226,16 @@ class PageExamen(QWidget):
 
         # ---- الجدولة ----
         c, v = carte("جدولة المواد")
-        aide = QLabel("سطر لكل مادة: التاريخ بصيغة 10/06/2027 والساعة بصيغة 08:30.")
+        aide = QLabel("سطر لكل مادة: اختر المادة من اللائحة أو اكتبها، التاريخ بصيغة 10/06/2027 والساعة بصيغة 08:30.")
         aide.setObjectName("sousTitre")
         v.addWidget(aide)
-        self.mats = tableau(["المادة", "التاريخ", "من", "إلى"], etirer=0)
+        self.mats = tableau(["المادة", "التاريخ", "من الساعة", "إلى الساعة"], etirer=1)
         self.mats.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        # خانة المادة أضيق، ومساحة أكبر للتاريخ والساعة (طلب المدير 2026-11-12)
+        hm = self.mats.horizontalHeader()
+        for j, largeur in ((0, 210), (2, 170), (3, 170)):
+            hm.setSectionResizeMode(j, QHeaderView.Fixed)
+            hm.resizeSection(j, largeur)
         self.mats.setMinimumHeight(220)
         v.addWidget(self.mats)
         h = QHBoxLayout()
