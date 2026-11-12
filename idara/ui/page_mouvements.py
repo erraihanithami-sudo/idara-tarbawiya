@@ -65,6 +65,10 @@ class PageMouvements(QWidget):
             r.toggled.connect(lambda on: on and self.chercher())
             h.addWidget(r)
         h.addStretch()
+        self.b_stats = QPushButton("الإحصائيات ووثيقة الحركية")
+        self.b_stats.setObjectName("principal")
+        self.b_stats.clicked.connect(self.statistiques)
+        h.addWidget(self.b_stats)
         cv.addLayout(h)
         self.recherche = QLineEdit()
         self.recherche.setPlaceholderText("الاسم، رمز مسار أو المؤسسة")
@@ -413,6 +417,13 @@ class PageMouvements(QWidget):
 
     def annuler(self) -> bool:
         return self.marquer("dossier_recu_le" if self.sens() == "arrive" else "dossier_envoye_le", annuler=True)
+
+    def statistiques(self):
+        """عدد الوافدين والمغادرين وتوليد وثيقة الحركية (طلب المدير 2026-11-12)، للوحدة المختارة أو للمؤسسة."""
+        from idara.ui.stats_mouvements import DialogueStatistiques
+        d = DialogueStatistiques(self)
+        d.open()
+        return d
 
     def _remplir_classes(self) -> None:
         from idara.services import annee as annee_srv

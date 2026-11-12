@@ -600,6 +600,18 @@ def test_page_mouvements(app, config_tmp, monkeypatch):
     p.etab.setEditText("مدرسة أخرى")
     assert p.enregistrer() is not None, p.message.text()
     assert p.liste.rowCount() == 2
+    # الإحصائيات ووثيقة الحركية (طلب المدير 2026-11-12)
+    d = p.statistiques()
+    t = d.stats["totaux"]
+    assert (t["arrive"], t["parti"]) == (1, 2)
+    assert d.tuiles["الوافدون"].chiffre.text() == "1" and d.tuiles["المغادرون"].chiffre.text() == "2"
+    assert d.t_niveaux.item(d.t_niveaux.rowCount() - 1, 0).text() == "المجموع"
+    assert d.t_mois.rowCount() == 2 and d.t_etabs.rowCount() == 3
+    d.debut.setText("01/10/2026")
+    assert d.actualiser()["totaux"]["arrive"] == 0
+    chemin = d.generer()
+    assert chemin is not None and chemin.exists() and ouverts[-1] == chemin, d.message.text()
+    d.close()
     f.close()
 
 

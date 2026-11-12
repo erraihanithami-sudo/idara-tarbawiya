@@ -171,3 +171,47 @@ def test_depart_ancien_non_present_dans_la_liste(base, dossier):
     # لا يظهر غائباً عند إعادة استيراد اللائحة
     r = imp.analyser(base, [classeur(dossier.racine / "a3.xlsx", AR)])
     assert "Z000000001" not in [x["code_massar"] for x in r.absents]
+
+
+def test_statistiques_et_vidage_de_la_periode(base, dossier):
+    """إحصائيات الحركية (طلب المدير 2026-11-12): حسب المستوى والنوع والشهر، والفترة الاختيارية."""
+    _arrive(base)                                                          # هبة، أنثى، الخامس، شتنبر
+    _arrive(base, "Y000000010", nom_ar="الوافد", prenom_ar="عمر", sexe="M", date_mouvement="2026-10-02",
+            etablissement="مدرسة بعيدة", hors_province=True, direction="إقليم: بعيد", academie="الجهة البعيدة")
+    _parti(base)                                                           # الرابع، أكتوبر
+    s = mv.statistiques(base)
+    t = s["totaux"]
+    assert (t["arrive"], t["arrive_F"], t["parti"], t["hors_province_arrive"]) == (2, 1, 1, 1)
+    assert t["solde"] == 1 and t["recus"] == 0 and t["envoyes"] == 0
+    niv = dict(s["niveaux"])
+    assert niv["الخامس"]["arrive"] == {"M": 1, "F": 1} and sum(niv["الرابع"]["parti"].values()) == 1
+    assert [n for n, _ in s["niveaux"]] == ["الرابع", "الخامس"]
+    assert s["mois"] == [("2026-09", {"arrive": 1, "parti": 0}), ("2026-10", {"arrive": 1, "parti": 1})]
+    assert mv.libelle_mois("2026-10") == "أكتوبر 2026"
+    assert {e["etablissement"] for e in s["etablissements"]} == {"المؤسسة الأصلية", "مدرسة بعيدة", "المؤسسة المستقبلة"}
+    oct_ = mv.statistiques(base, debut="2026-10-01", fin="2026-10-31")["totaux"]
+    assert (oct_["arrive"], oct_["parti"]) == (1, 1)
+    with pytest.raises(mv.ErreurMouvement, match="بعد نهايتها"):
+        mv.statistiques(base, debut="2026-11-01", fin="2026-10-01")
+    with pytest.raises(mv.ErreurMouvement, match="لا حركة"):
+        mv.generer_bilan(base, dossier, debut="2026-06-01", fin="2026-06-30")
+
+
+def test_document_de_la_mobilite(base, dossier):
+    from docx import Document
+    _arrive(base)
+    _parti(base)
+    eid = base.execute("SELECT id FROM eleve WHERE code_massar='X000000001'").fetchone()[0]
+    el.changer_statut(base, eid, "interrompu", "2026-10-20", "")
+    s = mv.statistiques(base)
+    assert s["totaux"]["interrompu"] == 1 and s["totaux"]["solde"] == -1
+    chemin = mv.generer_bilan(base, dossier)
+    d = Document(chemin)
+    texte = "\n".join(p.text for p in d.paragraphs)
+    cellules = [c.text for t in d.tables for r in t.rows for c in r.cells]
+    assert "حصيلة حركية التلاميذ" in texte and "ملحق: لائحة الوافدين (1)" in texte
+    assert "ملحق: لائحة المغادرين (1)" in texte and "هبة الوافد" in cellules and "المجموع" in cellules
+    assert "حركية التلاميذ" in str(chemin.parent)
+    sans = Document(mv.generer_bilan(base, dossier, listes=False))
+    assert not any("ملحق" in p.text for p in sans.paragraphs)
+    assert all("." * 3 not in c for c in cellules)

@@ -434,3 +434,156 @@ def sorties_sans_transfert(conn: sqlite3.Connection, texte: str = "",
         lignes = [r for r in lignes if any(cible in normaliser(x) for x in (
             r["code_massar"], f"{r['nom_ar']}{r['prenom_ar']}", f"{r['prenom_ar']}{r['nom_ar']}"))]
     return lignes
+
+
+# ---------- الإحصائيات ووثيقة الحركية (طلب المدير 2026-11-12) ----------
+
+NON_DEFINI = "غير محدد"
+
+
+def _niveaux_ordonnes(presents: set[str]) -> list[str]:
+    ordre = [v[0] for v in tx.NIVEAUX.values()]
+    return [n for n in ordre if n in presents] + sorted(presents - set(ordre) - {NON_DEFINI}) + (
+        [NON_DEFINI] if NON_DEFINI in presents else [])
+
+
+def _dans_periode(d: str | None, debut: str | None, fin: str | None) -> bool:
+    if not (debut or fin):
+        return True
+    if not d:
+        return False
+    return (not debut or d >= debut) and (not fin or d <= fin)
+
+
+def statistiques(conn: sqlite3.Connection, unite: str | None = None, debut: str | None = None,
+                 fin: str | None = None) -> dict:
+    """أعداد الوافدين والمغادرين (ومعهم المنقطعون والمفصولون) في السنة الجارية: إجمالاً، حسب المستوى والنوع،
+    حسب الشهر، وحسب المؤسسة الأخرى (داخل الإقليم أو خارجه). debut/fin: فترة اختيارية (تاريخ التحويل)."""
+    if debut and fin and debut > fin:
+        raise ErreurMouvement("بداية الفترة بعد نهايتها.")
+    a = _annee(conn)
+    ids = eleves_unite(conn, unite)
+    mvts = [r for r in lister(conn, unite=unite) if _dans_periode(r["date_mouvement"], debut, fin)]
+    sorties = conn.execute(
+        "SELECT i.eleve_id, i.statut, i.date_sortie, e.sexe, n.code AS niveau FROM inscription i "
+        "JOIN eleve e ON e.id=i.eleve_id LEFT JOIN niveau n ON n.id=i.niveau_id "
+        "WHERE i.annee_id=? AND i.statut IN ('interrompu','exclu')", (a["id"],)).fetchall()
+    sorties = [r for r in sorties if (ids is None or r["eleve_id"] in ids)
+               and _dans_periode(r["date_sortie"], debut, fin)]
+
+    def vide() -> dict:
+        return {"arrive": {"M": 0, "F": 0}, "parti": {"M": 0, "F": 0}, "interrompu": 0, "exclu": 0}
+
+    niveaux: dict[str, dict] = {}
+    mois: dict[str, dict[str, int]] = {}
+    etabs: dict[tuple[str, str], dict] = {}
+    for r in mvts:
+        n = r["niveau"] or NON_DEFINI
+        s = r["sexe"] if r["sexe"] in ("M", "F") else "M"
+        niveaux.setdefault(n, vide())[r["sens"]][s] += 1
+        m = (r["date_mouvement"] or "")[:7]
+        if m:
+            mois.setdefault(m, {"arrive": 0, "parti": 0})[r["sens"]] += 1
+        k = (r["sens"], " ".join((r["etablissement"] or "").split()))
+        e = etabs.setdefault(k, {"sens": r["sens"], "etablissement": k[1], "hors_province": bool(r["hors_province"]),
+                                 "direction": r["direction"] or "", "effectif": 0})
+        e["effectif"] += 1
+    for r in sorties:
+        n = tx.niveau_ar(r["niveau"]) if r["niveau"] in tx.NIVEAUX else NON_DEFINI
+        niveaux.setdefault(n, vide())[r["statut"]] += 1
+
+    def total(cle: str, s: str | None = None) -> int:
+        return sum(v[cle][s] if s else sum(v[cle].values()) for v in niveaux.values())
+
+    t = {"arrive": total("arrive"), "parti": total("parti"),
+         "arrive_F": total("arrive", "F"), "parti_F": total("parti", "F"),
+         "interrompu": sum(v["interrompu"] for v in niveaux.values()),
+         "exclu": sum(v["exclu"] for v in niveaux.values())}
+    t["solde"] = t["arrive"] - t["parti"] - t["interrompu"] - t["exclu"]
+    t["hors_province_arrive"] = sum(1 for r in mvts if r["sens"] == "arrive" and r["hors_province"])
+    t["hors_province_parti"] = sum(1 for r in mvts if r["sens"] == "parti" and r["hors_province"])
+    t["envoyes"] = sum(1 for r in mvts if r["sens"] == "parti" and r["dossier_envoye_le"])
+    t["recus"] = sum(1 for r in mvts if r["sens"] == "arrive" and r["dossier_recu_le"])
+    return {"annee": a["libelle"], "unite": unite, "debut": debut, "fin": fin, "totaux": t,
+            "niveaux": [(n, niveaux[n]) for n in _niveaux_ordonnes(set(niveaux))],
+            "mois": sorted(mois.items()),
+            "etablissements": sorted(etabs.values(), key=lambda e: (e["sens"], -e["effectif"], e["etablissement"])),
+            "mouvements": sorted(mvts, key=lambda r: (r["sens"], r["date_mouvement"] or "", r["nom_ar"]))}
+
+
+def libelle_mois(cle: str) -> str:
+    an, m = cle.split("-")
+    return f"{tx.MOIS_AR[int(m) - 1]} {an}"
+
+
+def generer_bilan(conn: sqlite3.Connection, dossier: DossierDonnees, unite: str | None = None,
+                  debut: str | None = None, fin: str | None = None, listes: bool = True,
+                  graphique_png: bytes | None = None):
+    """وثيقة الحركية: الحصيلة العامة والجداول في الصفحة الأولى، ولائحتا الوافدين والمغادرين في ملحق (اختياري)."""
+    from datetime import datetime
+
+    from docx.shared import Cm
+
+    from idara.services.docs_association import _nouveau, para, saut_page
+    from idara.services.soutien import _entete, _signature, _table
+    s = statistiques(conn, unite, debut, fin)
+    t = s["totaux"]
+    if not (t["arrive"] or t["parti"] or t["interrompu"] or t["exclu"]):
+        raise ErreurMouvement("لا حركة مسجلة" + (" في هذه الفترة" if debut or fin else "") + " بعد.")
+    d = _nouveau()
+    sous = f"السنة الدراسية {s['annee']}" + (f" · {unite}" if unite else "")
+    if debut or fin:
+        sous += " · الفترة" + (f" من {tx.date_ar(debut)}" if debut else "") + (f" إلى {tx.date_ar(fin)}" if fin else "")
+    _entete(d, conn, dossier, "حصيلة حركية التلاميذ", sous)
+    para(d, "1. الحصيلة العامة", gras=True, taille=12, apres=2)
+    _table(d, ["الوافدون", "منهم إناث", "المغادرون", "منهم إناث", "المنقطعون", "المفصولون", "الفرق"],
+           [[str(t["arrive"]), str(t["arrive_F"]), str(t["parti"]), str(t["parti_F"]), str(t["interrompu"]),
+             str(t["exclu"]), f"\u2066{t['solde']:+d}\u2069" if t["solde"] else "0"]],
+           [2.4, 2.2, 2.4, 2.2, 2.4, 2.4, 2.2], taille=10)
+    para(d, f"من خارج الإقليم: {t['hors_province_arrive']} وافداً و{t['hors_province_parti']} مغادراً. "
+            f"ملفات المغادرين المرسلة: {t['envoyes']} من {t['parti']}؛ ملفات الوافدين المتوصل بها: "
+            f"{t['recus']} من {t['arrive']}. الفرق = الوافدون − المغادرون − المنقطعون − المفصولون.",
+         taille=9, apres=4)
+    para(d, "2. حسب المستوى والنوع", gras=True, taille=12, apres=2)
+    lignes = []
+    for n, v in s["niveaux"]:
+        a, p = v["arrive"], v["parti"]
+        lignes.append([n, str(a["M"]), str(a["F"]), str(a["M"] + a["F"]), str(p["M"]), str(p["F"]),
+                       str(p["M"] + p["F"]), str(v["interrompu"] + v["exclu"])])
+    lignes.append(["المجموع", str(t["arrive"] - t["arrive_F"]), str(t["arrive_F"]), str(t["arrive"]),
+                   str(t["parti"] - t["parti_F"]), str(t["parti_F"]), str(t["parti"]),
+                   str(t["interrompu"] + t["exclu"])])
+    _table(d, ["المستوى", "وافدون ذكور", "وافدات إناث", "مجموع الوافدين", "مغادرون ذكور", "مغادرات إناث",
+               "مجموع المغادرين", "المنقطعون والمفصولون"], lignes, [2.4, 2, 2, 2.1, 2, 2, 2.1, 2.4], taille=9)
+    if s["mois"]:
+        para(d, "", apres=2)
+        para(d, "3. حسب الشهر", gras=True, taille=12, apres=2)
+        _table(d, ["الشهر", "الوافدون", "المغادرون"],
+               [[libelle_mois(m), str(v["arrive"]), str(v["parti"])] for m, v in s["mois"]], [4.5, 3, 3], taille=9)
+    if graphique_png:
+        para(d, "", apres=2)
+        d.add_picture(__import__("io").BytesIO(graphique_png), width=Cm(15))
+        d.paragraphs[-1].alignment = 1
+    _signature(d, conn)
+    if listes and s["mouvements"]:
+        for sens, titre, col in (("arrive", "لائحة الوافدين", "المؤسسة الأصلية"),
+                                 ("parti", "لائحة المغادرين", "المؤسسة المستقبلة")):
+            ls = [r for r in s["mouvements"] if r["sens"] == sens]
+            if not ls:
+                continue
+            saut_page(d)
+            para(d, f"ملحق: {titre} ({len(ls)})", gras=True, taille=13, centre=True, apres=4)
+            _table(d, ["ر.ت", "الاسم الكامل", "رمز مسار", "المستوى", col, "تاريخ التحويل", "حالة الملف"],
+                   [[str(i), f"{r['prenom_ar']} {r['nom_ar']}", r["code_massar"], r["niveau"] or "",
+                     r["etablissement"] + (" (خارج الإقليم)" if r["hors_province"] else ""),
+                     tx.date_chiffres(r["date_mouvement"]), etat(r)] for i, r in enumerate(ls, start=1)],
+                   [0.8, 3.6, 2.4, 1.8, 3.8, 2.3, 3.3], taille=8)
+    rep = dossier.archives / s["annee"].replace("/", "-") / "حركية التلاميذ"
+    rep.mkdir(parents=True, exist_ok=True)
+    chemin = rep / f"{datetime.now():%Y%m%d_%H%M%S}_حصيلة_الحركية{('_' + unite) if unite else ''}.docx"
+    n = 1
+    while chemin.exists():
+        n += 1
+        chemin = chemin.with_name(f"{chemin.stem}_{n}.docx")
+    d.save(chemin)
+    return chemin
