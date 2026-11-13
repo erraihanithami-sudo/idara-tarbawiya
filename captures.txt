@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "D:\a\idara-tarbawiya\idara-tarbawiya\outils\captures.py", line 389, in <module>
+    main(Path(sys.argv[1] if len(sys.argv) > 1 else "captures"))
+  File "D:\a\idara-tarbawiya\idara-tarbawiya\outils\captures.py", line 334, in main
+    pa.table.item(i, 4).setText(str(3 + i))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'setText'

@@ -1,0 +1,101 @@
+فتح النافذة (قاعدة فارغة): 6.85s
+استيراد الوحدة المركزية: 0.19s
+استيراد وحدة فرعية: 0.14s
+عدد التلاميذ: 360
+
+زمن فتح كل صفحة (المرة الثانية):
+      422 ms  الريادة
+      206 ms  الوثائق
+      108 ms  التسجيلات
+       79 ms  أولياء الأمور
+       73 ms  التلاميذ
+       72 ms  لوحة القيادة
+       66 ms  النقل المدرسي
+       57 ms  الاستيراد من مسار
+       54 ms  الإحصائيات
+       52 ms  الوثائق القانونية للجمعيات
+       48 ms  السبورة المرجعية
+       44 ms  التنظيم التربوي
+       36 ms  تسليم المهام
+       34 ms  تتبع الغياب
+       33 ms  برنامج العمل
+       31 ms  تدبير الفائض
+       28 ms  الامتحان
+       27 ms  الموارد البشرية
+       25 ms  الأندية والأنشطة
+       22 ms  محاضر الموارد البشرية
+       21 ms  الرخص
+       21 ms  استعمالات الزمن
+       21 ms  دليل الاستخدام
+       21 ms  الدعم التربوي
+       20 ms  حركية التلاميذ
+       20 ms  مشروع المؤسسة
+       19 ms  إعداد المؤسسة
+       17 ms  الجرد
+       17 ms  المراقبة المستمرة
+       17 ms  مجالس المؤسسة
+       16 ms  التلاميذ القدامى
+       15 ms  سجل الصادر
+       14 ms  البنية المادية
+       14 ms  تتبع السلوك
+       14 ms  جمعية دعم مدرسة النجاح
+       14 ms  التعلمات الأساس
+       13 ms  مجالس الأقسام
+       12 ms  محاضر نهاية الأسدوس
+       12 ms  الصرف
+       12 ms  استثمار النتائج
+       11 ms  جدول الحراسة
+       11 ms  أداء المؤسسة
+        9 ms  الجمعية الرياضية
+        8 ms  جمعية تنمية التعاون المدرسي
+
+الكتابة في بحث التلاميذ (6 أحرف): 79 ms
+
+         568009 function calls (567434 primitive calls) in 3.710 seconds
+
+   Ordered by: cumulative time
+   List reduced from 792 to 40 due to restriction <40>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       88    0.004    0.000    2.391    0.027 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:948(aller_a)
+       88    0.001    0.000    1.824    0.021 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:932(_rafraichir)
+       88    1.057    0.012    1.319    0.015 {built-in method processEvents}
+    18012    0.488    0.000    0.489    0.000 {method 'setItem' of 'PySide6.QtWidgets.QTableWidget' objects}
+       88    0.433    0.005    0.433    0.005 {method 'setCurrentIndex' of 'PySide6.QtWidgets.QStackedWidget' objects}
+        2    0.000    0.000    0.413    0.206 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_pedagogie.py:748(rafraichir)
+        2    0.000    0.000    0.412    0.206 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_pedagogie.py:763(charger)
+        2    0.005    0.003    0.401    0.201 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_pedagogie.py:771(charger_comptes)
+        2    0.001    0.000    0.377    0.188 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_documents.py:114(rafraichir)
+       36    0.004    0.000    0.366    0.010 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\documents.py:162(etat_modele)
+       72    0.088    0.001    0.320    0.004 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\moteur_docx.py:111(champs_du_modele)
+       88    0.017    0.000    0.249    0.003 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:656(paintEvent)
+     7425    0.049    0.000    0.222    0.000 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\zellige.py:32(dessiner_etoile)
+       72    0.004    0.000    0.177    0.002 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\moteur_docx.py:91(_lire_parties)
+     2445    0.151    0.000    0.151    0.000 {method 'execute' of 'sqlite3.Connection' objects}
+     1704    0.003    0.000    0.140    0.000 C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\zipfile\__init__.py:1568(read)
+        2    0.000    0.000    0.124    0.062 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_inscriptions.py:62(rafraichir)
+        2    0.034    0.017    0.119    0.059 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_inscriptions.py:104(afficher)
+       18    0.001    0.000    0.103    0.006 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\personnel.py:299(lister)
+     1210    0.096    0.000    0.096    0.000 {method 'setStyleSheet' of 'PySide6.QtWidgets.QWidget' objects}
+      466    0.025    0.000    0.096    0.000 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\personnel.py:270(_ligne_vers)
+        2    0.005    0.003    0.095    0.047 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:246(rafraichir)
+     1704    0.002    0.000    0.089    0.000 C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\zipfile\__init__.py:967(read)
+    14894    0.088    0.000    0.088    0.000 {method 'drawPolygon' of 'PySide6.QtGui.QPainter' objects}
+     1704    0.007    0.000    0.087    0.000 C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\zipfile\__init__.py:1049(_read1)
+        3    0.083    0.028    0.083    0.028 {method '__exit__' of 'sqlite3.Connection' objects}
+        2    0.000    0.000    0.079    0.040 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_vie_admin.py:143(rafraichir)
+      892    0.003    0.000    0.078    0.000 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:575(marquer)
+        2    0.003    0.002    0.075    0.038 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_vie_admin.py:344(rafraichir)
+        2    0.000    0.000    0.073    0.037 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_statistiques.py:56(rafraichir)
+        2    0.000    0.000    0.073    0.036 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_import.py:173(rafraichir)
+       50    0.073    0.001    0.073    0.001 {method 'setParent' of 'PySide6.QtWidgets.QWidget' objects}
+     7425    0.071    0.000    0.071    0.000 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\zellige.py:17(_carres_etoile)
+        2    0.000    0.000    0.067    0.034 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_vie_admin.py:150(charger)
+        2    0.005    0.002    0.066    0.033 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_import.py:355(_remplir_unites)
+    12398    0.057    0.000    0.065    0.000 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\saisie.py:166(cellule)
+        2    0.000    0.000    0.065    0.032 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_vie_admin.py:179(enregistrer)
+        2    0.000    0.000    0.064    0.032 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_parents.py:140(rafraichir)
+        2    0.000    0.000    0.064    0.032 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\vie_admin.py:92(enregistrer_asso)
+        2    0.000    0.000    0.064    0.032 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\fiches.py:14(ecrire)
+
+
