@@ -1799,7 +1799,7 @@ def test_page_structure(app, config_tmp, monkeypatch):
     f = _fenetre_avec_eleves(config_tmp)
     f.aller_a("البنية المادية")
     p = f.page_structure
-    assert p.table.rowCount() == len(st.ELEMENTS) and p.table.item(0, 0).text() == "الحجرات الدراسية"
+    assert p.table.rowCount() == len(st.ELEMENTS) and p.table.item(0, 0).text() == "عدد حجرات التعليم العام"
     assert p.generer() is None and "لم يُدخل" in p.message.text()
     p.table.item(0, 1).setText("8")
     p.ajouter()
@@ -1812,7 +1812,7 @@ def test_page_structure(app, config_tmp, monkeypatch):
     assert not p.enregistrer() and "عدد صحيح" in p.message.text()
     p.table.item(0, 1).setText("8")
     assert p.generer() is not None
-    assert any(l[1] == "الحجرات الدراسية" and l[2] == "08" for l in ps.lire(f.conn, "batiments")["lignes"])
+    assert any(l[1] == "عدد حجرات التعليم العام" and l[2] == "08" for l in ps.lire(f.conn, "batiments")["lignes"])
     p.table.setCurrentCell(p.table.rowCount() - 1, 0)
     assert p.supprimer() and p.table.rowCount() == len(st.ELEMENTS)
     f.close()
@@ -1844,4 +1844,39 @@ def test_page_parents(app, config_tmp, monkeypatch):
     assert pa.fiche(f.conn, p.eid)["mere"]["prenom_ar"] == "خديجة"
     assert p.importer([config_tmp / "absent.xlsx"]) is None
     assert p.generer() is not None
+    f.close()
+
+
+def test_page_sabboura(app, config_tmp, monkeypatch):
+    """السبورة المرجعية (نماذج المدير 2026-11-13)."""
+    from docx import Document
+
+    from idara.services import bureautique
+    from idara.services import sabboura as sb
+    from idara.ui.page_sabboura import ruban_png
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    png = ruban_png("بطاقة معلومات المؤسسة")
+    assert png[:4] == b"\x89PNG"
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("السبورة المرجعية")
+    p = f.page_sabboura
+    assert p.liste.count() == 11 and p.cle == "fiche" and p.editeurs["nom"].text() == "مدرسة تجريبية"
+    p.editeurs["gipe"].setText("G-1")
+    p.liste.setCurrentRow([l.cle for l in sb.LAVHAT].index("cellules"))   # الانتقال يحفظ
+    assert sb.lire(f.conn, "fiche")["champs"]["gipe"] == "G-1"
+    assert p.table is not None and p.table.item(0, 0).text() == "خلية اليقظة"
+    p.table.item(0, 1).setText("ذ. الأول، ذة. الثانية")
+    p.liste.setCurrentRow([l.cle for l in sb.LAVHAT].index("clubs"))
+    assert p.note is not None
+    p.note.setText("ذة. المنسقة")
+    p.ajouter_ligne()
+    p.table.item(p.table.rowCount() - 1, 0).setText("النادي البيئي")
+    chemin = p.generer()
+    assert chemin is not None and ouverts == [chemin]
+    d = Document(chemin)
+    assert len(d.sections) == 1 and d.inline_shapes      # شريط العنوان صورة
+    chemin = p.generer(tout=True)
+    assert chemin is not None and len(Document(chemin).sections) == 11
+    assert sb.lire(f.conn, "cellules")["lignes"][0][1] == "ذ. الأول، ذة. الثانية"
     f.close()

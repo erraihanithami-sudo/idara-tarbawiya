@@ -50,6 +50,7 @@ from idara.ui.page_inventaire import PageInventaire
 from idara.ui.page_structure import PageStructure
 from idara.ui.page_parents import PageParents
 from idara.ui.page_passation import PagePassation
+from idara.ui.page_sabboura import PageSabboura
 from idara.ui.page_projet import PageProjet
 from idara.ui.page_pv_rh import PagePvRh
 from idara.ui.page_examen import PageDeliberations, PageExamen
@@ -454,7 +455,8 @@ SECTIONS = [
     ("القيادة والتدبير", [("لوحة القيادة", "لوحة القيادة"), ("الإحصائيات", "إحصائيات المؤسسة"),
                           ("برنامج العمل", "برنامج العمل السنوي والتذكيرات"),
                           ("أداء المؤسسة", "الأداء العام للمؤسسة"),
-                          ("تتبع الغياب", "تتبع الغياب"), ("مجالس المؤسسة", "مجالس المؤسسة")]),
+                          ("تتبع الغياب", "تتبع الغياب"), ("مجالس المؤسسة", "مجالس المؤسسة"),
+                          ("السبورة المرجعية", "السبورة المرجعية")]),
     ("التلاميذ", [("التلاميذ", "وثائق التلاميذ"), ("حركية التلاميذ", "حركية التلاميذ"),
                   ("تتبع السلوك", "تتبع سلوكات التلاميذ"), ("أولياء الأمور", "معلومات أولياء الأمور"),
                   ("التلاميذ القدامى", "التلاميذ القدامى (ما قبل مسار)"), ("الاستيراد من مسار", "الاستيراد من مسار")]),
@@ -608,7 +610,8 @@ MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "
              "تسليم المهام": "محضر تسليم المهام المدير الجديد السابق مفاتيح أختام بنايات",
              "الجرد": "جرد ممتلكات تجهيزات سجل الجرد فاتورة محو",
              "البنية المادية": "حجرات مباني ملاعب مراحيض مرافق صحية بنايات إعاقة",
-             "أولياء الأمور": "ولي الأب الأم هاتف وصاية آباء"}
+             "أولياء الأمور": "ولي الأب الأم هاتف وصاية آباء",
+             "السبورة المرجعية": "سبورة لوحات بطاقة معلومات المؤسسة خلايا يقظة إنصات استعمال الزمن الجماعي"}
 
 
 class BarreLaterale(QFrame):
@@ -682,6 +685,7 @@ class FenetrePrincipale(QMainWindow):
         self.page_inventaire = PageInventaire(self)
         self.page_structure = PageStructure(self)
         self.page_parents = PageParents(self)
+        self.page_sabboura = PageSabboura(self)
         self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
@@ -694,7 +698,8 @@ class FenetrePrincipale(QMainWindow):
                       "الدعم التربوي": self.page_soutien,
                       "مشروع المؤسسة": self.page_projet, "محاضر الموارد البشرية": self.page_pv_rh,
                       "تسليم المهام": self.page_passation, "الجرد": self.page_inventaire,
-                      "البنية المادية": self.page_structure, "أولياء الأمور": self.page_parents}
+                      "البنية المادية": self.page_structure, "أولياء الأمور": self.page_parents,
+                      "السبورة المرجعية": self.page_sabboura}
         from idara.ui import vidage_ui
         vidage_ui.installer(self)   # تفريغ كل مكوّن من صفحته (طلب المدير 2026-11-07)
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة

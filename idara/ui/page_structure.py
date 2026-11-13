@@ -128,9 +128,16 @@ class PageStructure(QWidget):
     def generer(self):
         if not self.enregistrer():
             return None
+        # على شكل لوحة «البنية المادية للمؤسسة» في السبورة المرجعية (نموذج المدير 2026-11-13)
+        from idara.services import sabboura as sb
+        from idara.ui.page_sabboura import ruban_png
         try:
-            p = st.generer(self.f.conn, self.f.dossier)
-        except (st.ErreurStructure, OSError) as e:
+            if not st.saisi(self.f.conn):
+                raise st.ErreurStructure("لم يُدخل أي عدد في البنية المادية بعد.")
+            sb.actualiser(self.f.conn, "structure_mat")
+            p = sb.generer(self.f.conn, self.f.dossier, ["structure_mat"],
+                           {"structure_mat": ruban_png(sb.PAR_CLE["structure_mat"].titre)})
+        except (st.ErreurStructure, sb.ErreurSabboura, OSError) as e:
             message(self.message, str(e), True)
             return None
         message(self.message, f"وُلّدت وثيقة البنية المادية: ⁦{p.name}⁩")

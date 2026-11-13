@@ -15,16 +15,18 @@ from idara.data.dossier import DossierDonnees
 from idara.data.journal import journaliser
 from idara.services import etablissement as etab_srv
 
+# بترتيب نموذج المدير وتسمياته («البنية المادية للمؤسسة» في السبورة المرجعية، 2026-11-13)
 ELEMENTS = [
-    ("salles", "الحجرات الدراسية"),
-    ("batiments_admin", "المباني الإدارية"),
-    ("salles_prescolaire", "حجرات التعليم الأولي"),
-    ("salle_ressources", "قاعة الموارد للدعم والتأهيل"),
-    ("terrains", "الملاعب"),
+    ("salles", "عدد حجرات التعليم العام"),
+    ("salles_prescolaire", "عدد حجرات التعليم الأولي"),
+    ("sanitaires_prescolaire", "المرافق الصحية للتعليم الأولي"),
+    ("salle_ressources", "قاعة الموارد للتأهيل والدعم"),
+    ("sanitaires_handicap", "مرافق صحية لذوي الاحتياجات الخاصة"),
+    ("batiments_admin", "المكاتب الإدارية"),
     ("sanitaires_eleves", "مرافق صحية للتلاميذ"),
     ("sanitaires_enseignants", "مرافق صحية للأساتذة"),
-    ("sanitaires_prescolaire", "مرافق صحية للتعليم الأولي"),
-    ("sanitaires_handicap", "مراحيض الأشخاص في وضعية إعاقة"),
+    ("terrains", "ملاعب"),
+    ("magasins", "مخازن"),
 ]
 
 
