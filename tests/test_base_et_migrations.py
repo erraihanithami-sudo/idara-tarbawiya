@@ -115,3 +115,28 @@ def test_migration_0030_avec_donnees(tmp_path):
     assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
     assert not conn.execute("PRAGMA foreign_key_check").fetchall()
     conn.close()
+
+
+def test_migration_0034_gabsences_vers_presence(tmp_path):
+    """قرار 2026-11-13: أيام الغياب المسجلة سابقاً تتحول إلى نسبة حضور، وأيام الدراسة تصير اختيارية."""
+    import shutil
+    from idara.data import db
+    anciennes = tmp_path / "m"
+    anciennes.mkdir()
+    for n, _, f in db.lister_migrations():
+        if n < 34:
+            shutil.copy(f, anciennes / f.name)
+    conn = db.connecter(tmp_path / "b.sqlite")
+    db.migrer(conn, anciennes)
+    with conn:
+        conn.execute("INSERT INTO annee_scolaire(libelle, code_court, est_courante) VALUES ('2026/2027','2627',1)")
+        conn.execute("INSERT INTO classe(annee_id, code) VALUES (1, '1APG-1')")
+        conn.execute("INSERT INTO absence_mois(annee_id, mois, jours_etude) VALUES (1, '2026-10', 20)")
+        conn.execute("INSERT INTO absence_classe(annee_id, mois, classe_id, effectif, jours_absence, absents) "
+                     "VALUES (1, '2026-10', 1, 10, 10, 2)")
+    assert "0034_presence" in " ".join(db.migrer(conn))
+    assert conn.execute("SELECT taux_presence FROM absence_classe").fetchone()[0] == 95    # 100 − 10÷(10×20)
+    with conn:
+        conn.execute("INSERT INTO absence_mois(annee_id, mois) VALUES (1, '2026-11')")
+    assert not conn.execute("PRAGMA foreign_key_check").fetchall()
+    conn.close()

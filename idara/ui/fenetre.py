@@ -153,8 +153,8 @@ class PageTableauBord(QWidget):
         hd = ind["hadar"]
         from idara.services import absences as abs_srv
         dt = abs_srv.dernier_taux(self.f.conn)
-        jauges = [Jauge("الغياب", dt[1] if dt else None, f"آخر شهر مُدرج: {dt[0]}" if dt else "لم يُدرج أي شهر بعد",
-                        theme.ORANGE),
+        jauges = [Jauge("الحضور", dt[1] if dt else None, f"آخر شهر مُدرج: {dt[0]}" if dt else "لم يُدرج أي شهر بعد",
+                        theme.SARCELLE),
                   Jauge("الهدر المدرسي", hd["taux"], f"منقطعون {hd['interrompus']} · مفصولون {hd['exclus']}", theme.ROSE),
                   Jauge("الأنشطة الموازية", ind["activites"]["taux"],
                         f"{ind['activites']['participants']} تلميذاً في الأندية", theme.VIOLET)]

@@ -1414,14 +1414,12 @@ def test_absences_mensuelles(app, config_tmp, monkeypatch):
     assert p.mois.count() == 10 and p.table.rowCount() >= 1
     p.mois.setCurrentIndex(p.mois.findData("2026-10"))
     assert p.s is None and p.generer() is None
-    p.jours.setValue(20)
     i = next(k for k, x in enumerate(p.lignes) if x["effectif"] >= 1)   # قسم فيه تلميذ على الأقل
-    p.table.item(i, 3).setText("1")
-    p.table.item(i, 4).setText("1.5")
+    p.table.item(i, 3).setText("96.5")             # نسبة الحضور تُدخل يدوياً (قرار 2026-11-13)
     assert p.enregistrer(), p.message.text()
-    assert p.s["etablissement"]["jours_absence"] == 1.5 and "✓" in p.mois.currentText()
-    p.table.item(i, 4).setText("abc")
-    assert not p.enregistrer() and "أرقام" in p.message.text()
+    assert p.s["etablissement"]["taux"] == 96.5 and "✓" in p.mois.currentText()
+    p.table.item(i, 3).setText("abc")
+    assert not p.enregistrer() and "بين 0 و100" in p.message.text()
     png = png_evolution(p.evolution)
     assert png and png[:4] == b"\x89PNG"
     chemin = p.generer()

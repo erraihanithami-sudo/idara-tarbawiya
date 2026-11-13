@@ -1,5 +1,5 @@
-"""تتبع الغياب الشهري (طلب المدير 2026-11-07): إدراج الغياب حسب الأقسام والوحدات بالأشهر، نسب حسب الأشهر والوحدات
-والمؤسسة كاملة، وتقرير شهري بمبيان المؤسسة."""
+"""تتبع الحضور الشهري (طلب المدير 2026-11-07، ثم 2026-11-13): نسبة الحضور الشهرية لكل قسم تُدخل يدوياً، ويحسب
+البرنامج نسبة كل وحدة والمؤسسة كاملة، مع تقرير شهري بمبيان المؤسسة."""
 
 from __future__ import annotations
 
@@ -22,11 +22,11 @@ COULEURS_UNITES = [theme.SARCELLE, theme.VIOLET, theme.ROSE, theme.ORANGE]
 
 
 def png_evolution(evolution: list[dict], largeur: int = 1000, hauteur: int = 380) -> bytes | None:
-    """مبيان نسبة غياب المؤسسة عبر الأشهر المُدرجة، صورة PNG للتقرير."""
+    """مبيان نسبة حضور المؤسسة عبر الأشهر المُدرجة، صورة PNG للتقرير."""
     if not evolution:
         return None
     w = BarresGroupees([e["libelle"].split()[0] for e in evolution],
-                       [("المؤسسة كاملة", [e["etablissement"]["taux"] for e in evolution], theme.ORANGE)], None)
+                       [("المؤسسة كاملة", [e["etablissement"]["taux"] for e in evolution], theme.SARCELLE)], 100)
     w.setLayoutDirection(Qt.RightToLeft)
     w.resize(largeur, hauteur)
     img = QImage(largeur, hauteur, QImage.Format_ARGB32)
@@ -47,24 +47,25 @@ class PageAbsences(QWidget):
         super().__init__()
         self.f = fenetre
         racine, self.message = _page("تتبع الغياب",
-                                     "أدرج كل شهر مجموع أيام غياب تلاميذ كل قسم (نصف يوم = 0.5)؛ تُحسب النسب للأقسام "
-                                     "والوحدات والمؤسسة كاملة.")
+                                     "أدخل كل شهر نسبة الحضور الشهرية لكل قسم، ويحسب البرنامج نسبة حضور كل وحدة "
+                                     "والمؤسسة كاملة (متوسط مرجح بعدد تلاميذ الأقسام).")
         self.setLayout(racine)
-        c, v = carte("إدراج غياب الشهر")
+        c, v = carte("نسب حضور الشهر")
         self.mois = QComboBox()
         self.mois.currentIndexChanged.connect(lambda _: self.afficher())
         self.jours = QDoubleSpinBox()
         self.jours.setRange(0, 31)
         self.jours.setDecimals(1)
         self.jours.setSingleStep(0.5)
+        self.jours.setSpecialValueText("غير محدد")
         self.jours.setSuffix(" يوماً")
-        v.addLayout(_grille([("الشهر", self.mois), ("أيام الدراسة الفعلية في الشهر", self.jours)]))
-        self.table = tableau(["الوحدة", "القسم", "عدد التلاميذ", "المتغيبون", "أيام الغياب", "النسبة"], etirer=1)
+        v.addLayout(_grille([("الشهر", self.mois), ("أيام الدراسة الفعلية (اختياري)", self.jours)]))
+        self.table = tableau(["الوحدة", "القسم", "عدد التلاميذ", "نسبة الحضور %"], etirer=1)
         self.table.setEditTriggers(QAbstractItemView.AllEditTriggers)
         self.table.setMinimumHeight(360)
         v.addWidget(self.table)
         h = QHBoxLayout()
-        b = QPushButton("حفظ غياب الشهر")
+        b = QPushButton("حفظ نسب الشهر")
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer())
         self.b_rapport = QPushButton("توليد التقرير الشهري (Word)")
@@ -74,12 +75,12 @@ class PageAbsences(QWidget):
         h.addStretch()
         v.addLayout(h)
         racine.addWidget(c)
-        c, v = carte("نسب الشهر")
+        c, v = carte("نسبة الحضور: الوحدات والمؤسسة")
         self.grille = QGridLayout()
         self.grille.setSpacing(12)
         v.addLayout(self.grille)
         racine.addWidget(c)
-        c, self.v_evo = carte("تطور نسبة الغياب حسب الأشهر")
+        c, self.v_evo = carte("تطور نسبة الحضور حسب الأشهر")
         self.zone_evo = QWidget()
         self.l_evo = QHBoxLayout(self.zone_evo)
         self.l_evo.setContentsMargins(0, 0, 0, 0)
@@ -118,39 +119,36 @@ class PageAbsences(QWidget):
         for i, x in enumerate(self.lignes):
             self.table.setItem(i, 0, cellule(x["unite"] or "—"))
             self.table.setItem(i, 1, cellule(x["classe"], x["classe_id"]))
-            for j, k in ((2, "effectif"), (3, "absents"), (4, "jours_absence")):
-                it = QTableWidgetItem(f"{x[k]:g}")
+            for j, v in ((2, f"{x['effectif']:g}"), (3, "" if x["taux"] is None else f"{x['taux']:g}")):
+                it = QTableWidgetItem(v)
                 it.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable)
                 it.setTextAlignment(Qt.AlignCenter)
                 self.table.setItem(i, j, it)
-            self.table.setItem(i, 5, cellule(ab._fmt(x["taux"])))
-        for col in (0, 1, 5):
+        for col in (0, 1):
             for i in range(self.table.rowCount()):
                 it = self.table.item(i, col)
                 it.setFlags(it.flags() & ~Qt.ItemIsEditable)
         self.synthese()
 
-    def valeurs(self) -> list[tuple[int, int, float, int]]:
+    def valeurs(self) -> list[tuple[int, int, str]]:
         res = []
         for i in range(self.table.rowCount()):
             cid = self.table.item(i, 1).data(Qt.UserRole)
             try:
                 eff = int(float(self.table.item(i, 2).text().replace(",", ".") or 0))
-                abs_ = int(float(self.table.item(i, 3).text().replace(",", ".") or 0))
-                ja = float(self.table.item(i, 4).text().replace(",", ".") or 0)
             except ValueError:
-                raise ab.ErreurAbsence(f"{self.table.item(i, 1).text()}: أرقام فقط.") from None
-            res.append((cid, eff, ja, abs_))
+                raise ab.ErreurAbsence(f"{self.table.item(i, 1).text()}: عدد التلاميذ رقم.") from None
+            res.append((cid, eff, self.table.item(i, 3).text()))
         return res
 
     def enregistrer(self) -> bool:
         try:
-            ab.enregistrer(self.f.conn, self.mois.currentData(), self.jours.value(), self.valeurs())
+            ab.enregistrer(self.f.conn, self.mois.currentData(), self.valeurs(), self.jours.value() or None)
         except ab.ErreurAbsence as e:
             message(self.message, str(e), True)
             return False
         self.rafraichir()
-        message(self.message, f"حُفظ غياب {ab.libelle_mois(self.mois.currentData())}.")
+        message(self.message, f"حُفظت نسب حضور {ab.libelle_mois(self.mois.currentData())}.")
         return True
 
     def synthese(self) -> None:
@@ -163,16 +161,15 @@ class PageAbsences(QWidget):
         s = ab.synthese_mois(self.f.conn, self.mois.currentData())
         self.s = s
         if s is None:
-            self.grille.addWidget(Tuile("لم يُدرج غياب هذا الشهر بعد", "—", theme.GRIS, "القيادة والتدبير"), 0, 0)
+            self.grille.addWidget(Tuile("لم تُدرج نسب هذا الشهر بعد", "—", theme.GRIS, "القيادة والتدبير"), 0, 0)
         else:
             e = s["etablissement"]
-            self.grille.addWidget(Tuile("نسبة الغياب بالمؤسسة كاملة", ab._fmt(e["taux"]), theme.ORANGE,
+            self.grille.addWidget(Tuile("نسبة الحضور بالمؤسسة كاملة", ab._fmt(e["taux"]), theme.SARCELLE,
                                         "القيادة والتدبير",
-                                        f"المتغيبون {e['absents']} من {e['effectif']} · {e['jours_absence']:g} يوم غياب"),
-                                  0, 0, 1, 2)
+                                        f"{e['classes']} قسماً · {e['effectif']} تلميذاً"), 0, 0, 1, 2)
             for k, u in enumerate(s["unites"]):
                 self.grille.addWidget(Tuile(u["unite"], ab._fmt(u["taux"]), COULEURS_UNITES[k % 4], "القيادة والتدبير",
-                                            f"المتغيبون {u['absents']} من {u['effectif']}"), 1 + k // 2, k % 2)
+                                            f"{u['classes']} قسماً · {u['effectif']} تلميذاً"), 1 + k // 2, k % 2)
         # التطور عبر الأشهر
         while self.l_evo.count():
             w = self.l_evo.takeAt(0).widget()
@@ -186,12 +183,12 @@ class PageAbsences(QWidget):
             from PySide6.QtWidgets import QLabel
             self.l_evo.addWidget(QLabel("يظهر المبيان بعد إدراج شهر واحد على الأقل."))
         else:
-            series = [("المؤسسة كاملة", [e["etablissement"]["taux"] for e in ev], theme.ORANGE)]
+            series = [("المؤسسة كاملة", [e["etablissement"]["taux"] for e in ev], theme.SARCELLE)]
             noms_u = list(dict.fromkeys(u["unite"] for e in ev for u in e["unites"]))
             for k, nu in enumerate(noms_u[:4]):
                 series.append((nu, [next((u["taux"] for u in e["unites"] if u["unite"] == nu), None) for e in ev],
                                COULEURS_UNITES[k]))
-            self.l_evo.addWidget(BarresGroupees([e["libelle"].split()[0] for e in ev], series, None))
+            self.l_evo.addWidget(BarresGroupees([e["libelle"].split()[0] for e in ev], series, 100))
 
     def generer(self):
         try:
