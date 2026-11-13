@@ -237,6 +237,17 @@ def _auto_conseil(conseil: str):
     return f
 
 
+def _auto_bureau(cle: str):
+    def f(conn) -> dict:
+        from idara.services import fiches
+        d = fiches.lire(conn, f"asso:{cle}")      # مكتب الجمعية من صفحة الوثائق القانونية للجمعيات
+        ms = [[m[0], m[1]] for m in (d or {}).get("membres", []) if m and m[0]]
+        if ms:
+            return {"lignes": ms}
+        return _auto_najah(conn) if cle == "najah" else {"lignes": []}
+    return f
+
+
 def _auto_najah(conn) -> dict:
     a = conn.execute("SELECT president, tresorier FROM association WHERE type='najah'").fetchone()
     lignes = [["", r] for r in _ROLES_ASSO]
@@ -249,13 +260,19 @@ def _auto_najah(conn) -> dict:
 def _auto_emploi(conn) -> dict:
     ens = sorted((p for p in rh.lister(conn) if p.statut == "actif" and p.categorie == "enseignant"),
                  key=lambda p: (p.nom_ar, p.prenom_ar))
-    return {"lignes": [[f"{p.prenom_ar} {p.nom_ar}", p.ppr or ""] + [""] * 13 for p in ens]}
+    from idara.services import vie_admin as va
+    lignes = []
+    for p in ens:
+        dj = va.demi_journees(conn, p.id)       # من صفحة استعمالات الزمن إن أُدخلت حصصه
+        lignes.append([f"{p.prenom_ar} {p.nom_ar}", p.ppr or ""] + [x for j in va.JOURS for x in dj[j]] + [""])
+    return {"lignes": lignes}
 
 
 AUTO: dict[str, Callable] = {"fiche": _auto_fiche, "structure_ped": _auto_structure_ped, "tanzim": _auto_tanzim,
                              "structure_mat": _auto_structure_mat, "clubs": _auto_clubs,
                              "conseil_ped": _auto_conseil("pedagogique"), "conseil_gestion": _auto_conseil("gestion"),
-                             "najah": _auto_najah, "emploi": _auto_emploi}
+                             "najah": _auto_bureau("najah"), "sportive": _auto_bureau("sportive"),
+                             "emploi": _auto_emploi}
 
 
 def _auto(conn, cle: str) -> dict:

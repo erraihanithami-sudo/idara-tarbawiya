@@ -1902,3 +1902,62 @@ def test_page_sabboura(app, config_tmp, monkeypatch):
     assert chemin is not None and len(Document(chemin).sections) == 11
     assert sb.lire(f.conn, "cellules")["lignes"][0][1] == "ذ. الأول، ذة. الثانية"
     f.close()
+
+
+def test_pages_vie_admin(app, config_tmp, monkeypatch):
+    """الوثائق القانونية للجمعيات، الحراسة، النقل، استعمالات الزمن (2026-11-13)."""
+    from idara.services import bureautique
+    from idara.services import personnel as rh
+    from idara.services import vie_admin as va
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    pid = rh.enregistrer(f.conn, rh.Personnel(nom_ar="التجريبي", prenom_ar="أستاذ", sexe="M", categorie="enseignant",
+                                              ppr="900003"))
+    # الجمعيات
+    f.aller_a("الوثائق القانونية للجمعيات")
+    p = f.page_asso_legal
+    assert p.table.rowCount() == len(va.ROLES_BUREAU) and p.generer("liste") is None
+    p.table.item(0, 0).setText("رئيس تجريبي")
+    p.ajouter_personnel()
+    assert p.table.rowCount() == len(va.ROLES_BUREAU) + 1
+    assert p.generer("declaration") is not None and p.generer("pv") is not None
+    p.asso.setCurrentIndex(p.asso.findData("parents"))       # التبديل يحفظ الجمعية السابقة
+    assert va.lire_asso(f.conn, "najah")["membres"][0][0] == "رئيس تجريبي"
+    # الحراسة
+    f.aller_a("جدول الحراسة")
+    g = f.page_garde
+    assert g.generer() is None and "فارغ" in g.message.text()
+    g.table.item(0, 0).setText("أستاذ التجريبي")
+    g.renommer(0, "دخول الصباح")
+    assert g.generer() is not None and "أستاذ التجريبي (1)" in g.bilan.text()
+    assert va.lire_garde(f.conn)["periodes"][0] == "دخول الصباح"
+    # النقل
+    f.aller_a("النقل المدرسي")
+    t = f.page_transport
+    assert t.t_el.rowCount() == 5 and t.generer() is None
+    from idara.ui.page_vie_admin import _ajouter
+    _ajouter(t.t_veh)
+    t.t_veh.item(0, 0).setText("حافلة 1")
+    t.t_el.item(0, 2).setText("حافلة 1")
+    t.t_el.item(0, 3).setText("دوار أ")
+    assert t.generer() is not None and "المستفيدون: 1" in t.stats.text()
+    t.t_el.item(1, 2).setText("حافلة 7")
+    assert not t.enregistrer() and "غير موجودة" in t.message.text()
+    # استعمالات الزمن
+    f.aller_a("استعمالات الزمن")
+    e = f.page_emplois
+    e.prof.setCurrentIndex(e.prof.findData(pid))
+    assert e.generer() is None
+    e.ajouter()
+    e.table.item(0, 1).setText("08:30")
+    e.table.item(0, 2).setText("10:00")
+    assert e.enregistrer(), e.message.text()
+    assert "1 س 30 د" in e.total.text() and e.t_ctrl.rowCount() == 1
+    i = [e.t_quotas.item(k, 0).text() for k in range(e.t_quotas.rowCount())].index(e.table.item(0, 3).text())
+    e.t_quotas.item(i, 1).setText("90")
+    assert e.enregistrer_quotas() and e.t_ctrl.item(0, 3).text() == "الحصيص مكتمل"
+    e.table.item(0, 2).setText("08:00")
+    assert not e.enregistrer() and "قبل بدايتها" in e.message.text()
+    e.table.item(0, 2).setText("10:00")
+    assert e.generer() is not None
+    f.close()
