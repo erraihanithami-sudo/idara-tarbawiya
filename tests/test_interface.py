@@ -1211,7 +1211,7 @@ def test_lauha_qiyada_et_boutons_suppression(app, config_tmp):
     t.rafraichir()
     assert t.jauges[1].note.startswith("منقطعون 0")
     titres = [j.titre for j in t.jauges]
-    assert titres[:3] == ["الغياب", "الهدر المدرسي", "الأنشطة الموازية"] and titres[3] == "الحاصلون على المعدل"
+    assert titres[:3] == ["الحضور", "الهدر المدرسي", "الأنشطة الموازية"] and titres[3] == "الحاصلون على المعدل"
     assert t.jauges[0].taux is None and t.jauges[1].taux == 0, t.jauges[1].note
     e = et.lire_etablissement(f.conn)
     e.est_pionniere, e.type_etab = "1", "groupe"
