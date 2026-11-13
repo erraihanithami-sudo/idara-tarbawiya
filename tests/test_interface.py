@@ -1725,6 +1725,16 @@ def test_page_passation(app, config_tmp, monkeypatch):
         [s.cle for s in ps.SECTIONS].index("livres") - 1 and p.cle == "livres"
     p.retablir()
     assert all(a for _, a in ps.sections(f.conn))
+    # محور خاص (طلب المدير 2026-11-13)
+    cle = p.ajouter_section("الحديقة المدرسية", "النوع، العدد", False)
+    assert cle and p.cle == cle and p.table is not None and p.table.columnCount() == 2
+    assert p.b_suppr_section.isEnabled() and p.liste.count() == len(ps.SECTIONS) + 1
+    p.ajouter_ligne()
+    p.table.item(0, 0).setText("أشجار")
+    p.enregistrer()
+    assert ps.lire(f.conn, cle)["lignes"] == [["أشجار", ""]]
+    assert p.ajouter_section("الحديقة المدرسية", "", True) is None and "يوجد محور" in p.message.text()
+    assert p.supprimer_section() and p.liste.count() == len(ps.SECTIONS)
     p.date_pv.setText("25/07/2026")
     chemin = p.generer()
     assert chemin is not None and chemin.exists() and ouverts == [chemin], p.message.text()

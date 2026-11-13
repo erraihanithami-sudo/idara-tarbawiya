@@ -78,6 +78,15 @@ class PagePassation(QWidget):
         b.clicked.connect(self.retablir)
         h.addWidget(b)
         v.addLayout(h)
+        # محور خاص يضيفه المدير (طلب 2026-11-13)
+        h = QHBoxLayout()
+        b = QPushButton("إضافة محور خاص…")
+        b.clicked.connect(lambda: self.ajouter_section())
+        h.addWidget(b)
+        self.b_suppr_section = bouton("حذف المحور الخاص")
+        self.b_suppr_section.clicked.connect(lambda: self.supprimer_section())
+        h.addWidget(self.b_suppr_section)
+        v.addLayout(h)
         corps.addWidget(c, 3)
 
         # ---- المحور المختار ----
@@ -143,7 +152,7 @@ class PagePassation(QWidget):
         self.afficher(it.data(Qt.UserRole))
 
     def afficher(self, cle: str, donnees: dict | None = None) -> None:
-        s = ps.PAR_CLE[cle]
+        s = ps.section(self.f.conn, cle)
         d = donnees or ps.lire(self.f.conn, cle)
         self.cle = None
         for w in self._anciens:
@@ -202,6 +211,7 @@ class PagePassation(QWidget):
             b.setVisible(tableau_)
         self.b_importer.setVisible(s.deux_colonnes)
         self.b_actualiser.setVisible(cle in ps.AUTO)
+        self.b_suppr_section.setEnabled(cle not in ps.PAR_CLE)
         self.cle = cle
 
     @staticmethod
@@ -243,7 +253,7 @@ class PagePassation(QWidget):
             message(self.message, str(e), True)
             return False
         if afficher:
-            message(self.message, f"حُفظ محور «{ps.PAR_CLE[self.cle].titre}».")
+            message(self.message, f"حُفظ محور «{ps.section(self.f.conn, self.cle).titre}».")
         return True
 
     def ajouter_ligne(self) -> None:
@@ -286,7 +296,7 @@ class PagePassation(QWidget):
         cle = self.cle
         ps.enregistrer(self.f.conn, cle, d)
         self.afficher(cle)
-        message(self.message, f"أُضيف {len(lignes)} عنوان إلى «{ps.PAR_CLE[cle].titre}».")
+        message(self.message, f"أُضيف {len(lignes)} عنوان إلى «{ps.section(self.f.conn, cle).titre}».")
         return len(lignes)
 
     # ---------- المحاور ----------
@@ -300,6 +310,46 @@ class PagePassation(QWidget):
         self.enregistrer()
         ps.deplacer(self.f.conn, self.cle, pas)
         self.rafraichir()
+
+    def ajouter_section(self, titre: str | None = None, colonnes: str | None = None,
+                        texte: bool | None = None) -> str | None:
+        """عنوان المحور، وأعمدة جدوله مفصولة بفاصلة (أو لا شيء لنص حر)."""
+        if titre is None:
+            from PySide6.QtWidgets import QInputDialog
+            titre, ok = QInputDialog.getText(self, "محور خاص", "عنوان المحور:")
+            if not ok:
+                return None
+            colonnes, ok = QInputDialog.getText(
+                self, "محور خاص", "أعمدة الجدول مفصولة بفاصلة (مثلاً: النوع، العدد، ملاحظات).\n"
+                                  "اتركها فارغة لمحور نصي:")
+            if not ok:
+                return None
+            texte = not colonnes.strip()
+        self.enregistrer()
+        try:
+            cle = ps.ajouter_section(self.f.conn, titre, colonnes or "", bool(texte))
+        except ps.ErreurPassation as e:
+            message(self.message, str(e), True)
+            return None
+        self.cle = None
+        self.rafraichir()
+        cles = [self.liste.item(i).data(Qt.UserRole) for i in range(self.liste.count())]
+        self.liste.setCurrentRow(cles.index(cle))
+        message(self.message, f"أُضيف المحور «{titre.strip()}» في آخر المحضر؛ غيّر موضعه بالسهمين.")
+        return cle
+
+    def supprimer_section(self) -> bool:
+        if self.cle is None:
+            return False
+        try:
+            ps.supprimer_section(self.f.conn, self.cle)
+        except ps.ErreurPassation as e:
+            message(self.message, str(e), True)
+            return False
+        self.cle = None
+        self.rafraichir()
+        message(self.message, "حُذف المحور الخاص.")
+        return True
 
     def retablir(self) -> None:
         self.enregistrer()

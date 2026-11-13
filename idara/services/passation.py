@@ -480,12 +480,69 @@ def _auto(conn, cle: str) -> dict:
 
 # ---------- الحفظ ----------
 
-def _largeur(cle: str) -> int:
-    return len(PAR_CLE[cle].colonnes) if cle in PAR_CLE else 0
+# ---------- المحاور التي يضيفها المدير (2026-11-13) ----------
+
+def _perso(conn) -> list[Section]:
+    res = []
+    for r in conn.execute("SELECT * FROM passation_perso ORDER BY rowid"):
+        cols = tuple(json.loads(r["colonnes"] or "[]"))
+        res.append(Section(r["cle"], r["titre"], colonnes=cols, numero=bool(cols),
+                           champs=(C("texte", "النص", long=True),) if r["avec_texte"] or not cols else (),
+                           source="محور أضفتموه إلى المحضر: كل معطياته يدوية."))
+    return res
 
 
-def _normaliser(cle: str, donnees: dict) -> dict:
-    n = _largeur(cle)
+def section(conn: sqlite3.Connection, cle: str) -> Section:
+    if cle in PAR_CLE:
+        return PAR_CLE[cle]
+    for s in _perso(conn):
+        if s.cle == cle:
+            return s
+    raise ErreurPassation("محور غير معروف.")
+
+
+def ajouter_section(conn: sqlite3.Connection, titre: str, colonnes: list[str] | str = (), texte: bool = False) -> str:
+    """يضيف محوراً خاصاً: عنوان، وأعمدة جدول (مفصولة بفاصلة إن كانت نصاً) و/أو نص حر. يُدرج في آخر المحضر."""
+    titre = " ".join((titre or "").split())
+    if not titre:
+        raise ErreurPassation("عنوان المحور إجباري.")
+    if isinstance(colonnes, str):
+        colonnes = colonnes.replace("،", ",").split(",")
+    cols = [" ".join(c.split()) for c in colonnes if c and c.strip()]
+    if len(cols) > 8:
+        raise ErreurPassation("ثمانية أعمدة على الأكثر حتى يتسع الجدول للصفحة.")
+    if len(set(cols)) != len(cols):
+        raise ErreurPassation("أسماء الأعمدة مكررة.")
+    if titre in {s.titre for s in SECTIONS} | {s.titre for s in _perso(conn)}:
+        raise ErreurPassation("يوجد محور بهذا العنوان.")
+    n = conn.execute("SELECT COUNT(*) FROM passation_perso").fetchone()[0] + 1
+    cle = f"perso_{n}"
+    while conn.execute("SELECT 1 FROM passation_perso WHERE cle=?", (cle,)).fetchone():
+        n += 1
+        cle = f"perso_{n}"
+    with conn:
+        conn.execute("INSERT INTO passation_perso(cle, titre, colonnes, avec_texte) VALUES (?,?,?,?)",
+                     (cle, titre, json.dumps(cols, ensure_ascii=False), int(texte or not cols)))
+    _ecrire_etat(conn, sections(conn))      # يأخذ موضعه في آخر الترتيب الحالي
+    return cle
+
+
+def supprimer_section(conn: sqlite3.Connection, cle: str) -> None:
+    if cle in PAR_CLE:
+        raise ErreurPassation("محاور النموذج لا تُحذف: أزل علامتها لإخفائها من المحضر.")
+    section(conn, cle)
+    with conn:
+        conn.execute("DELETE FROM passation_perso WHERE cle=?", (cle,))
+        conn.execute("DELETE FROM passation_section WHERE cle=?", (cle,))
+
+
+def _largeur(cle: str, s: Section | None = None) -> int:
+    s = s or PAR_CLE.get(cle)
+    return len(s.colonnes) if s else 0
+
+
+def _normaliser(cle: str, donnees: dict, s: Section | None = None) -> dict:
+    n = _largeur(cle, s)
     lignes = []
     for l in donnees.get("lignes", []):
         l = [" ".join(str(v if v is not None else "").split()) for v in l][:n] if n else []
@@ -498,12 +555,11 @@ def _normaliser(cle: str, donnees: dict) -> dict:
 
 def lire(conn: sqlite3.Connection, cle: str) -> dict:
     """معطيات المحور: المحفوظة، وإلا المقترحة من البرنامج."""
-    if cle != "_general" and cle not in PAR_CLE:
-        raise ErreurPassation("محور غير معروف.")
+    s = None if cle == "_general" else section(conn, cle)
     r = conn.execute("SELECT donnees FROM passation_section WHERE cle=?", (cle,)).fetchone()
     if r and r[0]:
-        return _normaliser(cle, _adapter(conn, cle, json.loads(r[0])))
-    return _normaliser(cle, _auto(conn, cle))
+        return _normaliser(cle, _adapter(conn, cle, json.loads(r[0])), s)
+    return _normaliser(cle, _auto(conn, cle), s)
 
 
 # محاور تغيرت أعمدتها بعد الإصدار الأول (التحسينات التي وافق عليها المدير 2026-11-13)
@@ -530,9 +586,8 @@ def _adapter(conn, cle: str, d: dict) -> dict:
 
 
 def enregistrer(conn: sqlite3.Connection, cle: str, donnees: dict) -> None:
-    if cle != "_general" and cle not in PAR_CLE:
-        raise ErreurPassation("محور غير معروف.")
-    d = _normaliser(cle, donnees)
+    s = None if cle == "_general" else section(conn, cle)
+    d = _normaliser(cle, donnees, s)
     if cle == "_general" and d["champs"].get("date_pv"):
         try:
             date.fromisoformat(d["champs"]["date_pv"])
@@ -541,15 +596,14 @@ def enregistrer(conn: sqlite3.Connection, cle: str, donnees: dict) -> None:
     with conn:
         conn.execute("INSERT INTO passation_section(cle, donnees, maj_le) VALUES (?,?,datetime('now','localtime')) "
                      "ON CONFLICT(cle) DO UPDATE SET donnees=excluded.donnees, maj_le=excluded.maj_le",
-                     (cle, json.dumps({**d, "colonnes": list(PAR_CLE[cle].colonnes) if cle in PAR_CLE else []},
-                                      ensure_ascii=False)))
+                     (cle, json.dumps({**d, "colonnes": list(s.colonnes) if s else []}, ensure_ascii=False)))
 
 
 def actualiser(conn: sqlite3.Connection, cle: str) -> dict:
     """يعيد ما يأتي من البرنامج، ويحتفظ بما أُدخل يدوياً: الخانات التي لا يقترحها البرنامج، والأعمدة اليدوية
     للأسطر الموافقة (حسب العمود الأول)."""
     actuel = lire(conn, cle)
-    auto = _normaliser(cle, _auto(conn, cle))
+    auto = _normaliser(cle, _auto(conn, cle), None if cle == "_general" else section(conn, cle))
     champs = dict(actuel["champs"])
     champs.update({k: v for k, v in auto["champs"].items() if v})
     s = PAR_CLE.get(cle)
@@ -578,7 +632,7 @@ def sections(conn: sqlite3.Connection) -> list[tuple[Section, bool]]:
     """المحاور بترتيبها الحالي، مع هل تُدرج في المحضر."""
     etat = {r["cle"]: r for r in conn.execute("SELECT cle, actif, ordre FROM passation_section")}
     res = []
-    for i, s in enumerate(SECTIONS):
+    for i, s in enumerate(SECTIONS + _perso(conn)):
         r = etat.get(s.cle)
         ordre = r["ordre"] if r and r["ordre"] is not None else i
         res.append((ordre, i, s, bool(r["actif"]) if r else True))
@@ -607,7 +661,7 @@ def deplacer(conn: sqlite3.Connection, cle: str, pas: int) -> None:
 
 def retablir_ordre(conn: sqlite3.Connection) -> None:
     """ترتيب النموذج، وكل المحاور مدرجة."""
-    _ecrire_etat(conn, [(s, True) for s in SECTIONS])
+    _ecrire_etat(conn, [(s, True) for s in SECTIONS + _perso(conn)])
 
 
 # ---------- استيراد لائحة (الكتب...) ----------
@@ -797,7 +851,8 @@ def _champs_section(d, s: Section, champs: dict) -> None:
             _cellule(t.cell(i // 2, i % 2), f"{c.libelle}: {v}" if v else f"{c.libelle}:", taille=11,
                      centre=False)
     for c, v in longs:
-        para(d, f"{c.libelle}:", gras=True, taille=11, apres=0)
+        if not s.cle.startswith("perso_"):      # محور أضافه المدير: النص وحده، دون عنوان «النص»
+            para(d, f"{c.libelle}:", gras=True, taille=11, apres=0)
         for l in (v or "").splitlines() or [""]:
             if l.strip():
                 para(d, l, taille=11, apres=0)

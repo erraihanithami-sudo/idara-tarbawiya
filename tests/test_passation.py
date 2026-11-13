@@ -162,3 +162,33 @@ def test_ameliorations_des_tableaux(base, dossier):  # noqa: F811
     for c in ("الحالة", "يحتاج صيانة", "معطل", "SN-TEST-1", "الجمعيات المدرسية", "آخر وضعية بسجل", "1025",
               "الحواسيب المسلمة للأساتذة", "الأساتذة", "الملفات غير المتوفرة"):
         assert c in cellules, c
+
+
+def test_sections_ajoutees_par_le_directeur(base, dossier):  # noqa: F811
+    """طلب المدير 2026-11-13: إضافة محور خاص إلى المحاور المقترحة."""
+    with pytest.raises(ps.ErreurPassation, match="إجباري"):
+        ps.ajouter_section(base, " ")
+    with pytest.raises(ps.ErreurPassation, match="يوجد محور"):
+        ps.ajouter_section(base, "تعريف المؤسسة")
+    with pytest.raises(ps.ErreurPassation, match="مكررة"):
+        ps.ajouter_section(base, "محور", "أ، أ")
+    cle = ps.ajouter_section(base, "الحديقة المدرسية", "النوع، العدد، ملاحظات")
+    cle2 = ps.ajouter_section(base, "ملاحظات عامة", texte=True)
+    l = ps.sections(base)
+    assert [s.cle for s, _ in l][-2:] == [cle, cle2] and all(a for _, a in l)
+    assert ps.section(base, cle).colonnes == ("النوع", "العدد", "ملاحظات") and not ps.section(base, cle).champs
+    ps.enregistrer(base, cle, {"lignes": [["أشجار الزيتون", "12", ""]]})
+    ps.enregistrer(base, cle2, {"champs": {"texte": "سطر أول\nسطر ثان"}})
+    ps.deplacer(base, cle2, -100)
+    assert ps.sections(base)[0][0].cle == cle2
+    texte, cellules = _texte(ps.generer(base, dossier))
+    assert "الحديقة المدرسية" in cellules and "أشجار الزيتون" in cellules and "ملاحظات عامة" in cellules
+    assert "سطر ثان" in texte and "النص:" not in texte
+    with pytest.raises(ps.ErreurPassation, match="لا تُحذف"):
+        ps.supprimer_section(base, "etablissement")
+    ps.supprimer_section(base, cle)
+    assert cle not in [s.cle for s, _ in ps.sections(base)]
+    with pytest.raises(ps.ErreurPassation, match="غير معروف"):
+        ps.lire(base, cle)
+    ps.retablir_ordre(base)
+    assert [s.cle for s, _ in ps.sections(base)][-1] == cle2
