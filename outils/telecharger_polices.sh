@@ -18,3 +18,8 @@ done
 curl -sSfL -o "$d/OFL-Tajawal.txt" "https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/OFL.txt" || true
 curl -sSfL -o "$d/OFL-Amiri.txt" "https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/OFL.txt" || true
 ls -la "$d"
+
+# خط العناوين لهوية «رحاب» (رخصة SIL OFL): المسيري
+curl -sSfL -o "$d/ElMessiri.ttf" "https://raw.githubusercontent.com/google/fonts/main/ofl/elmessiri/ElMessiri%5Bwght%5D.ttf" || echo "تعذر تنزيل El Messiri"
+curl -sSfL -o "$d/OFL-ElMessiri.txt" "https://raw.githubusercontent.com/google/fonts/main/ofl/elmessiri/OFL.txt" || true
+ls -la "$d"

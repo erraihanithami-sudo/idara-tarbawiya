@@ -51,10 +51,23 @@ PALETTES = {
         RECHERCHE_FOND="#164F3C", RECHERCHE_TEXTE="#FFFFFF",
         NAV_TEXTE_ACTIF="#0B3B2C", ENTETE_FOND="#0B3B2C", ENTETE_TEXTE="#FFFFFF", FOCUS="#C9A44C",
         TITRE_SOULIGNE="#C9A44C", POLICE="Tajawal", POLICE_TITRE="Amiri"),
+    # رحاب: هوية «الشامل في الإدارة التربوية بالمغرب» (اختيار المدير 2026-11-13): أزرق ماجوريل والأصفر الليموني
+    "rihab": dict(
+        HERO_FOND="#2E3192", HERO_FOND2="#3B3FB6", HERO_TEXTE="#FFFFFF", HERO_TEXTE2="#F2C14E",
+        MARINE="#1B1B3A", SARCELLE="#2F6B4F", MENTHE="#F2C14E", VIOLET="#6B4FA0", BLEU="#3B3FB6",
+        ROSE="#B5462F", ORANGE="#B07A16", VERT="#3B3FB6", VERT_FONCE="#23266E", VERT_CLAIR="#E7E8F8",
+        ROUGE="#B5462F", ROUGE_TEXTE="#8E3422", ROUGE_CLAIR="#FBEAE5", PLATRE="#F7F5F0", BLANC="#FFFFFF",
+        ENCRE="#1B1B3A", GRIS="#4E5170", LIGNE="#E2DED4", BORDURE_CHAMP="#6B6E8C", BORDURE_CARTE="#D6D3E6",
+        NAV_FOND="#2E3192", NAV_FOND2="#24277F", NAV_TEXTE="#FFFFFF", NAV_TEXTE2="#D6D8F5",
+        NAV_ACTIF="#F2C14E", NAV_ACCENT="#F2C14E", NAV_SURVOL="#3B3FB6", NAV_BORD="#24277F",
+        NAV_SOMBRE=True, NAV_MOTIF="#6E72D8", BADGE_FOND="#F2C14E", BADGE_TEXTE="#1B1B3A",
+        RECHERCHE_FOND="#3B3FB6", RECHERCHE_TEXTE="#FFFFFF",
+        NAV_TEXTE_ACTIF="#1B1B3A", ENTETE_FOND="#2E3192", ENTETE_TEXTE="#FFFFFF", FOCUS="#3B3FB6",
+        TITRE_SOULIGNE="#F2C14E", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="El Messiri"),
 }
-NOMS_THEMES = {"maghribi": "المغربي (الأخضر والذهبي)", "classique": "الأصلي (فاتح)", "marine": "الكحلي والذهبي",
+NOMS_THEMES = {"rihab": "رحاب (أزرق ماجوريل والأصفر)", "maghribi": "المغربي (الأخضر والذهبي)", "classique": "الأصلي (فاتح)", "marine": "الكحلي والذهبي",
                "violet": "البنفسجي والوردي"}
-THEME_DEFAUT = "maghribi"
+THEME_DEFAUT = "rihab"
 
 
 def luminance(c: str) -> float:

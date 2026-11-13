@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QFileDialo
                                QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea,
                                QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
 
-from idara import NOM_APPLICATION, __version__
+from idara import NOM_APPLICATION, __version__, marque
 from idara.data.db import ouvrir_base
 from idara.data.dossier import DossierDonnees
 from idara.services import annee as annee_srv
@@ -51,7 +51,7 @@ from idara.ui.page_projet import PageProjet
 from idara.ui.page_pv_rh import PagePvRh
 from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
-from idara.ui.zellige import BandeZellige, FondZellige, LogoEtoile
+from idara.ui.zellige import BandeZellige, FondZellige, LogoMarque
 
 
 class Jauge(QWidget):
@@ -741,14 +741,19 @@ class FenetrePrincipale(QMainWindow):
         tete = QHBoxLayout()
         tete.setContentsMargins(20, 20, 20, 16)
         tete.setSpacing(12)
-        tete.addWidget(LogoEtoile(36))
+        tete.addWidget(LogoMarque(44), 0, Qt.AlignTop)
         noms = QVBoxLayout()
         noms.setSpacing(0)
-        a = QLabel(NOM_APPLICATION)
+        a = QLabel(marque.NOM_COURT)   # «الشامل» بخط العناوين، وتحته «في الإدارة التربوية بالمغرب»
         a.setObjectName("navTitre")
+        a.setToolTip(NOM_APPLICATION)
+        s = QLabel(marque.SOUS_TITRE)
+        s.setObjectName("navSous")
         self.nom_etab = QLabel()
         self.nom_etab.setObjectName("navSous")
+        self.nom_etab.setWordWrap(True)
         noms.addWidget(a)
+        noms.addWidget(s)
         noms.addWidget(self.nom_etab)
         tete.addLayout(noms, 1)
         v.addLayout(tete)

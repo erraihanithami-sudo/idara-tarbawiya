@@ -1,4 +1,4 @@
-﻿; ملف تثبيت تطبيق الإدارة التربوية (Inno Setup 6)
+﻿; ملف تثبيت «الشامل في الإدارة التربوية بالمغرب» (Inno Setup 6)
 ; يُثبَّت للمستخدم الحالي دون صلاحيات المسؤول. البيانات لا تُمس عند التحديث أو الإزالة.
 
 #ifndef Version
@@ -7,11 +7,11 @@
 
 [Setup]
 AppId={{6E1E5C2A-4B7D-4E3F-9A51-2D0C7A1B8F33}
-AppName=الإدارة التربوية
+AppName=الشامل في الإدارة التربوية بالمغرب
 AppVersion={#Version}
-AppPublisher=الإدارة التربوية
+AppPublisher=الشامل في الإدارة التربوية بالمغرب
 DefaultDirName={localappdata}\Programs\IdaraTarbawiya
-DefaultGroupName=الإدارة التربوية
+DefaultGroupName=الشامل في الإدارة التربوية بالمغرب
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=..\dist-installateur
@@ -35,9 +35,15 @@ Name: "bureau"; Description: "إنشاء اختصار على سطح المكتب
 [Files]
 Source: "..\dist\Idara\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+; الاختصارات القديمة باسم «الإدارة التربوية» (قبل تغيير الاسم 2026-11-13)
+Type: files; Name: "{autodesktop}\الإدارة التربوية.lnk"
+Type: files; Name: "{userprograms}\الإدارة التربوية\الإدارة التربوية.lnk"
+Type: dirifempty; Name: "{userprograms}\الإدارة التربوية"
+
 [Icons]
-Name: "{group}\الإدارة التربوية"; Filename: "{app}\Idara.exe"
-Name: "{autodesktop}\الإدارة التربوية"; Filename: "{app}\Idara.exe"; Tasks: bureau
+Name: "{group}\الشامل في الإدارة التربوية بالمغرب"; Filename: "{app}\Idara.exe"
+Name: "{autodesktop}\الشامل في الإدارة التربوية بالمغرب"; Filename: "{app}\Idara.exe"; Tasks: bureau
 
 [Run]
-Filename: "{app}\Idara.exe"; Description: "تشغيل الإدارة التربوية"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Idara.exe"; Description: "تشغيل الشامل في الإدارة التربوية بالمغرب"; Flags: nowait postinstall skipifsilent

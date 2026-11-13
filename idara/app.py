@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import traceback
 from datetime import datetime
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
@@ -49,10 +50,14 @@ def creer_application(argv=None) -> QApplication:
     app.setApplicationName(NOM_APPLICATION)
     app.setLayoutDirection(Qt.RightToLeft)
     cfg = config_srv.lire_config()
-    if not cfg.get("theme_maghribi_applique"):
-        # المظهر المغربي يُفعَّل مرة واحدة عند التحديث (طلب المدير 2026-11-12)، ثم يبقى اختياره حراً
-        config_srv.ecrire_config(theme=theme.THEME_DEFAUT, theme_maghribi_applique=True)
+    if not cfg.get("theme_rihab_applique"):
+        # هوية «رحاب» تُفعَّل مرة واحدة عند التحديث (اختيار المدير 2026-11-13)، ثم يبقى اختيار المظهر حراً
+        config_srv.ecrire_config(theme=theme.THEME_DEFAUT, theme_maghribi_applique=True, theme_rihab_applique=True)
         cfg = config_srv.lire_config()
+    ico = Path(__file__).resolve().parent / "resources" / "icone.ico"
+    if ico.exists():
+        from PySide6.QtGui import QIcon
+        app.setWindowIcon(QIcon(str(ico)))
     theme.appliquer(cfg.get("theme", theme.THEME_DEFAUT))   # المظهر المختار
     app.setFont(theme.charger_police())   # بعد المظهر: لكل مظهر خطه
     app.setStyleSheet(theme.appliquer(theme.THEME_ACTUEL))   # بعد تحميل الخطوط (خط العناوين)

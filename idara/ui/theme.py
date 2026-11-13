@@ -157,38 +157,48 @@ QLineEdit#rechercheNav:focus {{ border: 2px solid {NAV_ACCENT}; }}
 """ + feuille_maghribi()
 
 
+# ألوان ثانوية لمظاهر العناوين المزخرفة (لا يُكتب عليها نص، فلا تدخل في اختبار التباين)
+_EXTRAS = {
+    "maghribi": {"degrade": "#1E6B4A", "alterne": "#FBF8F1", "bord_entete": "#164B39", "pastille": "#E8D49C",
+                 "ascenseur": "#D8CCB2"},
+    "rihab": {"degrade": "#4B50C8", "alterne": "#F8F7FC", "bord_entete": "#24277F", "pastille": "#F2C14E",
+              "ascenseur": "#C9CBE8", "taille_titre": "20pt"},
+}
+
+
 def feuille_maghribi() -> str:
     """لمسات إضافية خاصة بالمظاهر ذات العناوين المزخرفة (المغربي): خط أميري، خط ذهبي، زوايا أنعم."""
     if not TITRE_SOULIGNE:
         return ""
     titre = police_titres()
     fam = f'font-family: "{titre}";' if titre else ""
+    x = _EXTRAS.get(THEME_ACTUEL, _EXTRAS["maghribi"])
     return f"""
 #titrePage {{ {fam} font-size: 24pt; font-weight: 700; color: {VERT_FONCE};
     border-bottom: 2px solid {TITRE_SOULIGNE}; padding-bottom: 4px; }}
 #etapeTitre {{ {fam} font-size: 19pt; }}
-#navTitre {{ {fam} font-size: 15pt; }}
+#navTitre {{ {fam} font-size: {x.get('taille_titre', '15pt')}; }}
 #titreCarte {{ color: {VERT_FONCE}; }}
 #carte, #tuile {{ border-radius: 16px; border: 1px solid {BORDURE_CARTE}; }}
 #tuile {{ border-top: 3px solid {TITRE_SOULIGNE}; }}
 #chiffre {{ color: {VERT_FONCE}; }}
 QPushButton {{ border-radius: 11px; color: {VERT_FONCE}; font-weight: 600; }}
 QPushButton:hover {{ background: {VERT_CLAIR}; border-color: {TITRE_SOULIGNE}; }}
-QPushButton#principal {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1E6B4A, stop:1 {VERT});
+QPushButton#principal {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {x['degrade']}, stop:1 {VERT});
     color: {BLANC}; border: 1px solid {VERT_FONCE}; }}
 QPushButton#principal:hover {{ background: {VERT_FONCE}; border-color: {TITRE_SOULIGNE}; }}
 QPushButton#nav, QPushButton#sousnav {{ color: {NAV_TEXTE}; }}
 QPushButton#nav:checked {{ border-right: 4px solid {NAV_ACCENT}; }}
 QLineEdit, QComboBox, QDateEdit {{ border-radius: 10px; }}
 QLineEdit:hover, QComboBox:hover, QDateEdit:hover {{ border-color: {TITRE_SOULIGNE}; }}
-QTableWidget, QTableView {{ border-radius: 12px; alternate-background-color: #FBF8F1;
+QTableWidget, QTableView {{ border-radius: 12px; alternate-background-color: {x['alterne']};
     selection-background-color: {VERT_CLAIR}; }}
 QTableWidget::item:selected, QTableView::item:selected {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; }}
-QHeaderView::section {{ border-left: 1px solid #164B39; border-bottom: 2px solid {TITRE_SOULIGNE}; padding: 8px; }}
+QHeaderView::section {{ border-left: 1px solid {x['bord_entete']}; border-bottom: 2px solid {TITRE_SOULIGNE}; padding: 8px; }}
 QTabBar::tab:selected {{ border-bottom: 3px solid {TITRE_SOULIGNE}; }}
-#pastille {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; border: 1px solid #E8D49C; }}
+#pastille {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; border: 1px solid {x['pastille']}; }}
 QScrollBar:vertical {{ background: transparent; width: 11px; margin: 3px; }}
-QScrollBar::handle:vertical {{ background: #D8CCB2; border-radius: 5px; min-height: 30px; }}
+QScrollBar::handle:vertical {{ background: {x['ascenseur']}; border-radius: 5px; min-height: 30px; }}
 QScrollBar::handle:vertical:hover {{ background: {TITRE_SOULIGNE}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QToolTip {{ background: {VERT_FONCE}; color: #FFFFFF; border: 1px solid {TITRE_SOULIGNE}; padding: 5px; }}

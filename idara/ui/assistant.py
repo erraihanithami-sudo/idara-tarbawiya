@@ -20,7 +20,8 @@ from idara.services.etablissement import (ConfigurationInitiale, ErreurValidatio
 from idara.ui import theme
 from idara.ui.formulaires import (FormDirecteur, FormEtablissement, FormIdentite, champ,
                                   etiquette)
-from idara.ui.zellige import FondZellige, LogoEtoile
+from idara import marque
+from idara.ui.zellige import FondZellige, LogoMarque
 
 ETAPES = ["المؤسسة", "المدير", "الهوية البصرية للوثائق", "مجلد البيانات والسنة الدراسية"]
 TITRES = ["تعريف المؤسسة", "المدير", "الهوية البصرية للوثائق", "مجلد البيانات والسنة الدراسية"]
@@ -86,8 +87,8 @@ class AssistantPremierLancement(QWidget):
         cv = QVBoxLayout(cote)
         cv.setContentsMargins(36, 44, 36, 36)
         cv.setSpacing(14)
-        cv.addWidget(LogoEtoile(56))
-        t = QLabel("مرحباً بكم")
+        cv.addWidget(LogoMarque(64, inverse=False))
+        t = QLabel(f"مرحباً بكم في «{marque.NOM_COURT}»")
         t.setObjectName("titrePage")
         cv.addWidget(t)
         p = QLabel("تُدخل هذه المعلومات مرة واحدة، وتُستعمل آلياً في كل الوثائق. "

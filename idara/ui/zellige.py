@@ -8,6 +8,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import QWidget
 
+from idara import marque
 from idara.ui import theme
 
 RACINE2 = math.sqrt(2)
@@ -104,4 +105,30 @@ class LogoEtoile(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         t = self.width()
         dessiner_etoile(p, t / 2, t / 2, t * 0.28, theme.NAV_ACCENT, pleine=True, trou=True)
+        p.end()
+
+
+class LogoMarque(QWidget):
+    """رمز البرنامج (باب بقوس مغربي، هوية «رحاب»: اختيار المدير 2026-11-13)، من هندسة idara/marque.py.
+    على شريط جانبي داكن تصير التربيعة بيضاء حتى يظهر الرمز."""
+
+    def __init__(self, taille: int = 36, parent=None, inverse: bool | None = None):
+        super().__init__(parent)
+        self.setFixedSize(taille, taille)
+        self.inverse = inverse
+        self.setToolTip(f"{marque.NOM_COURT} {marque.SOUS_TITRE}")
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(Qt.NoPen)
+        k = self.width() / marque.COTE
+        inverse = theme.NAV_SOMBRE if self.inverse is None else self.inverse
+        for nature, couleur, g in marque.formes(inverse):
+            p.setBrush(QColor(couleur))
+            if nature in ("tuile", "rect"):
+                x0, y0, x1, y1, r = g
+                p.drawRoundedRect(QRectF(x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k), r * k, r * k)
+            else:
+                p.drawPolygon(QPolygonF([QPointF(x * k, y * k) for x, y in g]))
         p.end()
