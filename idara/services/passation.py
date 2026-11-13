@@ -52,6 +52,7 @@ class Section:
     fusion: bool = False         # دمج الخانات المتطابقة المتتالية في العمود الأول (الوحدة)
     source: str = ""
     defaut: tuple = ()           # أسطر مقترحة حين لا تتوفر معطيات في البرنامج
+    annexe: bool = False         # لائحة طويلة: في المتن عدد العناوين والنسخ، والتفصيل في ملحق آخر المحضر
 
 
 C = Champ
@@ -68,11 +69,12 @@ SECTIONS: list[Section] = [
                     C("nouveau_type", "التعيين (رسمي أو مؤقت)"), C("decision", "قرار الإسناد")),
             source="المدير السابق: المدير المسجل حالياً في البرنامج. المدير الجديد يُدخل يدوياً."),
     Section("ressources", "البنية البشرية بالمؤسسة",
-            champs=(C("nb_enseignants", "الأطر العاملة بالمؤسسة: عدد الأساتذة"), C("nb_agents", "عدد الأعوان"),
-                    C("dossiers_enseignants", "عدد ملفات الأساتذة"),
-                    C("dossiers_partis", "عدد ملفات الأساتذة المنتقلين والمتقاعدين"),
-                    C("dossiers_agents", "عدد ملفات الأعوان"), C("nb_eleves", "مجموع التلاميذ بالمؤسسة")),
-            source="من الموارد البشرية (الموظفون في العمل، وخانة «الملف متوفر») ومن لوائح التلاميذ الحاضرين."),
+            champs=(C("dossiers_partis", "عدد ملفات الأساتذة المنتقلين والمتقاعدين"),
+                    C("nb_eleves", "مجموع التلاميذ بالمؤسسة")),
+            colonnes=("الفئة", "العدد", "الملفات المتوفرة", "الملفات غير المتوفرة", "ملاحظات"),
+            total=(1, 2, 3), manuels=(4,),
+            source="من الموارد البشرية: الموظفون في العمل (عدا المدير) حسب الفئة، وخانة «الملف متوفر»؛ "
+                   "ومن لوائح التلاميذ الحاضرين."),
     Section("eleves", "وثائق المتعلمين",
             colonnes=("الوحدات المدرسية", "عدد التلاميذ", "الملفات المدرسية: المتوفر", "الملفات المدرسية: الخصاص",
                       "الملفات الصحية: المتوفر", "الملفات الصحية: الخصاص",
@@ -95,8 +97,10 @@ SECTIONS: list[Section] = [
                       "من يشغلها (الاسم – ر.ت)", "ملاحظات"),
             source="يدوي."),
     Section("equip_admin", "تجهيزات الإدارة",
-            colonnes=("النوع", "العدد", "رقم الجرد", "الحالة (صالحة – غير صالحة)", "ملاحظات"),
-            numero=True, manuels=(4,), source="من الجرد إن أُدخل فيه شيء، وإلا يدوي."),
+            colonnes=("النوع", "العدد", "رقم الجرد", "الحالة: صالح", "الحالة: يحتاج صيانة", "الحالة: معطل",
+                      "ملاحظات"),
+            groupes=(("النوع", 1), ("العدد", 1), ("رقم الجرد", 1), ("الحالة", 3), ("ملاحظات", 1)),
+            numero=True, total=(1, 3, 4, 5), manuels=(6,), source="من الجرد إن أُدخل فيه شيء، وإلا يدوي."),
     Section("equip_classes", "تجهيزات الحجرات الدراسية",
             colonnes=("الوحدة المدرسية", "عدد القاعات", "سبورة خشبية", "سبورة ألمنيوم", "سبورة متحركة",
                       "عدد المقاعد", "مكتب الأستاذ", "كرسي الأستاذ", "رفوف مكتبية"),
@@ -104,10 +108,18 @@ SECTIONS: list[Section] = [
             source="سطر لكل وحدة مدرسية؛ الأعداد تُدخل يدوياً."),
     Section("moyens", "الوسائل التعليمية والموارد الرقمية", colonnes=("النوع", "العدد", "ملاحظات"), numero=True,
             source="يدوي."),
-    Section("livres", "الكتب والمراجع", colonnes=("الكتاب", "العدد"), deux_colonnes=True,
-            source="يدوي، أو استيراد لائحة من Excel (العمود الأول العنوان والثاني العدد)."),
-    Section("bibliotheque", "مكتبة المدرسة", colonnes=("الكتاب", "العدد"), deux_colonnes=True,
-            source="يدوي، أو استيراد لائحة من Excel (العمود الأول العنوان والثاني العدد)."),
+    Section("ordinateurs", "الحواسيب المسلمة للأساتذة",
+            colonnes=("الاسم الكامل", "رقم التأجير", "الجهاز", "الرقم التسلسلي", "تاريخ التسليم",
+                      "ملاحظات (الاسترجاع عند الانتقال أو التقاعد)"),
+            numero=True, manuels=(5,),
+            source="من إسناد التجهيزات للموظفين (القطع غير المسترجعة) إن أُدخل شيء، وإلا يدوي. محور مقترح، "
+                   "غير موجود في النموذج الأصلي."),
+    Section("livres", "الكتب والمراجع", colonnes=("الكتاب", "العدد"), deux_colonnes=True, annexe=True,
+            source="يدوي، أو استيراد لائحة من Excel (العمود الأول العنوان والثاني العدد). في المحضر: عدد "
+                   "العناوين والنسخ، واللائحة المفصلة في ملحق آخر المحضر."),
+    Section("bibliotheque", "مكتبة المدرسة", colonnes=("الكتاب", "العدد"), deux_colonnes=True, annexe=True,
+            source="يدوي، أو استيراد لائحة من Excel (العمود الأول العنوان والثاني العدد). في المحضر: عدد "
+                   "العناوين والنسخ، واللائحة المفصلة في ملحق آخر المحضر."),
     Section("registres_eleves", "السجلات والدفاتر: سجلات التلاميذ",
             champs=(C("date_biens", "تاريخ حصر سجل الممتلكات"),),
             colonnes=("الوحدة المدرسية", "العدد", "الرقم الأخير", "تاريخه", "ملاحظات"),
@@ -121,20 +133,16 @@ SECTIONS: list[Section] = [
     Section("jardinage", "البستنة المدرسية", colonnes=("النوع", "العدد", "ملاحظات"), numero=True, source="يدوي."),
     Section("sport_equip", "تجهيزات التربية البدنية والرياضة المدرسية", colonnes=("النوع", "العدد", "ملاحظات"),
             numero=True, source="يدوي."),
-    Section("cooperative", "التعاونية المدرسية",
-            champs=(C("date_renouvellement", "تاريخ التجديد"), C("solde", "الرصيد نقداً بالدرهم"),
-                    C("date_recettes", "تاريخ آخر وضعية بسجل المداخيل"),
-                    C("date_depenses", "تاريخ آخر وضعية بسجل النفقات")), source="يدوي."),
-    Section("sportive", "الجمعية الرياضية",
-            champs=(C("date_fondation", "تاريخ التأسيس"), C("date_renouvellement", "تاريخ التجديد"),
-                    C("president", "الرئيس"), C("tresorier", "الأمين"), C("solde", "رصيد الجمعية نقداً"),
-                    C("date_recettes", "تاريخ آخر وضعية بسجل المداخيل"),
-                    C("date_depenses", "تاريخ آخر وضعية بسجل النفقات")),
-            colonnes=("ممتلكات الجمعية: النوع", "العدد", "رقم الجرد", "حالتها (جيدة – متلاشية)", "ملاحظات"),
-            source="يدوي."),
-    Section("parents", "جمعية آباء وأولياء التلاميذ",
-            champs=(C("date_fondation", "تاريخ التأسيس"), C("date_renouvellement", "تاريخ التجديد"),
-                    C("president", "الرئيس"), C("tresorier", "الأمين"), C("dossier", "ملف الجمعية")),
+    Section("associations", "الجمعيات المدرسية",
+            colonnes=("الجمعية", "تاريخ التأسيس", "تاريخ التجديد", "الرئيس", "الأمين", "الرصيد (درهم)",
+                      "آخر وضعية: المداخيل", "آخر وضعية: النفقات", "ملاحظات (ملف الجمعية...)"),
+            groupes=(("الجمعية", 1), ("تاريخ التأسيس", 1), ("تاريخ التجديد", 1), ("الرئيس", 1), ("الأمين", 1),
+                     ("الرصيد (درهم)", 1), ("آخر وضعية بسجل", 2), ("ملاحظات", 1)),
+            manuels=(1, 2, 3, 4, 5, 6, 7, 8),
+            source="جدول واحد للتعاونية المدرسية والجمعية الرياضية وجمعية الآباء. ما سُجل منها في البرنامج يُقترح "
+                   "(الرئيس، الأمين، تاريخ التجديد)، والباقي يدوي. جمعية النجاح في محورها."),
+    Section("sportive", "ممتلكات الجمعية الرياضية",
+            colonnes=("النوع", "العدد", "رقم الجرد", "حالتها (جيدة – متلاشية)", "ملاحظات"), numero=True,
             source="يدوي."),
     Section("assurance", "التأمين المدرسي خلال الموسم الدراسي الحالي",
             champs=(C("nb_eleves", "عدد تلاميذ المؤسسة"), C("nb_assures", "عدد المنخرطين في التأمين المدرسي"),
@@ -145,11 +153,13 @@ SECTIONS: list[Section] = [
                     C("rib", "رقم الحساب البريدي"), C("solde_banque", "الرصيد في الحساب البريدي (درهم)"),
                     C("date_banque", "تاريخ آخر وضعية إدارية (الحساب)"), C("solde_caisse", "رصيد الصندوق (درهم)"),
                     C("date_caisse", "تاريخ آخر وضعية إدارية (الصندوق)"), C("total", "مجموع رصيد الجمعية (درهم)"),
-                    C("cheques", "دفاتر الشيكات: المستعملة وغير المستعملة والملغاة", long=True),
                     C("releves", "عدد كشوفات الحساب الجارية وآخر تاريخ"),
                     C("rapports", "عدد التقارير المالية وآخرها"), C("cachets", "عدد أختام الجمعية")),
             colonnes=("سجلات الجمعية", "تاريخ أول عملية", "تاريخ آخر عملية"), manuels=(),
-            source="من صفحة الجمعية: الحساب، الأرصدة، وتواريخ أول وآخر عملية في كل سجل. الشيكات والكشوفات يدوية."),
+            source="من صفحة الجمعية: الحساب، الأرصدة، وتواريخ أول وآخر عملية في كل سجل. الكشوفات يدوية."),
+    Section("najah_cheques", "جمعية دعم مدرسة النجاح: دفاتر الشيكات",
+            colonnes=("الدفتر", "من رقم", "إلى رقم", "الحالة (مستعمل، غير مستعمل، ملغى)", "ملاحظات"),
+            numero=True, source="يدوي: سطر لكل مجموعة شيكات متتالية لها نفس الحالة."),
     Section("projet", "مشروع المؤسسة",
             champs=(C("document", "وثيقة المشروع (متوفرة – غير متوفرة)"),),
             colonnes=("عنوان المشروع", "مجالاته", "فترة الإنجاز: من", "إلى", "المساهمون", "التكلفة الإجمالية",
@@ -253,13 +263,15 @@ def _auto_ressources(conn) -> dict:
     tous = rh.lister(conn, actifs_seulement=False)
     did = _directeur_id(conn)
     actifs = [p for p in tous if p.statut == "actif" and p.id != did and p.categorie != "directeur"]
-    ens = [p for p in actifs if p.categorie in _ENSEIGNANTS]
-    agents = [p for p in actifs if p.categorie not in _ENSEIGNANTS]
     partis = [p for p in tous if p.statut != "actif" and p.categorie in _ENSEIGNANTS and p.dossier_disponible]
-    return {"champs": {"nb_enseignants": _nb(len(ens)), "nb_agents": _nb(len(agents)),
-                       "dossiers_enseignants": _nb(sum(1 for p in ens if p.dossier_disponible)),
-                       "dossiers_agents": _nb(sum(1 for p in agents if p.dossier_disponible)),
-                       "dossiers_partis": _nb(len(partis)), "nb_eleves": _nb(sum(_effectifs(conn).values()))}}
+    lignes = []
+    for cat, (_, _, pluriel) in rh.CATEGORIES.items():
+        ps_ = [p for p in actifs if p.categorie == cat]
+        if ps_:
+            dispo = sum(1 for p in ps_ if p.dossier_disponible)
+            lignes.append([pluriel, _nb(len(ps_)), _nb(dispo), _nb(len(ps_) - dispo), ""])
+    return {"champs": {"dossiers_partis": _nb(len(partis)), "nb_eleves": _nb(sum(_effectifs(conn).values()))},
+            "lignes": lignes}
 
 
 def _auto_eleves(conn) -> dict:
@@ -304,18 +316,43 @@ def _auto_batiments(conn) -> dict:
 
 
 def _auto_equip_admin(conn) -> dict:
-    arts = conn.execute("SELECT designation, quantite, num_inv_debut, qte_bon, qte_maintenance, qte_hs "
+    arts = conn.execute("SELECT designation, quantite, num_inv_debut, num_inv_fin, qte_bon, qte_maintenance, qte_hs "
                         "FROM article_inventaire ORDER BY id").fetchall()
     lignes = []
     for a in arts:
         q = a["quantite"] or 0
         inv = ""
         if a["num_inv_debut"]:
-            inv = str(a["num_inv_debut"]) if q <= 1 else f"{a['num_inv_debut']} - {a['num_inv_debut'] + q - 1}"
-        etat = "صالحة" if (a["qte_bon"] or 0) >= q else ""
-        rem = "، ".join(x for x in (f"{a['qte_maintenance']} تحتاج للصيانة" if a["qte_maintenance"] else "",
-                                    f"{a['qte_hs']} غير صالحة" if a["qte_hs"] else "") if x)
-        lignes.append([a["designation"], _nb(q), inv, etat or ("صالحة جزئياً" if rem else ""), rem])
+            fin = a["num_inv_fin"] or (a["num_inv_debut"] + q - 1)
+            inv = str(a["num_inv_debut"]) if fin <= a["num_inv_debut"] else f"{a['num_inv_debut']} - {fin}"
+        lignes.append([a["designation"], _nb(q), inv, _nb(a["qte_bon"] or 0), _nb(a["qte_maintenance"] or 0),
+                       _nb(a["qte_hs"] or 0), ""])
+    return {"lignes": lignes}
+
+
+def _auto_ordinateurs(conn) -> dict:
+    try:
+        rs = conn.execute(
+            "SELECT p.prenom_ar, p.nom_ar, p.ppr, ai.designation, e.num_serie, a.date_remise, a.remarque "
+            "FROM affectation_equipement a JOIN equipement e ON e.id=a.equipement_id "
+            "JOIN article_inventaire ai ON ai.id=e.article_id JOIN personnel p ON p.id=a.personnel_id "
+            "WHERE a.date_retour IS NULL ORDER BY p.nom_ar, p.prenom_ar").fetchall()
+    except sqlite3.Error:
+        rs = []
+    return {"lignes": [[f"{r['prenom_ar']} {r['nom_ar']}", r["ppr"] or "", r["designation"], r["num_serie"] or "",
+                        _d(r["date_remise"]), r["remarque"] or ""] for r in rs]}
+
+
+_ASSOCIATIONS = (("cooperative", "التعاونية المدرسية"), ("sportive", "الجمعية الرياضية"),
+                 (None, "جمعية آباء وأولياء التلاميذ"))
+
+
+def _auto_associations(conn) -> dict:
+    lignes = []
+    for typ, nom in _ASSOCIATIONS:
+        a = conn.execute("SELECT * FROM association WHERE type=?", (typ,)).fetchone() if typ else None
+        lignes.append([nom, "", _d(a["date_renouvellement"]) if a else "", (a["president"] or "") if a else "",
+                       (a["tresorier"] or "") if a else "", "", "", "", ""])
     return {"lignes": lignes}
 
 
@@ -418,7 +455,8 @@ AUTO = {"_general": _auto_general, "etablissement": _auto_etablissement, "partie
         "ressources": _auto_ressources, "eleves": _auto_eleves, "personnel": _auto_personnel,
         "batiments": _auto_batiments, "equip_admin": _auto_equip_admin, "equip_classes": _auto_equip_classes,
         "registres_eleves": _auto_registres_eleves, "registres": _auto_registres, "documents": _auto_documents,
-        "assurance": _auto_assurance, "najah": _auto_najah, "projet": _auto_projet}
+        "assurance": _auto_assurance, "najah": _auto_najah, "projet": _auto_projet,
+        "ordinateurs": _auto_ordinateurs, "associations": _auto_associations}
 
 
 def _auto(conn, cle: str) -> dict:
@@ -456,8 +494,31 @@ def lire(conn: sqlite3.Connection, cle: str) -> dict:
         raise ErreurPassation("محور غير معروف.")
     r = conn.execute("SELECT donnees FROM passation_section WHERE cle=?", (cle,)).fetchone()
     if r and r[0]:
-        return _normaliser(cle, json.loads(r[0]))
+        return _normaliser(cle, _adapter(conn, cle, json.loads(r[0])))
     return _normaliser(cle, _auto(conn, cle))
+
+
+# محاور تغيرت أعمدتها بعد الإصدار الأول (التحسينات التي وافق عليها المدير 2026-11-13)
+_REFAITS = {"ressources", "equip_admin"}
+
+
+def _adapter(conn, cle: str, d: dict) -> dict:
+    """معطيات محفوظة بأعمدة قديمة: تُنقل الخانات حسب اسم العمود، وما لم يعد له مكان يُترك. إن لم تُحفظ أسماء
+    الأعمدة (الإصدار الأول) والمحور أعيد تصميمه، تؤخذ أسطره من البرنامج وتبقى الخانات."""
+    s = PAR_CLE.get(cle)
+    if not s or not s.colonnes:
+        return d
+    anciennes = d.get("colonnes")
+    if anciennes is None:
+        if cle in _REFAITS:
+            return {"champs": d.get("champs", {}), "lignes": _auto(conn, cle)["lignes"]}
+        return d
+    if list(anciennes) == list(s.colonnes):
+        return d
+    pos = {c: i for i, c in enumerate(anciennes)}
+    return {"champs": d.get("champs", {}),
+            "lignes": [[l[pos[c]] if c in pos and pos[c] < len(l) else "" for c in s.colonnes]
+                       for l in d.get("lignes", [])]}
 
 
 def enregistrer(conn: sqlite3.Connection, cle: str, donnees: dict) -> None:
@@ -472,7 +533,8 @@ def enregistrer(conn: sqlite3.Connection, cle: str, donnees: dict) -> None:
     with conn:
         conn.execute("INSERT INTO passation_section(cle, donnees, maj_le) VALUES (?,?,datetime('now','localtime')) "
                      "ON CONFLICT(cle) DO UPDATE SET donnees=excluded.donnees, maj_le=excluded.maj_le",
-                     (cle, json.dumps(d, ensure_ascii=False)))
+                     (cle, json.dumps({**d, "colonnes": list(PAR_CLE[cle].colonnes) if cle in PAR_CLE else []},
+                                      ensure_ascii=False)))
 
 
 def actualiser(conn: sqlite3.Connection, cle: str) -> dict:
@@ -620,7 +682,6 @@ _LARGEURS = {
     "personnel": [1.0, 4.0, 2.4, 4.1, 2.8, 3.1],
     "batiments": [3.6, 3.8, 1.6, 2.7, 2.7, 3.0],
     "logements": [3.0, 2.0, 2.4, 2.6, 4.0, 3.4],
-    "equip_admin": [1.0, 5.1, 1.4, 3.6, 2.8, 3.5],
     "equip_classes": [2.9, 1.6, 1.6, 1.7, 1.6, 1.6, 1.6, 1.6, 1.6],
     "registres_eleves": [5.5, 1.6, 2.2, 3.0, 5.1],
     "registres": [3.3, 1.4, 4.2, 4.2, 4.3],
@@ -628,7 +689,12 @@ _LARGEURS = {
     "projet": [2.6, 4.2, 1.8, 1.8, 3.0, 2.0, 2.0],
     "cles": [8.0, 2.4, 7.0],
     "commission": [1.0, 5.4, 5.0, 6.0],
-    "sportive": [5.0, 1.6, 3.4, 3.4, 4.0],
+    "sportive": [1.0, 4.6, 1.6, 3.0, 3.4, 3.8],
+    "ressources": [5.4, 2.4, 3.0, 3.0, 3.6],
+    "equip_admin": [1.0, 4.2, 1.4, 2.8, 1.6, 2.0, 1.6, 2.8],
+    "ordinateurs": [1.0, 3.6, 2.2, 2.6, 2.8, 2.2, 3.0],
+    "associations": [3.2, 1.7, 1.7, 2.0, 2.0, 1.7, 1.7, 1.7, 1.7],
+    "najah_cheques": [1.0, 3.0, 2.4, 2.4, 4.6, 4.0],
 }
 
 
@@ -788,8 +854,19 @@ def _texte_registres(champs: dict) -> str:
             "مهامها يومه بما في ذلك السجل المذكور وقد حصر بتاريخ: " + (dt or ""))
 
 
+def resume_liste(lignes: list[list[str]]) -> str:
+    """«عدد العناوين: 12، عدد النسخ: 40» (العدد غير الرقمي لا يُجمع)."""
+    nb = 0
+    for l in lignes:
+        try:
+            nb += int(l[1])
+        except (ValueError, IndexError):
+            pass
+    return f"عدد العناوين: {_nb(len(lignes))}، عدد النسخ: {_nb(nb)}"
+
+
 def generer(conn: sqlite3.Connection, dossier: DossierDonnees) -> Path:
-    from idara.services.docs_association import _nouveau, para, tableau
+    from idara.services.docs_association import _nouveau, para, saut_page, tableau
     g = lire(conn, "_general")["champs"]
     actives = [s for s, a in sections(conn) if a]
     if not actives:
@@ -802,9 +879,15 @@ def generer(conn: sqlite3.Connection, dossier: DossierDonnees) -> Path:
     sec.different_first_page_header_footer = True     # صفحة الغلاف دون تذييل
     _couverture(d, conn, dossier, g)
     parties = lire(conn, "parties")["champs"]
+    annexes: list[tuple[Section, list]] = []
     for s in actives:
         donnees = lire(conn, s.cle)
         _bande(d, s.titre)
+        if s.annexe and donnees["lignes"]:
+            annexes.append((s, donnees["lignes"]))
+            para(d, resume_liste(donnees["lignes"]) + f" (اللائحة المفصلة في الملحق رقم {len(annexes)}).",
+                 taille=11, apres=6)
+            continue
         if s.cle == "registres_eleves":
             para(d, _texte_registres(donnees["champs"]), taille=11, apres=4)
         elif s.cle == "declarations":
@@ -824,9 +907,7 @@ def generer(conn: sqlite3.Connection, dossier: DossierDonnees) -> Path:
             continue
         elif s.champs and s.cle != "projet":
             _champs_section(d, s, donnees["champs"])
-        if s.colonnes and (donnees["lignes"] or not s.champs):
-            if s.cle == "sportive":
-                para(d, "ممتلكات الجمعية:", gras=True, souligne=True, taille=11, apres=2)
+        if s.colonnes and (donnees["lignes"] or not s.champs or s.cle in ("projet", "ressources")):
             if s.cle == "najah":
                 para(d, "سجلات الجمعية:", gras=True, souligne=True, taille=11, apres=2)
             _tableau_section(d, s, donnees["lignes"])
@@ -837,6 +918,11 @@ def generer(conn: sqlite3.Connection, dossier: DossierDonnees) -> Path:
     ville = g.get("ville", "")
     para(d, f"حرر ب: {ville}، بتاريخ: {_d(g['date_pv']) if g.get('date_pv') else ''}", taille=12, centre=True, apres=8)
     para(d, "توقيع وخاتم المدير الإقليمي", gras=True, taille=12, centre=True)
+    for i, (s, lignes) in enumerate(annexes, start=1):
+        saut_page(d)
+        para(d, f"الملحق رقم {i}: {s.titre}", gras=True, taille=14, centre=True, apres=2)
+        para(d, resume_liste(lignes) + ".", taille=11, centre=True, apres=6)
+        _tableau_section(d, s, lignes)
     _pied(d, _d(g.get("date_pv")) if g.get("date_pv") else "")
     rep = dossier.archives / "تسليم المهام"
     rep.mkdir(parents=True, exist_ok=True)

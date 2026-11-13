@@ -28,9 +28,11 @@ def test_donnees_proposees_par_le_programme(base):  # noqa: F811
     _personnel(base)
     e = ps.lire(base, "etablissement")["champs"]
     assert e["nb_unites"] == "01" and e["nom"]
-    r = ps.lire(base, "ressources")["champs"]
-    assert (r["nb_enseignants"], r["nb_agents"], r["dossiers_enseignants"], r["dossiers_agents"]) == \
-        ("02", "01", "01", "01")
+    rd = ps.lire(base, "ressources")
+    r = rd["champs"]
+    assert rd["lignes"] == [["الأساتذة", "02", "01", "01", ""], ["الحراس", "01", "01", "00", ""]]
+    assert [l[0] for l in ps.lire(base, "associations")["lignes"]] == [
+        "التعاونية المدرسية", "الجمعية الرياضية", "جمعية آباء وأولياء التلاميذ"]
     el = ps.lire(base, "eleves")["lignes"]
     assert [l[0] for l in el] == ["الوحدة المركزية", "فرعية الجبل"]
     assert sum(int(l[1]) for l in el) == int(r["nb_eleves"])
@@ -123,3 +125,40 @@ def test_eleves_sans_unite_comptes(base):  # noqa: F811
     et.definir_unites(base, ["الوحدة المركزية", "فرعية الجبل"])
     l = ps.lire(base, "eleves")["lignes"]
     assert len(l) == 1 and int(l[0][1]) == int(ps.lire(base, "ressources")["champs"]["nb_eleves"]) > 0
+
+
+def test_ameliorations_des_tableaux(base, dossier):  # noqa: F811
+    """التحسينات الست التي وافق عليها المدير (2026-11-13)."""
+    import json
+    _deux_unites(base)
+    _personnel(base)
+    # الجرد: الحالة بالأعداد، والحواسيب المسندة غير المسترجعة
+    base.execute("INSERT INTO article_inventaire(id, designation, quantite, num_inv_debut, num_inv_fin, qte_bon, "
+                 "qte_maintenance, qte_hs) VALUES (1, 'حاسوب محمول', 3, 10, 12, 1, 1, 1)")
+    base.execute("INSERT INTO equipement(id, article_id, num_serie) VALUES (1, 1, 'SN-TEST-1')")
+    pid = base.execute("SELECT id FROM personnel WHERE prenom_ar='موظف0'").fetchone()[0]
+    base.execute("INSERT INTO affectation_equipement(equipement_id, personnel_id, date_remise) "
+                 "VALUES (1, ?, '2025-10-01')", (pid,))
+    assert ps.lire(base, "equip_admin")["lignes"] == [["حاسوب محمول", "03", "10 - 12", "01", "01", "01", ""]]
+    o = ps.lire(base, "ordinateurs")["lignes"]
+    assert o == [["موظف0 التجريبي", "900000", "حاسوب محمول", "SN-TEST-1", "01/10/2025", ""]]
+    # معطيات محفوظة بأعمدة الإصدار الأول: تُكيَّف
+    base.execute("INSERT INTO passation_section(cle, donnees) VALUES ('equip_admin', ?)",
+                 (json.dumps({"champs": {}, "lignes": [["مكتب", "02", "", "صالحة", ""]]}, ensure_ascii=False),))
+    assert ps.lire(base, "equip_admin")["lignes"][0][0] == "حاسوب محمول"     # أعيد من الجرد
+    ps.enregistrer(base, "sportive", {"lignes": [["كرة", "05", "", "جيدة", ""]]})
+    d = json.loads(base.execute("SELECT donnees FROM passation_section WHERE cle='sportive'").fetchone()[0])
+    d["colonnes"] = ["العدد", "النوع"]
+    base.execute("UPDATE passation_section SET donnees=? WHERE cle='sportive'", (json.dumps(d, ensure_ascii=False),))
+    assert ps.lire(base, "sportive")["lignes"] == [["05", "كرة", "", "", ""]]
+    # اللوائح الطويلة في ملحق، والمتن يكتفي بالعدد
+    ps.enregistrer(base, "livres", {"lignes": [["كتاب أ", "02"], ["كتاب ب", "03"], ["كتاب ج", "بدون"]]})
+    assert ps.resume_liste(ps.lire(base, "livres")["lignes"]) == "عدد العناوين: 03، عدد النسخ: 05"
+    ps.enregistrer(base, "najah_cheques", {"lignes": [["الدفتر 1", "1001", "1025", "مستعمل", ""]]})
+    texte, cellules = _texte(ps.generer(base, dossier))
+    assert "عدد العناوين: 03، عدد النسخ: 05 (اللائحة المفصلة في الملحق رقم 1)." in texte
+    assert "الملحق رقم 1: الكتب والمراجع" in texte and "كتاب ب" in cellules
+    assert texte.index("توقيع وخاتم المدير الإقليمي") < texte.index("الملحق رقم 1: الكتب")
+    for c in ("الحالة", "يحتاج صيانة", "معطل", "SN-TEST-1", "الجمعيات المدرسية", "آخر وضعية بسجل", "1025",
+              "الحواسيب المسلمة للأساتذة", "الأساتذة", "الملفات غير المتوفرة"):
+        assert c in cellules, c
