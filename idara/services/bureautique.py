@@ -82,3 +82,9 @@ def imprimer(docx: Path, copies: int = 1) -> None:
         raise ErreurBureautique(f"تعذرت الطباعة: {e}") from e
     finally:
         word.Quit()
+
+
+def ouvrir_lien(url: str) -> None:
+    """يفتح رابطاً في المتصفح أو التطبيق المرتبط به (واتساب). لا شيء يُرسل دون ضغط المستعمل."""
+    import webbrowser
+    webbrowser.open(url)

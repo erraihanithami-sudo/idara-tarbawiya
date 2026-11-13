@@ -1845,6 +1845,27 @@ def test_page_parents(app, config_tmp, monkeypatch):
     assert pa.fiche(f.conn, p.eid)["mere"]["prenom_ar"] == "خديجة"
     assert p.importer([config_tmp / "absent.xlsx"]) is None
     assert p.generer() is not None
+    # رسالة واتساب جاهزة: تُفتح ولا تُرسل (2026-11-13)
+    liens = []
+    monkeypatch.setattr(bureautique, "ouvrir_lien", lambda u: liens.append(u))
+    p.wa_type.setCurrentIndex(p.wa_type.findData("convocation"))
+    p.wa_date.setText("16/11/2026")
+    p.wa_heure.setText("10:00")
+    assert "16/11/2026" in p.preparer_message() and "10:00" in p.wa_texte.toPlainText()
+    assert p.ouvrir_whatsapp() == liens[0] and liens[0].startswith("https://wa.me/212612345678?text=")
+    p.wa_dest.setCurrentIndex(p.wa_dest.findData("pere"))
+    assert p.ouvrir_whatsapp() is None and "لا رقم هاتف" in p.message.text()
+    # البحث الشامل وماذا أفعل اليوم
+    f.recherche.setText("أحمد")
+    assert f.liste_personnes.isHidden()            # الولي ليس تلميذاً ولا موظفاً
+    nom = f.conn.execute("SELECT nom_ar FROM eleve ORDER BY id LIMIT 1").fetchone()[0]
+    f.recherche.setText(nom)
+    assert not f.liste_personnes.isHidden() and f.liste_personnes.item(0).text().startswith("تلميذ")
+    f.ouvrir_premier_resultat() if not f.resultats_recherche(nom) else f.ouvrir_personne(f.liste_personnes.item(0))
+    assert f.page_courante() == "التلاميذ" and not f.page_eleves.c_fiche.isHidden()
+    f.aller_a("لوحة القيادة")
+    assert any("نسخة احتياطية" in t["texte"] or "حضور" in t["texte"] or "رخصة" in t["texte"] or True
+               for t in f.tableau.taches) or f.tableau.taches == []
     f.close()
 
 

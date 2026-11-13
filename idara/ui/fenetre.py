@@ -16,8 +16,10 @@ from idara.data.dossier import DossierDonnees
 from idara.services import annee as annee_srv
 from idara.services import calendrier as cal_srv
 from idara.services import config as config_srv
+from idara.services import eleves as el
 from idara.services import etablissement as etab_srv
 from idara.services import import_eleves as imp
+from idara.services import personnel as rh
 from idara.services import sauvegarde
 from idara.services import tableau_bord as tb_srv
 from idara.services.etablissement import ErreurValidation
@@ -178,6 +180,32 @@ class PageTableauBord(QWidget):
         cv.addLayout(h)
         self.v.addWidget(c)
 
+    def _aujourdhui(self) -> None:
+        """«ماذا أفعل اليوم؟» (2026-11-13): أعمال ينتظرها البرنامج من المدير، محسوبة من المعطيات."""
+        from idara.services import aujourdhui as auj
+        try:
+            self.taches = auj.taches(self.f.conn, self.f.dossier)
+        except Exception:  # noqa: BLE001 (لا يُعطَّل فتح لوحة القيادة)
+            self.taches = []
+        c, cv = carte("ماذا أفعل اليوم؟")
+        if not self.taches:
+            l = QLabel("لا شيء مستعجل اليوم.")
+            l.setObjectName("etiquette")
+            cv.addWidget(l)
+        for t in self.taches:
+            ligne = QHBoxLayout()
+            l = QLabel(("● " if t["urgence"] >= 2 else "○ ") + t["texte"])
+            l.setWordWrap(True)
+            if t["urgence"] >= 2:
+                l.setStyleSheet(f"color:{theme.ROUGE_TEXTE}; font-weight:600;")
+            ligne.addWidget(l, 1)
+            if t["page"]:
+                b = QPushButton("فتح")
+                b.clicked.connect(lambda _=False, p=t["page"]: self.f.aller_a(p))
+                ligne.addWidget(b)
+            cv.addLayout(ligne)
+        self.v.addWidget(c)
+
     def _rappels(self) -> None:
         """التذكيرات بمحطات المقرر الوزاري والمؤسسة (اقتراح المدير 2026-11-03)."""
         try:
@@ -257,6 +285,7 @@ class PageTableauBord(QWidget):
             grille.addWidget(t, i // 2, i % 2)
         self.v.addLayout(grille)
 
+        self._aujourdhui()
         self._rappels()
         self._jauges(ind)
         # التوزيع حسب القسم
@@ -778,7 +807,7 @@ class FenetrePrincipale(QMainWindow):
         # البحث في الصفحات (اقتراح المدير 2026-11-06)
         self.recherche = QLineEdit()
         self.recherche.setObjectName("rechercheNav")
-        self.recherche.setPlaceholderText("ابحث عن صفحة… (مثال: رخص، محضر، امتحان)")
+        self.recherche.setPlaceholderText("ابحث: صفحة، تلميذ، موظف… (Ctrl+K)")
         self.recherche.setClearButtonEnabled(True)
         self.recherche.textChanged.connect(self.filtrer_nav)
         self.recherche.returnPressed.connect(self.ouvrir_premier_resultat)
@@ -786,6 +815,19 @@ class FenetrePrincipale(QMainWindow):
         rv.setContentsMargins(14, 0, 14, 10)
         rv.addWidget(self.recherche)
         v.addLayout(rv)
+        # البحث الشامل (2026-11-13): التلاميذ والموظفون أيضاً، والنقر يفتح البطاقة. Ctrl+K يضع المؤشر في البحث
+        from PySide6.QtGui import QKeySequence, QShortcut
+        from PySide6.QtWidgets import QListWidget
+        self.liste_personnes = QListWidget()
+        self.liste_personnes.setObjectName("rechercheListe")
+        self.liste_personnes.setMaximumHeight(190)
+        self.liste_personnes.hide()
+        self.liste_personnes.itemClicked.connect(self.ouvrir_personne)
+        lp = QHBoxLayout()
+        lp.setContentsMargins(14, 0, 14, 6)
+        lp.addWidget(self.liste_personnes)
+        v.addLayout(lp)
+        QShortcut(QKeySequence("Ctrl+K"), self, activated=lambda: (self.recherche.setFocus(), self.recherche.selectAll()))
         self.aucun_resultat = QLabel("لا صفحة بهذا الاسم.")
         self.aucun_resultat.setObjectName("navSous")
         self.aucun_resultat.setContentsMargins(20, 0, 20, 6)
@@ -921,8 +963,47 @@ class FenetrePrincipale(QMainWindow):
                     res.append(page)
         return res
 
+    def resultats_personnes(self, texte: str, limite: int = 8) -> list[tuple[str, int, str]]:
+        """تلاميذ وموظفون يطابقون النص (حرفان على الأقل): (النوع، المعرف، ما يُعرض)."""
+        t = " ".join((texte or "").split())
+        if len(t) < 2:
+            return []
+        res = []
+        try:
+            for r in el.rechercher(self.conn, t, limite=limite):
+                res.append(("eleve", r["id"], f"تلميذ · {r['prenom_ar']} {r['nom_ar']} · {r['classe'] or ''}"))
+        except Exception:  # noqa: BLE001
+            pass
+        mots = normaliser_recherche(t).split()
+        for p in rh.lister(self.conn, actifs_seulement=False):
+            cible = normaliser_recherche(f"{p.prenom_ar} {p.nom_ar} {p.ppr or ''} {p.nom_fr or ''} {p.prenom_fr or ''}")
+            if all(m in cible for m in mots) or t.lower() in cible.lower():
+                res.append(("personnel", p.id, f"موظف · {p.prenom_ar} {p.nom_ar}"))
+        return res[:limite + 4]
+
+    def _maj_personnes(self, texte: str) -> None:
+        from PySide6.QtWidgets import QListWidgetItem
+        ps = self.resultats_personnes(texte)
+        self.liste_personnes.clear()
+        for typ, ident, lib in ps:
+            it = QListWidgetItem(lib)
+            it.setData(Qt.UserRole, (typ, ident))
+            self.liste_personnes.addItem(it)
+        self.liste_personnes.setVisible(bool(ps))
+
+    def ouvrir_personne(self, it) -> None:
+        typ, ident = it.data(Qt.UserRole)
+        self.recherche.clear()
+        if typ == "eleve":
+            self.aller_a("التلاميذ")
+            self.page_eleves.afficher(ident)
+        else:
+            self.aller_a("الموارد البشرية")
+            self.page_rh.afficher(ident)
+
     def filtrer_nav(self, texte: str) -> list[str]:
         res = self.resultats_recherche(texte)
+        self._maj_personnes(texte)
         if not texte.strip():
             for k, (_, fils) in enumerate(SECTIONS):
                 self.boutons[k].show()
@@ -940,7 +1021,7 @@ class FenetrePrincipale(QMainWindow):
                 sb.setVisible(v)
             self.blocs[k].setVisible(any(vis) and bool(self.sous[k]))
             self.boutons[k].ouvrir(any(vis))
-        self.aucun_resultat.setVisible(not res)
+        self.aucun_resultat.setVisible(not res and self.liste_personnes.isHidden())
         return res
 
     def ouvrir_premier_resultat(self) -> None:
@@ -948,6 +1029,8 @@ class FenetrePrincipale(QMainWindow):
         if res:
             self.recherche.clear()
             self.aller_a(res[0])
+        elif self.liste_personnes.count():
+            self.ouvrir_personne(self.liste_personnes.item(0))
 
     # ---------- السنوات الدراسية ----------
     def gerer_annees(self):

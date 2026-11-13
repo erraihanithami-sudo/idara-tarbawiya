@@ -6,11 +6,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QWidget)
+from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
+                               QPlainTextEdit, QPushButton, QWidget)
 
 from idara.services import annee as annee_srv
 from idara.services import bureautique
+from idara.services import messages_wa as wa
 from idara.services import parents as pa
 from idara.ui.composants import carte
 from idara.ui.formulaires import etiquette
@@ -95,6 +96,42 @@ class PageParents(QWidget):
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer())
         v.addWidget(b, 0, Qt.AlignRight)
+        # رسالة واتساب جاهزة (2026-11-13): تُفتح في واتساب ولا تُرسل إلا بضغط المدير
+        t = QLabel("رسالة واتساب إلى الولي")
+        t.setObjectName("titreCarte")
+        v.addWidget(t)
+        h = QHBoxLayout()
+        self.wa_type = QComboBox()
+        for cle, (lib, _) in wa.MODELES.items():
+            self.wa_type.addItem(lib, cle)
+        self.wa_dest = QComboBox()
+        for role, lib in pa.ROLES.items():
+            self.wa_dest.addItem(lib, role)
+        self.wa_date = QLineEdit()
+        self.wa_date.setPlaceholderText("اليوم: مثلاً 14/11/2026")
+        self.wa_heure = QLineEdit()
+        self.wa_heure.setPlaceholderText("الساعة: مثلاً 10:00")
+        for w in (self.wa_type, self.wa_dest, self.wa_date, self.wa_heure):
+            h.addWidget(w)
+        b = QPushButton("تهيئة النص")
+        b.clicked.connect(lambda: self.preparer_message())
+        h.addWidget(b)
+        v.addLayout(h)
+        self.wa_texte = QPlainTextEdit()
+        self.wa_texte.setFixedHeight(90)
+        self.wa_texte.setPlaceholderText("نص الرسالة: يُهيأ من النموذج ويمكن تعديله قبل الفتح")
+        v.addWidget(self.wa_texte)
+        h = QHBoxLayout()
+        b = QPushButton("فتح في واتساب")
+        b.setObjectName("principal")
+        b.setToolTip("تُفتح الرسالة جاهزة في واتساب، ولا تُرسل إلا حين تضغط «إرسال» هناك")
+        b.clicked.connect(lambda: self.ouvrir_whatsapp())
+        h.addWidget(b)
+        b = QPushButton("نسخ النص")
+        b.clicked.connect(lambda: QApplication.clipboard().setText(self.wa_texte.toPlainText()))
+        h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
         self.c_fiche.hide()
         racine.addWidget(self.c_fiche)
         racine.addStretch()
@@ -139,6 +176,37 @@ class PageParents(QWidget):
                 w.setText((f.get(role) or {}).get(ch) or "")
         self.tutelle.setCurrentText((f.get("tuteur") or {}).get("tutelle") or "")
         self.c_fiche.show()
+
+    def preparer_message(self) -> str | None:
+        if self.eid is None:
+            return None
+        from idara.services import etablissement as etab_srv
+        r = self.f.conn.execute("SELECT prenom_ar, nom_ar, sexe FROM eleve WHERE id=?", (self.eid,)).fetchone()
+        l = next((x for x in self.lignes if x["eleve_id"] == self.eid), None)
+        e = etab_srv.lire_etablissement(self.f.conn)
+        t = wa.texte(self.wa_type.currentData(), f"{r['prenom_ar']} {r['nom_ar']}", r["sexe"],
+                     l["classe"] if l else "", e.nom_ar if e else "", self.wa_date.text().strip(),
+                     self.wa_heure.text().strip())
+        self.wa_texte.setPlainText(t)
+        return t
+
+    def ouvrir_whatsapp(self) -> str | None:
+        if self.eid is None:
+            return None
+        if not self.wa_texte.toPlainText().strip():
+            self.preparer_message()
+        role = self.wa_dest.currentData()
+        tel = self.champs[role]["telephone"].text()
+        try:
+            if not tel.strip():
+                raise wa.ErreurMessage(f"لا رقم هاتف مسجل لـ{pa.ROLES[role]}.")
+            url = wa.lien(tel, self.wa_texte.toPlainText())
+        except wa.ErreurMessage as e:
+            message(self.message, str(e), True)
+            return None
+        bureautique.ouvrir_lien(url)
+        message(self.message, "فُتحت الرسالة في واتساب: راجعها ثم اضغط «إرسال» هناك.")
+        return url
 
     def enregistrer(self) -> bool:
         if self.eid is None:
