@@ -58,9 +58,9 @@ class Section:
 C = Champ
 SECTIONS: list[Section] = [
     Section("etablissement", "تعريف المؤسسة",
-            champs=(C("nom", "اسم المؤسسة"), C("code", "رمزها"), C("commune", "الجماعة"), C("cercle", "الدائرة"),
+            champs=(C("nom", "اسم المؤسسة"), C("code", "رمزها"), C("commune", "الجماعة"),
                     C("date_creation", "تاريخ إحداثها"), C("nb_unites", "عدد الفرعيات")),
-            source="من إعداد المؤسسة والوحدات المدرسية. الدائرة وتاريخ الإحداث يُدخلان يدوياً."),
+            source="من إعداد المؤسسة والوحدات المدرسية. تاريخ الإحداث يُدخل يدوياً."),
     Section("parties", "طرفا عملية تسليم المهام",
             champs=(C("ancien_nom", "المدير السابق: الاسم الكامل"), C("ancien_ppr", "رقم التأجير"),
                     C("ancien_date", "تاريخ التعيين بالمؤسسة"), C("ancien_qualite", "بصفة (رسمية، مؤقتة)"),

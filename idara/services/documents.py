@@ -72,7 +72,7 @@ MODELES: dict[str, DefModele] = {d.code: d for d in [
         "mesures", "numero", "date_enregistrement", "h_type", "h_duree", "h_du", "h_au", "h_obs")),
     DefModele("recu_certificat", "إيصال باستلام شهادة طبية", "ar", _COMMUNS + _RH + (
         "date_reception", "deposant", "deposant_cin", "medecin", "specialite", "duree", "du", "bi_sayyid",
-        "nom_complet", "ppr", "cadre", "matiere", "adresse", "remarques")),
+        "nom_complet", "ppr", "cadre", "matiere", "adresse", "remarques", "deposant_bas")),
     DefModele("demande_remplacement", "طلب تعويض أستاذ(ة) في رخصة", "ar", _COMMUNS + _RH + (
         "ostadh", "al_ostadh", "nom_complet", "alladhi", "yaamal", "ppr", "matiere", "type_conge", "duree",
         "du", "litaawid")),

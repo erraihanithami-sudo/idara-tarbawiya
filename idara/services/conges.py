@@ -475,8 +475,18 @@ def valeurs_recu(conn, c: Conge, p: rh.Personnel | None = None) -> dict[str, str
     v.update({"date_reception": tx.date_ar(c.certificat_recu_le), "deposant": c.certificat_remis_par,
               "deposant_cin": c.certificat_remis_par_cin, "medecin": c.medecin, "specialite": c.specialite,
               "duree": tx.duree_jours_ar(c.certificat_duree_jours or c.duree_jours), "du": tx.date_ar(c.date_debut),
-              "remarques": c.remarques_certificat or "—"})
+              "remarques": c.remarques_certificat or "—",
+              # الموظف نفسه أدلى بالشهادة (طلب المدير 2026-11-13): اسمه أسفل الوصل تحت رقم بطاقته
+              "deposant_bas": f"الاسم الكامل: {c.certificat_remis_par}" if depose_par_lui_meme(c, p) else ""})
     return v
+
+
+def depose_par_lui_meme(c: Conge, p: rh.Personnel) -> bool:
+    """المدلي بالشهادة هو الموظف نفسه (الاسم نفسه، بالترتيبين)."""
+    def n(s: str) -> str:
+        return " ".join((s or "").split())
+    return n(c.certificat_remis_par) in (n(f"{p.prenom_ar} {p.nom_ar}"), n(f"{p.nom_ar} {p.prenom_ar}")) and \
+        bool(n(c.certificat_remis_par))
 
 
 def valeurs_remplacement(conn, c: Conge, le: str | None = None, p: rh.Personnel | None = None) -> dict[str, str]:

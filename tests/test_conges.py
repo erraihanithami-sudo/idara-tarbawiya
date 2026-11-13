@@ -149,6 +149,13 @@ def test_recu_remplacement_bordereau(base, dossier):
     for a in ["أنا الموقعة أسفله السيدة: أحمد المدير", "بصفتي مديرة لمدرسة تجريبية", "الدكتور الطبيب",
               "تتعلق بالسيدة: سلمى التجريبية", "CD1", "دتها: عشرة أيام"]:
         assert a in t, a
+    assert "الاسم الكامل:" not in t
+    # الموظفة نفسها أدلت بالشهادة (طلب المدير 2026-11-13): اسمها أسفل الوصل
+    c = cg.lire(base, cid)
+    base.execute("UPDATE conge SET certificat_remis_par='سلمى  التجريبية' WHERE id=?", (cid,))
+    assert cg.depose_par_lui_meme(cg.lire(base, cid), rh.lire(base, pid)) and c.certificat_remis_par
+    t = m.texte_complet(cg.generer_recu(base, dossier, cid).chemin.read_bytes())
+    assert "الاسم الكامل: سلمى  التجريبية" in t or "الاسم الكامل: سلمى التجريبية" in t
     t = m.texte_complet(cg.generer_remplacement(base, dossier, cid).chemin.read_bytes())
     assert "طلب تعويض أستاذة في رخصة" in t and "الأستاذة سلمى التجريبية التي تعمل بمدرسة تجريبية" in t
     assert "لتعويضها" in t and "مكتب تسيير مؤسسات التعليم الابتدائي" in t
@@ -159,7 +166,7 @@ def test_recu_remplacement_bordereau(base, dossier):
     t = m.texte_complet(doc.chemin.read_bytes())
     assert "وصل تسلم الشهادة الطبية" in t and t.count("*01") == 4
     assert "{{" not in t
-    assert len(cg.documents(base, cid)) == 3
+    assert len(cg.documents(base, cid)) == 4       # وصلان (الثاني أدلت فيه الموظفة بنفسها)
     with pytest.raises(cg.ErreurConge, match="واحدة على الأقل"):
         cg.generer_bordereau(base, dossier, [("  ", 1)], "فارغ")
     with pytest.raises(cg.ErreurConge, match="ثماني"):

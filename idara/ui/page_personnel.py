@@ -89,10 +89,11 @@ class PagePersonnel(QWidget):
         for k, (_, _, pl) in rh.CATEGORIES.items():
             self.filtre_cat.addItem(pl, k)
         self.filtre_cat.currentIndexChanged.connect(lambda _: self.chercher())
+        # زر «إظهار المغادرين» حُذف من الواجهة (طلب المدير 2026-11-13)؛ الخانة تبقى داخلياً (غير ظاهرة)
         self.voir_partis = QCheckBox("إظهار المغادرين")
+        self.voir_partis.hide()
         self.voir_partis.toggled.connect(lambda _: self.chercher())
         filtres.addWidget(self.filtre_cat)
-        filtres.addWidget(self.voir_partis)
         filtres.addStretch()
         cv.addLayout(filtres)
         # قرار المدير 2026-11-03: المهمة بدل الفئة، دون عمود الملف، مع الوحدة المدرسية
@@ -128,7 +129,7 @@ class PagePersonnel(QWidget):
 
         self.c = {}
         for k, aide, ltr in (("nom_ar", "", False), ("prenom_ar", "", False), ("nom_fr", "", True),
-                             ("prenom_fr", "", True), ("ppr", "أرقام فقط", True), ("cin", "AB123456", True),
+                             ("prenom_fr", "", True), ("ppr", "", True), ("cin", "AB123456", True),
                              ("adresse", "", False), ("telephone", "06XXXXXXXX", True),
                              ("niveau_enseigne", "إن لم يُسند قسم", False),
                              ("nb_eleves", "إن لم يُسند قسم", True), ("heures_hebdo", "", True)):
@@ -658,7 +659,7 @@ class PagePersonnel(QWidget):
         pid = self.pid
         self.rafraichir()
         self.afficher(pid)
-        message(self.message, f"سُجّلت المغادرة ({rh.STATUTS[statut]}). الملف محفوظ ويظهر بتفعيل «إظهار المغادرين».")
+        message(self.message, f"سُجّلت المغادرة ({rh.STATUTS[statut]}). الملف يبقى محفوظاً في البرنامج.")
         return True
 
     def reintegrer(self) -> None:

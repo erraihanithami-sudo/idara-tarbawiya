@@ -129,6 +129,10 @@ class PageProjet(QWidget):
         # 5. التقارير
         c, v = carte("التقارير")
         h = QHBoxLayout()
+        b = QPushButton("وثيقة لوحة القيادة (Word)")
+        b.setObjectName("principal")
+        b.clicked.connect(lambda: self.generer_tableau_bord())
+        h.addWidget(b)
         for lib, final in (("التقرير التركيبي للإنجاز (Word)", False), ("حصيلة نهاية المشروع (Word)", True)):
             b = QPushButton(lib)
             b.clicked.connect(lambda _=False, fi=final: self.generer(fi))
@@ -350,6 +354,26 @@ class PageProjet(QWidget):
             return
         pe.supprimer_operation(self.f.conn, self.t_ops.item(rows[0].row(), 0).data(Qt.UserRole))
         self.changer_projet()
+
+    def _pngs(self) -> dict[str, bytes]:
+        pngs = {}
+        for cle, x in self.ind.items():
+            cats, series = series_indicateur(x)
+            pngs[cle] = png_barres(cats, series, maximum=None if cle == "hadar" else 100)
+        return pngs
+
+    def generer_tableau_bord(self):
+        """وثيقة لوحة قيادة المشروع (طلب المدير 2026-11-13)."""
+        if not self.pid():
+            message(self.message, "سجّل المشروع أولاً.", True)
+            return None
+        p = pe.generer_tableau_bord(self.f.conn, self.f.dossier, self.pid(), self._pngs())
+        message(self.message, f"وُلّدت وثيقة لوحة القيادة: {p.name}")
+        try:
+            bureautique.ouvrir(p)
+        except Exception:  # noqa: BLE001
+            pass
+        return p
 
     def generer(self, final: bool = False):
         if not self.pid():

@@ -253,6 +253,11 @@ def test_page_eleves_recherche_et_documents(app, config_tmp, monkeypatch):
     assert p.resultats.rowCount() == 1
     __import__("idara.ui.saisie", fromlist=["x"]).selectionner(p.resultats, 0)
     assert not p.c_fiche.isHidden() and "يوسف" in p.titre.text()
+    # نسخ رمز مسار (طلب المدير 2026-11-13)
+    from PySide6.QtWidgets import QApplication
+    code = p.copier_code()
+    assert code and QApplication.clipboard().text() == code and code in p.sous_titre.text()
+    assert p.copier_code(depuis_liste=True) == code and p.resultats.actions()
     # المستوى غير مؤكد: رسالة واضحة بدل وثيقة خاطئة
     assert p.vacances(date(2026, 12, 20), date(2027, 1, 4)) is None
     assert p.message.objectName() == "erreur"
@@ -1500,6 +1505,7 @@ def test_projet_etablissement(app, config_tmp, monkeypatch, tmp_path):
     assert p.enregistrer_suivi(), p.message.text()
     assert p.synthese["par_statut"]["realisee"] == 1 and p.synthese["taux_global"] == 50
     assert p.generer() is not None and p.generer(final=True) is not None
+    assert p.generer_tableau_bord() is not None and "لوحة القيادة" in p.message.text()
     f.close()
 
 
@@ -1688,9 +1694,9 @@ def test_page_passation(app, config_tmp, monkeypatch):
     p = f.page_passation
     assert f.page_courante() == "تسليم المهام" and p.liste.count() == len(ps.SECTIONS)
     assert p.cle == "etablissement" and p.editeurs["nom"].text() == "مدرسة تجريبية"
-    p.editeurs["cercle"].setText("الدائرة التجريبية")
+    p.editeurs["date_creation"].setText("1985")
     p.liste.setCurrentRow([s.cle for s in ps.SECTIONS].index("eleves"))      # الانتقال يحفظ المحور السابق
-    assert ps.lire(f.conn, "etablissement")["champs"]["cercle"] == "الدائرة التجريبية"
+    assert ps.lire(f.conn, "etablissement")["champs"]["date_creation"] == "1985"
     assert p.table is not None and sum(int(p.table.item(i, 1).text()) for i in range(p.table.rowCount())) == 5
     p.table.item(0, 2).setText("5")
     p.actualiser()

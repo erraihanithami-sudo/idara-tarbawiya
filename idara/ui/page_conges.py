@@ -198,6 +198,7 @@ class PageConges(QWidget):
         self.personnel = QComboBox()
         self.personnel.currentIndexChanged.connect(lambda _: self._maj_prolongations())
         self.personnel.currentIndexChanged.connect(lambda _: self._maj_adresse())
+        self.personnel.currentIndexChanged.connect(lambda _: self._maj_deposant() if hasattr(self, "qui_depose") else None)
         self._adresse_auto = ""
         self.type = QComboBox()
         self.type.currentIndexChanged.connect(lambda _: self._maj_type())
@@ -243,6 +244,11 @@ class PageConges(QWidget):
         self.medecin = champ("الدكتور(ة) ...")
         self.specialite, self.deposant = champ(), champ("قد يكون شخصاً آخر")
         self.deposant_cin = champ(ltr=True)
+        # من أدلى بالشهادة (طلب المدير 2026-11-13): «الموظف نفسه» يملأ اسمه ورقم بطاقته ويُكتب اسمه أسفل الوصل
+        self.qui_depose = QComboBox()
+        self.qui_depose.addItem("شخص آخر", "autre")
+        self.qui_depose.addItem("الموظف نفسه", "lui")
+        self.qui_depose.currentIndexChanged.connect(lambda _: self._maj_deposant())
         self.recu_le = ChampDate()
         self.duree_cert = QSpinBox()
         self.duree_cert.setRange(0, 1100)
@@ -250,6 +256,7 @@ class PageConges(QWidget):
         self.rem_cert = champ("اختياري")
         fv.addLayout(_grille([("الطبيب", self.medecin), ("التخصص", self.specialite),
                               ("تاريخ تسلم الشهادة", self.recu_le), ("مدة الشهادة", self.duree_cert),
+                              ("من أدلى بالشهادة", self.qui_depose),
                               ("المدلي بالشهادة", self.deposant), ("رقم بطاقته الوطنية", self.deposant_cin),
                               ("ملاحظات الإيصال", self.rem_cert)]))
         b_save = QPushButton("حفظ ملف الرخصة")
@@ -392,6 +399,20 @@ class PageConges(QWidget):
             self._adresse_auto = (r["adresse"] if r else "") or ""
             self.adresse.setText(self._adresse_auto)
 
+    def _maj_deposant(self) -> None:
+        lui = self.qui_depose.currentData() == "lui"
+        for w in (self.deposant, self.deposant_cin):
+            w.setReadOnly(lui)
+        pid = self.personnel.currentData()
+        r = self.f.conn.execute("SELECT prenom_ar, nom_ar, cin FROM personnel WHERE id=?", (pid,)).fetchone() \
+            if pid else None
+        if lui and r:
+            self.deposant.setText(f"{r['prenom_ar']} {r['nom_ar']}")
+            self.deposant_cin.setText(r["cin"] or "")
+        elif not lui and r and self.deposant.text() == f"{r['prenom_ar']} {r['nom_ar']}":
+            self.deposant.clear()
+            self.deposant_cin.clear()
+
     def nouveau(self) -> None:
         self.cid = None
         self.liste.clearSelection()
@@ -403,6 +424,7 @@ class PageConges(QWidget):
             w.clear()
         self._adresse_auto = ""
         self._maj_adresse()
+        self.qui_depose.setCurrentIndex(0)
         self.date_demande.definir(date.today().isoformat())
         self.duree.setValue(1)
         self.duree_cert.setValue(0)
@@ -427,6 +449,12 @@ class PageConges(QWidget):
                      (self.specialite, c.specialite), (self.deposant, c.certificat_remis_par),
                      (self.deposant_cin, c.certificat_remis_par_cin), (self.rem_cert, c.remarques_certificat)):
             w.setText(v or "")
+        p = rh.lire(self.f.conn, c.personnel_id)
+        self.qui_depose.blockSignals(True)
+        self.qui_depose.setCurrentIndex(1 if cg.depose_par_lui_meme(c, p) else 0)
+        self.qui_depose.blockSignals(False)
+        for w in (self.deposant, self.deposant_cin):
+            w.setReadOnly(self.qui_depose.currentData() == "lui")
         self.recu_le.definir(c.certificat_recu_le or None)
         self.naissance.definir(c.date_naissance_enfant or None)
         self.horaire.setText(c.horaire_allaitement or "")

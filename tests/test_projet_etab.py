@@ -80,3 +80,11 @@ def test_import_et_suivi(base, dossier, tmp_path):  # noqa: F811
     assert "الهدف 2: تقليص الهدر المدرسي" in t and "منجزة" in t
     t = _textes(pe.generer_rapport(base, dossier, pid, final=True))
     assert "خلاصات لاستثمارها في صياغة المشروع الجديد" in t and "العمليات غير المنجزة" in t
+    # وثيقة لوحة القيادة (طلب المدير 2026-11-13): صفحة أفقية
+    from docx import Document
+    chemin = pe.generer_tableau_bord(base, dossier, pid)
+    t = _textes(chemin)
+    assert "لوحة قيادة مشروع المؤسسة المندمج" in t and "الهدف 1: تحسين التحكم في التعلمات الأساس" in t
+    assert "نسبة الإنجاز" in t and "المصروف من الميزانية" in t
+    s0 = Document(chemin).sections[0]
+    assert s0.page_width > s0.page_height

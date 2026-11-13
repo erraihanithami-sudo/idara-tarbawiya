@@ -151,6 +151,14 @@ class PageEleves(QWidget):
         self.resultats.setSelectionMode(self.resultats.SelectionMode.ExtendedSelection)
         self.resultats.itemSelectionChanged.connect(self._selection)
         self.resultats.setMinimumHeight(420)
+        # نسخ الرمز من اللائحة أيضاً: النقر بالزر الأيمن أو Ctrl+C
+        from PySide6.QtGui import QAction, QKeySequence
+        a = QAction("نسخ رمز مسار", self.resultats)
+        a.setShortcut(QKeySequence.Copy)
+        a.setShortcutContext(Qt.WidgetShortcut)
+        a.triggered.connect(lambda: self.copier_code(depuis_liste=True))
+        self.resultats.addAction(a)
+        self.resultats.setContextMenuPolicy(Qt.ActionsContextMenu)
         cv.addWidget(self.resultats, 1)
         self.nb = QLabel()
         self.nb.setObjectName("etiquette")
@@ -168,8 +176,16 @@ class PageEleves(QWidget):
         self.sous_titre = QLabel()
         self.sous_titre.setObjectName("sousTitre")
         self.sous_titre.setWordWrap(True)
+        self.sous_titre.setTextInteractionFlags(Qt.TextSelectableByMouse)
         fv.addWidget(self.titre)
-        fv.addWidget(self.sous_titre)
+        ligne_code = QHBoxLayout()
+        ligne_code.addWidget(self.sous_titre, 1)
+        # نسخ رمز مسار (طلب المدير 2026-11-13) للصقه في منظومة مسار أو في مراسلة
+        self.b_copier = QPushButton("نسخ رمز مسار")
+        self.b_copier.setToolTip("ينسخ رمز مسار التلميذ للصقه حيث تشاء (Ctrl+V)")
+        self.b_copier.clicked.connect(lambda: self.copier_code())
+        ligne_code.addWidget(self.b_copier, 0, Qt.AlignTop)
+        fv.addLayout(ligne_code)
 
         actions = QGridLayout()
         actions.setSpacing(8)
@@ -273,6 +289,18 @@ class PageEleves(QWidget):
         return [self.resultats.item(r, 0).data(Qt.UserRole) for r in lignes]
 
     # ---------- البطاقة ----------
+
+    def copier_code(self, depuis_liste: bool = False) -> str | None:
+        """ينسخ رمز مسار التلميذ المعروض (أو المحدد في اللائحة) إلى الحافظة."""
+        from PySide6.QtWidgets import QApplication
+        ids = self.ids_selectionnes()
+        eid = (ids[0] if ids else None) if depuis_liste else (self.eleve_id or (ids[0] if ids else None))
+        if not eid:
+            return None
+        code = el.fiche(self.f.conn, eid)["code_massar"]
+        QApplication.clipboard().setText(code)
+        message(self.message, f"نُسخ رمز مسار \u2066{code}\u2069: الصقه حيث تشاء (Ctrl+V).")
+        return code
 
     def afficher(self, eleve_id: int) -> None:
         self.eleve_id = eleve_id

@@ -164,7 +164,7 @@ def nombre_classes(conn: sqlite3.Connection) -> int:
 
 # ---------- محضر الفائض وتوقيعات الأساتذة (طلب المدير 2026-11-12) ----------
 
-RESULTATS = {"maintenu": "باق بالمؤسسة", "fa": "فائض", "exempte": "مستثنى", "incomplet": "معطيات ناقصة", "": "—"}
+RESULTATS = {"maintenu": "غير فائض", "fa": "فائض", "exempte": "مستثنى", "incomplet": "معطيات ناقصة", "": "—"}
 
 
 def generer_pv(conn: sqlite3.Connection, dossier, le: date | None = None, observations: str = ""):

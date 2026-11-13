@@ -600,6 +600,66 @@ def generer_rapport(conn: sqlite3.Connection, dossier: DossierDonnees, pid: int,
     return _sauver_projet(d, dossier, an, "حصيلة_مشروع_المؤسسة" if final else "تقرير_تنزيل_مشروع_المؤسسة")
 
 
+def generer_tableau_bord(conn: sqlite3.Connection, dossier: DossierDonnees, pid: int,
+                         graphiques: dict[str, bytes] | None = None) -> Path:
+    """وثيقة لوحة قيادة مشروع المؤسسة (طلب المدير 2026-11-13): صفحة أفقية واحدة، فيها لكل هدف بطاقة
+    (المرجعية، آخر قيمة محققة، المستهدف، بلوغه) ومبيانه، ثم وضعية تنزيل العمليات والميزانية."""
+    from docx.enum.section import WD_ORIENT
+    from docx.shared import Cm
+
+    from idara.services.docs_association import _cellule, _ombre, _nouveau, para, tableau
+    from idara.services.soutien import _entete
+    p = projet(conn, pid)
+    ind = tableau_indicateurs(conn, pid)
+    so = synthese_operations(conn, pid)
+    a = annee_srv.annee_courante(conn)
+    d = _nouveau()
+    s = d.sections[0]
+    s.orientation = WD_ORIENT.LANDSCAPE
+    s.page_width, s.page_height = s.page_height, s.page_width
+    s.left_margin = s.right_margin = Cm(1.4)
+    s.top_margin = s.bottom_margin = Cm(1.0)
+    _entete(d, conn, dossier, "لوحة قيادة مشروع المؤسسة المندمج",
+            f"{p['intitule']} · {p['annee_debut']} - {p['annee_fin']}"
+            + (f" · الوضعية في {date.today():%d/%m/%Y}" if a else ""))
+    cles = list(ind)
+    t = tableau(d, 3, len(cles), largeurs=[8.9] * len(cles))
+    for j, k in enumerate(cles):
+        x = ind[k]
+        der = x["derniere"]
+        cible = next((l["cible"] for l in reversed(x["annees"]) if l["cible"] is not None), None)
+        if der and der["atteint"] is not None:
+            etat = "بُلغ المستهدف" if der["atteint"] else "لم يُبلغ المستهدف بعد"
+        else:
+            etat = "في انتظار المعطيات"
+        _cellule(t.cell(0, j), x["objectif"], gras=True, taille=10)
+        _ombre(t.cell(0, j), "E7E8F8")
+        _cellule(t.cell(1, j), (_n(der["realise"]) + f" ({der['annee']})") if der else "لا قيمة محققة بعد",
+                 gras=True, taille=16)
+        _cellule(t.cell(2, j), f"المرجعية: {_n(x['reference'])} · المستهدف: {_n(cible)} · {etat}", taille=9)
+    if graphiques:
+        g = tableau(d, 1, len(cles), bordures=False, largeurs=[8.9] * len(cles))
+        for j, k in enumerate(cles):
+            c = g.cell(0, j)
+            if graphiques.get(k):
+                c.paragraphs[0].add_run().add_picture(io.BytesIO(graphiques[k]), width=Cm(8.4))
+                c.paragraphs[0].alignment = 1
+    para(d, "", apres=2, taille=4)
+    ps = so["par_statut"]
+    t = tableau(d, 2, 8, largeurs=[3.2, 3.2, 3.6, 3.2, 3.2, 3.2, 3.6, 3.5])
+    for j, (lib, v) in enumerate((("العمليات", so["total"]), ("منجزة", ps["realisee"]),
+                                  ("في طور الإنجاز", ps["en_cours"]), ("مبرمجة", ps["programmee"]),
+                                  ("مؤجلة", ps["reportee"]), ("ملغاة", ps["annulee"]),
+                                  ("نسبة الإنجاز", _n(so["taux_global"])),
+                                  ("المصروف من الميزانية", _n(so["pct_depense"])))):
+        _cellule(t.cell(0, j), lib, gras=True, taille=9)
+        _ombre(t.cell(0, j), "E7E8F8")
+        _cellule(t.cell(1, j), str(v), gras=True, taille=12)
+    para(d, f"الميزانية المبرمجة: {_dh(so['montant_programme'])} · المصروف: {_dh(so['montant_depense'])}",
+         taille=9, apres=0)
+    return _sauver_projet(d, dossier, a["libelle"] if a else p["annee_debut"], "لوحة_قيادة_مشروع_المؤسسة")
+
+
 def _sauver_projet(d, dossier, annee: str, nom: str) -> Path:
     rep = dossier.archives / annee.replace("/", "-") / "مشروع المؤسسة"
     rep.mkdir(parents=True, exist_ok=True)

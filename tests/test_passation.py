@@ -55,10 +55,10 @@ def test_actualiser_garde_la_saisie_manuelle(base):  # noqa: F811
     n = ps.actualiser(base, "eleves")["lignes"][0]
     assert n[2] == "20" and n[1] != "999"
     e = ps.lire(base, "etablissement")
-    e["champs"]["cercle"] = "الدائرة التجريبية"
+    e["champs"]["date_creation"] = "1985"
     ps.enregistrer(base, "etablissement", e)
-    assert ps.actualiser(base, "etablissement")["champs"]["cercle"] == "الدائرة التجريبية"
-    assert ps.reinitialiser(base, "etablissement")["champs"].get("cercle", "") == ""
+    assert ps.actualiser(base, "etablissement")["champs"]["date_creation"] == "1985"
+    assert ps.reinitialiser(base, "etablissement")["champs"].get("date_creation", "") == ""
     with pytest.raises(ps.ErreurPassation, match="غير معروف"):
         ps.lire(base, "inexistant")
     with pytest.raises(ps.ErreurPassation, match="تاريخ"):
