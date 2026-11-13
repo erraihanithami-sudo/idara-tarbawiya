@@ -1856,8 +1856,8 @@ def test_page_parents(app, config_tmp, monkeypatch):
     p.wa_dest.setCurrentIndex(p.wa_dest.findData("pere"))
     assert p.ouvrir_whatsapp() is None and "لا رقم هاتف" in p.message.text()
     # البحث الشامل وماذا أفعل اليوم
-    f.recherche.setText("أحمد")
-    assert f.liste_personnes.isHidden()            # الولي ليس تلميذاً ولا موظفاً
+    f.recherche.setText("ققققق")
+    assert f.liste_personnes.isHidden()            # لا تلميذ ولا موظف بهذا الاسم
     nom = f.conn.execute("SELECT nom_ar FROM eleve ORDER BY id LIMIT 1").fetchone()[0]
     f.recherche.setText(nom)
     assert not f.liste_personnes.isHidden() and f.liste_personnes.item(0).text().startswith("تلميذ")
