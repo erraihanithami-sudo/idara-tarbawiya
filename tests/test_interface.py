@@ -156,7 +156,8 @@ def test_navigation_deroulante(app, config_tmp):
     f.boutons[i].click()
     assert f.est_ouvert(i) and not f.est_ouvert(0) and f.page_courante() == "لوحة القيادة"
     assert [b.text().split("  ")[0] for b in f.sous[i]][:3] == ["تدبير التسجيلات", "الجرد", "جمعية دعم مدرسة النجاح"]
-    assert "قريباً" in f.sous[i][1].text() and "قريباً" not in f.sous[i][2].text()
+    assert "قريباً" not in f.sous[i][1].text() and "قريباً" not in f.sous[i][2].text()   # الجرد مبرمج (2026-11-13)
+    assert any("قريباً" in b.text() for b in f.sous[i])
     f.sous[i][2].click()
     assert f.page_courante() == "جمعية دعم مدرسة النجاح" and f.sous[i][2].isChecked() and f.boutons[i].actif
     f.boutons[i].click()   # الضغطة الثانية تطوي الفروع، والصفحة تبقى
@@ -1728,4 +1729,52 @@ def test_page_passation(app, config_tmp, monkeypatch):
     chemin = p.generer()
     assert chemin is not None and chemin.exists() and ouverts == [chemin], p.message.text()
     assert ps.lire(f.conn, "_general")["champs"]["date_pv"] == "2026-07-25"
+    f.close()
+
+
+def test_page_inventaire(app, config_tmp, monkeypatch):
+    """سجل الجرد (طلب المدير 2026-11-13): إدخال، فرز حسب النوع، محو، حذف، توليد."""
+    from idara.services import bureautique
+    from idara.services import inventaire as inv
+    from idara.services import passation as ps
+    from idara.ui.saisie import selectionner
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("الجرد")
+    p = f.page_inventaire
+    assert p.numero.text() == "1" and p.table.rowCount() == 0
+    assert p.generer() is None and "لا تجهيزات" in p.message.text()
+    p.designation.setText("خزانة حديدية")
+    p.type.setCurrentText("أثاث مكتبي")
+    p.quantite.setValue(3)
+    p.prix.setText("900")
+    p.entretien.setCurrentText("صالح")
+    assert p.enregistrer(), p.message.text()
+    p.nouveau()
+    assert p.numero.text() == "2"
+    p.designation.setText("طابعة")
+    p.type.setCurrentText("معلوميات ووسائل رقمية")
+    p.date_facture.setText("31/02/2025")
+    assert p.enregistrer() is None and "التواريخ" in p.message.text()
+    p.date_facture.setText("")
+    assert p.enregistrer(), p.message.text()
+    assert p.table.rowCount() == 2 and "2 700.00" in p.total.text()
+    p.filtre.setCurrentIndex(p.filtre.findData("أثاث مكتبي"))
+    assert p.table.rowCount() == 1 and p.table.item(0, 2).text() == "خزانة حديدية"
+    p.filtre.setCurrentIndex(0)
+    # المحو من السجل
+    selectionner(p.table, [p.table.item(i, 2).text() for i in range(2)].index("طابعة"))
+    p.radie_le.setText("01/10/2026")
+    p.motif.setText("عطب")
+    assert p.enregistrer() and inv.lister(f.conn, radies=False)[0].designation == "خزانة حديدية"
+    p.radies.setChecked(False)
+    assert p.table.rowCount() == 1
+    assert ps.lire(f.conn, "equip_admin")["lignes"][0][:4] == ["خزانة حديدية", "03", "1", "03"]
+    chemin = p.generer()
+    assert chemin is not None and ouverts == [chemin]
+    p.radies.setChecked(True)
+    selectionner(p.table, 0)
+    assert p.supprimer(confirmer=True) and p.table.rowCount() == 1
+    assert p.t_types.rowCount() >= 1
     f.close()

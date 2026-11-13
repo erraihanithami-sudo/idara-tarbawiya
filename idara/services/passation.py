@@ -100,7 +100,7 @@ SECTIONS: list[Section] = [
             colonnes=("النوع", "العدد", "رقم الجرد", "الحالة: صالح", "الحالة: يحتاج صيانة", "الحالة: معطل",
                       "ملاحظات"),
             groupes=(("النوع", 1), ("العدد", 1), ("رقم الجرد", 1), ("الحالة", 3), ("ملاحظات", 1)),
-            numero=True, total=(1, 3, 4, 5), manuels=(6,), source="من الجرد إن أُدخل فيه شيء، وإلا يدوي."),
+            numero=True, total=(1, 3, 4, 5), manuels=(6,), source="من سجل الجرد (التجهيزات غير الممحوة وحالة صيانتها) إن أُدخل فيه شيء، وإلا يدوي."),
     Section("equip_classes", "تجهيزات الحجرات الدراسية",
             colonnes=("الوحدة المدرسية", "عدد القاعات", "سبورة خشبية", "سبورة ألمنيوم", "سبورة متحركة",
                       "عدد المقاعد", "مكتب الأستاذ", "كرسي الأستاذ", "رفوف مكتبية"),
@@ -316,6 +316,10 @@ def _auto_batiments(conn) -> dict:
 
 
 def _auto_equip_admin(conn) -> dict:
+    from idara.services import inventaire as inv
+    lignes = inv.pour_passation(conn)      # سجل الجرد (2026-11-13) إن أُدخل فيه شيء
+    if lignes:
+        return {"lignes": lignes}
     arts = conn.execute("SELECT designation, quantite, num_inv_debut, num_inv_fin, qte_bon, qte_maintenance, qte_hs "
                         "FROM article_inventaire ORDER BY id").fetchall()
     lignes = []

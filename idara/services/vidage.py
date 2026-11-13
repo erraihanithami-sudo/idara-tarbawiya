@@ -67,6 +67,9 @@ COMPOSANTS = [
               "السنوات المالية وكل عملياتها (المداخيل والمصاريف والمنقول)، والوثائق المرقمة، والميزانية، وملفات "
               "الصرف والممونون، والهبات العينية. تبقى معطيات الجمعية (المكتب، رقم الحساب) وبنود الميزانية.",
               "SELECT COUNT(*) FROM exercice"),
+    Composant("inventaire", "سجل الجرد",
+              "كل أسطر سجل الجرد (التجهيزات القائمة والممحوة).",
+              "SELECT COUNT(*) FROM inventaire"),
     Composant("projet", "مشروع المؤسسة",
               "المشاريع المتتبَّعة ومستهدفاتها وعملياتها المستوردة من مسار وتتبعها.",
               "SELECT COUNT(*) FROM projet_operation"),
@@ -180,6 +183,7 @@ def _executer(conn, cle: str, unite: str | None) -> int:
         "soutien": ["soutien_seance", "soutien_eleve", "soutien_groupe", "soutien_categorie", "soutien_etape"],
         "examen": ["examen_affectation", "examen_candidat", "examen_matiere", "examen_salle", "examen"],
         "projet": ["projet_operation", "projet_cible", "projet_etab"],
+        "inventaire": ["inventaire"],
         "finances": ["achat_offre", "achat_article", "numero_achat", "achat", "fournisseur", "piece_association",
                      "don_nature", "prevision", "operation_financiere", "exercice"],
     }[cle]
