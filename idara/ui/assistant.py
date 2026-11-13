@@ -90,6 +90,7 @@ class AssistantPremierLancement(QWidget):
         cv.addWidget(LogoMarque(64, inverse=False))
         t = QLabel(f"مرحباً بكم في «{marque.NOM_COURT}»")
         t.setObjectName("titrePage")
+        t.setWordWrap(True)
         cv.addWidget(t)
         p = QLabel("تُدخل هذه المعلومات مرة واحدة، وتُستعمل آلياً في كل الوثائق. "
                    "يمكن تعديلها لاحقاً من إعداد المؤسسة.")
