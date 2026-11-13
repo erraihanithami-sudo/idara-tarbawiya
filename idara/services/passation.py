@@ -90,7 +90,7 @@ SECTIONS: list[Section] = [
     Section("batiments", "البنايات (حجرات، مستودع، مرافق)",
             colonnes=("الوحدات المدرسية", "أنواع البنايات", "عددها", "مستعملة – غير مستعملة", "صالحة – غير صالحة",
                       "ملاحظات"),
-            fusion=True, source="أسطر مقترحة لكل وحدة؛ الأعداد والحالة تُدخل يدوياً."),
+            fusion=True, source="من صفحة البنية المادية (المكونات وأعدادها لكل وحدة) إن أُدخل فيها شيء، وإلا أسطر مقترحة لكل وحدة. الحالة (مستعملة، صالحة) تُدخل يدوياً."),
     Section("logements", "السكنيات",
             champs=(C("autres", "معلومات أخرى عن السكن بالمؤسسة", long=True),),
             colonnes=("الوحدات المدرسية", "رقم السكنية", "نوعها (صلب، مفكك)", "وظيفية – إدارية",
@@ -303,6 +303,10 @@ def _auto_personnel(conn) -> dict:
 
 
 def _auto_batiments(conn) -> dict:
+    from idara.services import structure as st
+    lignes = st.pour_passation(conn)      # صفحة البنية المادية (2026-11-13) إن أُدخل فيها شيء
+    if lignes:
+        return {"lignes": lignes}
     locaux = conn.execute("SELECT u.nom_ar AS unite, l.type, COUNT(*) n, SUM(l.en_usage) u, SUM(l.bon_etat) b "
                           "FROM local l LEFT JOIN unite_scolaire u ON u.id=l.unite_id GROUP BY l.unite_id, l.type "
                           "ORDER BY u.id, l.type").fetchall()

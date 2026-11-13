@@ -70,6 +70,9 @@ COMPOSANTS = [
     Composant("inventaire", "سجل الجرد",
               "كل أسطر سجل الجرد (التجهيزات القائمة والممحوة).",
               "SELECT COUNT(*) FROM inventaire"),
+    Composant("structure", "البنية المادية",
+              "أعداد مكونات البنية المادية وملاحظاتها.",
+              "SELECT COUNT(*) FROM structure_materielle"),
     Composant("projet", "مشروع المؤسسة",
               "المشاريع المتتبَّعة ومستهدفاتها وعملياتها المستوردة من مسار وتتبعها.",
               "SELECT COUNT(*) FROM projet_operation"),
@@ -184,6 +187,7 @@ def _executer(conn, cle: str, unite: str | None) -> int:
         "examen": ["examen_affectation", "examen_candidat", "examen_matiere", "examen_salle", "examen"],
         "projet": ["projet_operation", "projet_cible", "projet_etab"],
         "inventaire": ["inventaire"],
+        "structure": ["structure_materielle", "structure_remarque"],
         "finances": ["achat_offre", "achat_article", "numero_achat", "achat", "fournisseur", "piece_association",
                      "don_nature", "prevision", "operation_financiere", "exercice"],
     }[cle]

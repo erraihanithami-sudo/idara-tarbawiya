@@ -1778,3 +1778,31 @@ def test_page_inventaire(app, config_tmp, monkeypatch):
     assert p.supprimer(confirmer=True) and p.table.rowCount() == 1
     assert p.t_types.rowCount() >= 1
     f.close()
+
+
+def test_page_structure(app, config_tmp, monkeypatch):
+    """البنية المادية (طلب المدير 2026-11-13)."""
+    from idara.services import bureautique
+    from idara.services import passation as ps
+    from idara.services import structure as st
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("البنية المادية")
+    p = f.page_structure
+    assert p.table.rowCount() == len(st.ELEMENTS) and p.table.item(0, 0).text() == "الحجرات الدراسية"
+    assert p.generer() is None and "لم يُدخل" in p.message.text()
+    p.table.item(0, 1).setText("8")
+    p.ajouter()
+    i = p.table.rowCount() - 1
+    p.table.item(i, 0).setText("مستودع")
+    p.table.item(i, 1).setText("1")
+    assert p.enregistrer(), p.message.text()
+    assert p.table.rowCount() == len(st.ELEMENTS) + 1
+    p.table.item(0, 1).setText("ثمانية")
+    assert not p.enregistrer() and "عدد صحيح" in p.message.text()
+    p.table.item(0, 1).setText("8")
+    assert p.generer() is not None
+    assert any(l[1] == "الحجرات الدراسية" and l[2] == "08" for l in ps.lire(f.conn, "batiments")["lignes"])
+    p.table.setCurrentCell(p.table.rowCount() - 1, 0)
+    assert p.supprimer() and p.table.rowCount() == len(st.ELEMENTS)
+    f.close()
