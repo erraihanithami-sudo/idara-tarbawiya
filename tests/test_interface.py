@@ -1816,3 +1816,32 @@ def test_page_structure(app, config_tmp, monkeypatch):
     p.table.setCurrentCell(p.table.rowCount() - 1, 0)
     assert p.supprimer() and p.table.rowCount() == len(st.ELEMENTS)
     f.close()
+
+
+def test_page_parents(app, config_tmp, monkeypatch):
+    """أولياء الأمور (طلب المدير 2026-11-13): استيراد ملف مسار، تعديل، لائحة."""
+    from idara.services import bureautique
+    from idara.services import parents as pa
+    from idara.ui.saisie import selectionner
+    from tests.test_parents import _w, fichier_tuteurs
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("أولياء الأمور")
+    p = f.page_parents
+    assert p.table.rowCount() == 5 and "معلومات الأولياء مسجلة لـ 0" in p.nb.text()
+    code = f.conn.execute("SELECT code_massar FROM eleve ORDER BY id LIMIT 1").fetchone()[0]
+    r = p.importer([fichier_tuteurs(config_tmp / "t.xlsx", [(code, "أب", {"tuteur": _w("أحمد", "0612345678")})])])
+    assert r and r.eleves == 1 and "لـ 1" in p.nb.text()
+    p.recherche.setText("0612345678")
+    assert p.table.rowCount() == 1
+    selectionner(p.table, 0)
+    assert not p.c_fiche.isHidden() and p.champs["tuteur"]["telephone"].text() == "0612345678"
+    p.champs["mere"]["prenom_ar"].setText("خديجة")
+    p.champs["mere"]["telephone"].setText("هاتف")
+    assert not p.enregistrer() and "الهاتف" in p.message.text()
+    p.champs["mere"]["telephone"].setText("0700000000")
+    assert p.enregistrer(), p.message.text()
+    assert pa.fiche(f.conn, p.eid)["mere"]["prenom_ar"] == "خديجة"
+    assert p.importer([config_tmp / "absent.xlsx"]) is None
+    assert p.generer() is not None
+    f.close()

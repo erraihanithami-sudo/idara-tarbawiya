@@ -50,8 +50,12 @@ def test_vider_eleves_une_unite_puis_tout(base, dossier):  # noqa: F811
     assert [r["code"] for r in imp.repartition_classes(base)] == [r["code"] for r in rep[1:]]
     with pytest.raises(vd.ErreurVidage, match="خاص بلوائح التلاميذ"):
         vd.vider(base, dossier, "tarl", "الوحدة المركزية")
-    vd.vider(base, dossier, "eleves")
+    eid = base.execute("SELECT id FROM eleve LIMIT 1").fetchone()[0]
+    base.execute("INSERT INTO tuteur(eleve_id, role, prenom_ar) VALUES (?, 'tuteur', 'ولي تجريبي')", (eid,))
+    base.commit()
+    vd.vider(base, dossier, "eleves")       # أولياء الأمور يُحذفون مع تلاميذهم (دون خطأ المفاتيح الخارجية)
     assert vd.compter(base, "eleves") == 0 and not imp.repartition_classes(base)
+    assert vd.compter(base, "parents") == 0
     assert base.execute("SELECT COUNT(*) FROM inscription").fetchone()[0] == 0
 
 

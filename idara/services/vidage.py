@@ -67,6 +67,9 @@ COMPOSANTS = [
               "السنوات المالية وكل عملياتها (المداخيل والمصاريف والمنقول)، والوثائق المرقمة، والميزانية، وملفات "
               "الصرف والممونون، والهبات العينية. تبقى معطيات الجمعية (المكتب، رقم الحساب) وبنود الميزانية.",
               "SELECT COUNT(*) FROM exercice"),
+    Composant("parents", "أولياء الأمور",
+              "معلومات أولياء الأمور والآباء والأمهات المستوردة من مسار أو المدخلة يدوياً.",
+              "SELECT COUNT(*) FROM tuteur"),
     Composant("inventaire", "سجل الجرد",
               "كل أسطر سجل الجرد (التجهيزات القائمة والممحوة).",
               "SELECT COUNT(*) FROM inventaire"),
@@ -105,6 +108,7 @@ def _supprimer_eleves(conn, eleves: list[int]) -> None:
                 f"DELETE FROM observation_comportement WHERE eleve_id IN {e}",
                 f"DELETE FROM mouvement WHERE eleve_id IN {e}",
                 f"DELETE FROM eleve_avant_massar WHERE eleve_id IN {e}",
+                f"DELETE FROM tuteur WHERE eleve_id IN {e}",
                 f"UPDATE document_genere SET eleve_id=NULL WHERE eleve_id IN {e}",
                 f"DELETE FROM inscription WHERE eleve_id IN {e}",
                 f"DELETE FROM eleve WHERE id IN {e}"):
@@ -187,6 +191,7 @@ def _executer(conn, cle: str, unite: str | None) -> int:
         "examen": ["examen_affectation", "examen_candidat", "examen_matiere", "examen_salle", "examen"],
         "projet": ["projet_operation", "projet_cible", "projet_etab"],
         "inventaire": ["inventaire"],
+        "parents": ["tuteur"],
         "structure": ["structure_materielle", "structure_remarque"],
         "finances": ["achat_offre", "achat_article", "numero_achat", "achat", "fournisseur", "piece_association",
                      "don_nature", "prevision", "operation_financiere", "exercice"],
