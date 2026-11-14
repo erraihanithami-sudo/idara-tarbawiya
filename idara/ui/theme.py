@@ -227,9 +227,9 @@ QPushButton#puceRahba {{ border: 0; background: transparent; font-weight: 700; f
     padding: 0 10px; color: {VERT_FONCE}; border-radius: 10px; }}
 QPushButton#puceRahba:hover {{ background: {VERT_CLAIR}; }}
 QPushButton#pilule {{ border: 1px solid {BORDURE_CARTE}; border-radius: 17px; min-height: 34px; padding: 0 16px;
-    background: {PLATRE}; color: {GRIS}; font-weight: 500; }}
+    background: {PLATRE}; color: {GRIS}; font-weight: 600; }}
 QPushButton#pilule:hover {{ border-color: {VERT}; color: {ENCRE}; background: {BLANC}; }}
-QPushButton#pilule:checked {{ background: {VERT}; color: {BLANC}; border-color: {VERT}; font-weight: 700; }}
+QPushButton#pilule:checked {{ background: {VERT}; color: {BLANC}; border-color: {VERT}; }}
 """
 
 
