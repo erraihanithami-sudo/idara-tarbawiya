@@ -328,16 +328,16 @@ def main(sortie: Path) -> None:
     f.aller_a("تتبع الغياب")
     pa = f.page_absences
     pa.mois.setCurrentIndex(pa.mois.findData("2026-10"))
-    pa.jours.setValue(20)
+    if hasattr(pa, 'jours'):
+        pa.jours.setValue(20)
     for i in range(pa.table.rowCount()):
-        pa.table.item(i, 3).setText("2")
-        pa.table.item(i, 4).setText(str(3 + i))
+        pa.table.item(i, 3).setText(str(96 - i % 4))
     pa.enregistrer()
     pa.mois.setCurrentIndex(pa.mois.findData("2026-11"))
-    pa.jours.setValue(18)
+    if hasattr(pa, 'jours'):
+        pa.jours.setValue(18)
     for i in range(pa.table.rowCount()):
-        pa.table.item(i, 3).setText("1")
-        pa.table.item(i, 4).setText("2")
+        pa.table.item(i, 3).setText(str(97 - i % 3))
     pa.enregistrer()
     photo(f, "55_absences")
     with f.conn:   # أستاذة وهمية للدعم
