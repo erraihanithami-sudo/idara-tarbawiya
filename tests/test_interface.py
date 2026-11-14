@@ -146,16 +146,18 @@ def test_navigation_deroulante(app, config_tmp):
     from idara.ui.fenetre import SECTIONS
     f = _fenetre_avec_eleves(config_tmp)
     titres = [t for t, _ in SECTIONS]
-    assert titres[:8] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي",
+    assert titres[:9] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي", "الحياة المدرسية",
                           "التدبير المالي والمادي", "التقييم", "مشروع المؤسسة", "تسليم المهام"]
-    assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص", "المحاضر"]
+    assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص", "المحاضر",
+                                         "طلبات الموظفين والورقة الشخصية", "أعوان الحراسة والنظافة"]
     assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
                                          "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة",
                                          "السبورة المرجعية"]
     assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
     i = titres.index("التدبير المالي والمادي")
-    f.boutons[i].click()
-    assert f.est_ouvert(i) and not f.est_ouvert(0) and f.page_courante() == "لوحة القيادة"
+    f.boutons[i].click()   # النقر على القسم يفتح فروعه ويعرض رحبته (2026-11-14)
+    assert f.est_ouvert(i) and not f.est_ouvert(0) and f.page_courante() is None and f.rahba_courante() == i
+    assert f.groupe.checkedButton() is None and f.boutons[i].actif
     assert [b.text().split("  ")[0] for b in f.sous[i]][:3] == ["تدبير التسجيلات", "الجرد", "جمعية دعم مدرسة النجاح"]
     assert "قريباً" not in f.sous[i][1].text() and "قريباً" not in f.sous[i][2].text()   # الجرد مبرمج (2026-11-13)
     assert any("قريباً" in b.text() for b in f.sous[i])
@@ -1325,7 +1327,7 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     f = _fenetre_avec_eleves(config_tmp)
     # عدّاد الصفحات الفرعية بجانب كل قسم
     i = [t for t, _ in SECTIONS].index("الموارد البشرية")
-    assert f.boutons[i].l_badge.text() == "4" and not f.boutons[i].l_badge.isHidden()
+    assert f.boutons[i].l_badge.text() == "6" and not f.boutons[i].l_badge.isHidden()
     # البحث
     assert f.filtrer_nav("رخص") == ["الرخص"] and not f.boutons[i].isHidden()
     assert all(b.isHidden() for k, b in enumerate(f.boutons) if k != i)
@@ -1960,4 +1962,73 @@ def test_pages_vie_admin(app, config_tmp, monkeypatch):
     assert not e.enregistrer() and "قبل بدايتها" in e.message.text()
     e.table.item(0, 2).setText("10:00")
     assert e.generer() is not None
+    f.close()
+
+
+def test_rihab_et_registres(app, config_tmp, monkeypatch):
+    """طلب المدير 2026-11-14: رحبة لكل قسم، شريط المسار، والسجلات الإدارية المعرَّفة بالوصف. بيانات وهمية."""
+    from idara.services import bureautique
+    from idara.ui.fenetre import SECTIONS
+    from idara.ui.saisie import selectionner
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    titres = [t for t, _ in SECTIONS]
+    i = titres.index("الحياة المدرسية")
+    f.ouvrir_rahba(i)
+    r = f.rahbat[i]
+    assert f.rahba_courante() == i and f.page_courante() is None and f.est_ouvert(i)
+    assert list(r.cartes) == [p for p, _ in SECTIONS[i][1]]
+    assert all(c.l_desc.text() for c in r.cartes.values())
+    assert f.bandeau_page.indice == i and not any(b.isChecked() for b in f.bandeau_page.pilules.values())
+    r.cartes["التحفيز والتهاني"].cliquer()
+    assert f.page_courante() == "التحفيز والتهاني" and f.bandeau_page.pilules["التحفيز والتهاني"].isChecked()
+    f.bandeau_page.pilules["الإعلام والتواصل"].click()   # الحبوب تنقل بين صفحات القسم
+    assert f.page_courante() == "الإعلام والتواصل" and not f.bandeau_page.pilules["التحفيز والتهاني"].isChecked()
+    f.bandeau_page.b_rahba.click()
+    assert f.rahba_courante() == i
+    j = titres.index("تسليم المهام")   # قسم بصفحة واحدة: لا رحبة، يفتح صفحته
+    assert j not in f.rahbat
+    f.ouvrir_rahba(j)
+    assert f.page_courante() == "تسليم المهام" and f.bandeau_page.zone.isHidden()
+    # كل صفحة لها سطر تعريفي في رحبتها
+    from idara.ui.rihab import DESCRIPTIONS, SOUS_SECTIONS
+    assert {p for _, fils in SECTIONS for p, _ in fils} <= set(DESCRIPTIONS)
+    assert {t for t, fils in SECTIONS if len(fils) > 1} <= set(SOUS_SECTIONS)
+    # سجل الحوادث
+    f.aller_a("الصحة والسلامة")
+    v = f.page_sante.vue()
+    nom = v.w["eleve"].itemText(1)
+    v.w["eleve"].setEditText(nom)
+    assert v.w["classe"].text() == v.classes[nom] != ""
+    assert v.enregistrer() is None and f.page_sante.message.objectName() == "erreur"   # التاريخ مطلوب
+    v.remplir({"date": "2026-11-10", "description": "سقوط في الساحة", "lieu": "الساحة"})
+    lid = v.enregistrer()
+    assert lid and v.table.rowCount() == 1 and v.lid == lid and v.b_suppr.isEnabled()
+    assert v.generer("declaration") is not None and len(ouverts) == 1
+    v.nouveau()
+    assert v.lid is None and not v.b_suppr.isEnabled() and v.generer("declaration") is None
+    selectionner(v.table, 0)
+    assert v.lid == lid and v.w["lieu"].currentText() == "الساحة"
+    v.filtre.setCurrentIndex(v.filtre.findData("الملعب"))
+    assert v.table.rowCount() == 0
+    v.filtre.setCurrentIndex(0)
+    assert v.table.rowCount() == 1
+    k = titres.index("التلاميذ")   # عدّاد حي على بطاقة الصفحة في الرحبة
+    f.ouvrir_rahba(k)
+    assert f.rahbat[k].cartes["الصحة والسلامة"].l_pastille.text() == "1 سجلاً"
+    assert "تلميذاً" in f.rahbat[k].cartes["التلاميذ"].l_pastille.text()
+    # صفحة بسجلين: الحبوب تبدّل بينهما، والحصيلة تقترح أسماء الأعوان
+    f.aller_a("الأعوان")
+    p = f.page_agents
+    assert not p.vues["agents"].isHidden() and p.vues["suivi_agents"].isHidden()
+    p.vue().remplir({"nom": "عون تجريبي", "fonction": "الحراسة"})
+    assert p.vue().enregistrer()
+    p.pilules["suivi_agents"].click()
+    assert p.cle == "suivi_agents" and p.vues["agents"].isHidden() and not p.vues["suivi_agents"].isHidden()
+    assert p.vue().w["agent"].findText("عون تجريبي") >= 0
+    f.aller_a("طلبات الموظفين")
+    v = f.page_demandes.vue()
+    assert v.cible is not None and v.supprimer() is False
+    assert v.generer("suivi") is None and f.page_demandes.message.objectName() == "erreur"   # لا أسطر بعد
     f.close()

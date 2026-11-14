@@ -154,7 +154,19 @@ QLineEdit#rechercheNav:focus {{ border: 2px solid {NAV_ACCENT}; }}
 #numero {{ background: {NAV_ACCENT}; color: #1A1A1A; border-radius: 13px; font-weight: 700; }}
 #pastille {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; border-radius: 10px; padding: 2px 10px;
     font-weight: 600; font-size: 9pt; }}
-""" + feuille_maghribi()
+#bandeauPage {{ background: {BLANC}; border-bottom: 3px solid {VERT}; }}
+QScrollArea#defilPilules, QWidget#fondPilules {{ background: transparent; border: 0; }}
+QScrollArea#defilPilules > QWidget#qt_scrollarea_viewport {{ background: transparent; }}
+#carteAction {{ background: {BLANC}; border: 1px solid {BORDURE_CARTE}; border-radius: 16px; }}
+#carteAction:hover {{ background: {VERT_CLAIR}; border-color: {VERT}; }}
+#carteAction:focus {{ border: 2px solid {FOCUS}; }}
+#carteAction QLabel {{ background: transparent; }}
+#carteActionTitre {{ font-size: 11.5pt; font-weight: 700; color: {VERT_FONCE}; }}
+#heroTitre {{ color: #FFFFFF; font-size: 22pt; font-weight: 700; background: transparent; }}
+#heroSous {{ color: #FFFFFF; font-size: 11pt; background: transparent; }}
+#heroPuce {{ background: rgba(255, 255, 255, 46); color: #FFFFFF; border-radius: 12px; padding: 4px 14px;
+    font-weight: 600; font-size: 9.5pt; }}
+""" + feuille_maghribi() + feuille_pilules()
 
 
 # ألوان ثانوية لمظاهر العناوين المزخرفة (لا يُكتب عليها نص، فلا تدخل في اختبار التباين)
@@ -202,6 +214,22 @@ QScrollBar::handle:vertical {{ background: {x['ascenseur']}; border-radius: 5px;
 QScrollBar::handle:vertical:hover {{ background: {TITRE_SOULIGNE}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QToolTip {{ background: {VERT_FONCE}; color: #FFFFFF; border: 1px solid {TITRE_SOULIGNE}; padding: 5px; }}
+"""
+
+
+def feuille_pilules() -> str:
+    """الحبوب وشارة الرحبة: بعد لمسات المظهر حتى لا تغلبها قواعد QPushButton العامة."""
+    titre = police_titres()
+    fam = f'font-family: "{titre}";' if titre else ""
+    return f"""
+#heroTitre {{ {fam} }}
+QPushButton#puceRahba {{ border: 0; background: transparent; font-weight: 700; font-size: 11.5pt; min-height: 40px;
+    padding: 0 10px; color: {VERT_FONCE}; border-radius: 10px; }}
+QPushButton#puceRahba:hover {{ background: {VERT_CLAIR}; }}
+QPushButton#pilule {{ border: 1px solid {BORDURE_CARTE}; border-radius: 17px; min-height: 34px; padding: 0 16px;
+    background: {PLATRE}; color: {GRIS}; font-weight: 500; }}
+QPushButton#pilule:hover {{ border-color: {VERT}; color: {ENCRE}; background: {BLANC}; }}
+QPushButton#pilule:checked {{ background: {VERT}; color: {BLANC}; border-color: {VERT}; font-weight: 700; }}
 """
 
 

@@ -377,6 +377,23 @@ def main(sortie: Path) -> None:
             pp.t_ops.cellWidget(0, 5).setCurrentIndex(pp.t_ops.cellWidget(0, 5).findData("realisee"))
             pp.enregistrer_suivi()
     photo(f, "57_projet_etablissement")
+    # الرحاب والسجلات (2026-11-14)
+    from idara.ui.fenetre import SECTIONS
+    titres = [t for t, _ in SECTIONS]
+    for num, t in (("60", "الحياة المدرسية"), ("61", "التلاميذ"), ("62", "الموارد البشرية")):
+        f.ouvrir_rahba(titres.index(t))
+        photo(f, f"{num}_rahba")
+    f.aller_a("الصحة والسلامة")
+    v = f.page_sante.vue()
+    if v.w["eleve"].count() > 1:
+        v.w["eleve"].setEditText(v.w["eleve"].itemText(1))
+        v.remplir({"date": "2026-11-10", "lieu": "الساحة", "description": "سقوط أثناء الاستراحة", "declare": "نعم"})
+        v.enregistrer()
+    photo(f, "63_registre_accidents")
+    f.aller_a("خليتا اليقظة والإنصات")
+    photo(f, "64_cellules")
+    f.aller_a("التحفيز والتهاني")
+    photo(f, "65_tahfiz")
     f.filtrer_nav("محضر")
     photo(f, "53_recherche_nav")
     f.filtrer_nav("")

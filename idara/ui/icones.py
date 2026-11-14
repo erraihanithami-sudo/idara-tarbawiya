@@ -25,6 +25,7 @@ COULEURS = {
     "التدبير المالي والمادي": theme.ORANGE,
     "المراسلات": theme.BLEU,
     "مشروع المؤسسة": theme.VIOLET,
+    "الحياة المدرسية": theme.ROSE,
     "الإعدادات": theme.GRIS,
 }
 
@@ -148,7 +149,22 @@ def _parametres(p, a, m):        # الإعدادات: مسنن
     p.drawEllipse(c, 3.4, 3.4)
 
 
+def _vie(p, a, m):               # الحياة المدرسية: نجمة خماسية وكرتان (نشاط واحتفال)
+    pts = []
+    for k in range(10):
+        r = 8.2 if k % 2 == 0 else 3.5
+        t = -math.pi / 2 + k * math.pi / 5
+        pts.append(QPointF(11 + r * math.cos(t), 11.5 + r * math.sin(t)))
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor(a))
+    p.drawPolygon(QPolygonF(pts))
+    p.setBrush(QColor(m))
+    p.drawEllipse(QPointF(19.5, 5), 2.4, 2.4)
+    p.drawEllipse(QPointF(4.5, 19.5), 1.8, 1.8)
+
+
 DESSINS = {
+    "الحياة المدرسية": _vie,
     "القيادة والتدبير": _tableau, "تسليم المهام": _passation,
     "لوحة القيادة": _tableau, "التلاميذ": _eleves, "الموارد البشرية": _personnel,
     "التدبير التربوي": _pedagogie, "التقييم": _evaluation, "مجالس المؤسسة": _conseils,

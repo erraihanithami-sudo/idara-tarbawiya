@@ -55,6 +55,8 @@ from idara.ui.page_passation import PagePassation
 from idara.ui.page_sabboura import PageSabboura
 from idara.ui.page_vie_admin import PageAssoLegal, PageEmplois, PageGarde, PageTransport
 from idara.ui.page_projet import PageProjet
+from idara.ui.page_registre import PageRegistres
+from idara.ui.rihab import BandeauPage, PageRahba
 from idara.ui.page_pv_rh import PagePvRh
 from idara.ui.page_examen import PageDeliberations, PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
@@ -489,13 +491,19 @@ SECTIONS = [
                           ("السبورة المرجعية", "السبورة المرجعية")]),
     ("التلاميذ", [("التلاميذ", "وثائق التلاميذ"), ("حركية التلاميذ", "حركية التلاميذ"),
                   ("تتبع السلوك", "تتبع سلوكات التلاميذ"), ("أولياء الأمور", "معلومات أولياء الأمور"),
-                  ("النقل المدرسي", "النقل المدرسي"),
+                  ("النقل المدرسي", "النقل المدرسي"), ("الصحة والسلامة", "الصحة والسلامة المدرسية"),
                   ("التلاميذ القدامى", "التلاميذ القدامى (ما قبل مسار)"), ("الاستيراد من مسار", "الاستيراد من مسار")]),
     ("الموارد البشرية", [("الموارد البشرية", "معلومات الأطر"), ("تدبير الفائض", "تدبير الفائض"),
-                         ("الرخص", "الرخص"), ("محاضر الموارد البشرية", "المحاضر")]),
-    ("التدبير التربوي", [("التنظيم التربوي", "التنظيم التربوي"), ("الأندية والأنشطة", "الحياة المدرسية"), ("التعلمات الأساس", "تتبع التعلمات الأساس"),
+                         ("الرخص", "الرخص"), ("محاضر الموارد البشرية", "المحاضر"),
+                         ("طلبات الموظفين", "طلبات الموظفين والورقة الشخصية"),
+                         ("الأعوان", "أعوان الحراسة والنظافة")]),
+    ("التدبير التربوي", [("التنظيم التربوي", "التنظيم التربوي"), ("التعلمات الأساس", "تتبع التعلمات الأساس"),
                          ("الدعم التربوي", "الدعم التربوي"), ("الريادة", "المدرسة الرائدة"),
                          ("استعمالات الزمن", "استعمالات الزمن"), ("جدول الحراسة", "جدول الحراسة")]),
+    ("الحياة المدرسية", [("الأندية والأنشطة", "الأندية والأنشطة"),
+                         ("خليتا اليقظة والإنصات", "خليتا اليقظة والإنصات"),
+                         ("التحفيز والتهاني", "التحفيز والتهاني"), ("الانفتاح والشراكة", "الانفتاح والشراكة"),
+                         ("الإعلام والتواصل", "الإعلام والتواصل")]),
     ("التدبير المالي والمادي", [("التسجيلات", "تدبير التسجيلات"), ("الجرد", "الجرد"),
                                 ("جمعية دعم مدرسة النجاح", "جمعية دعم مدرسة النجاح"),
                                 ("الصرف", "الصرف: سند الطلب والاتفاقية"), ("الجمعية الرياضية", "الجمعية الرياضية"),
@@ -505,7 +513,8 @@ SECTIONS = [
     ("التقييم", [("المراقبة المستمرة", "المراقبة المستمرة"), ("الامتحان", "الامتحان"),
                  ("استثمار النتائج", "استثمار النتائج"), ("مجالس الأقسام", "المحاضر: مجالس الأقسام"),
                  ("محاضر نهاية الأسدوس", "المحاضر: نهاية الأسدوس")]),
-    ("مشروع المؤسسة", [("مشروع المؤسسة", "تتبع مشروع المؤسسة المندمج")]),
+    ("مشروع المؤسسة", [("مشروع المؤسسة", "تتبع مشروع المؤسسة المندمج"),
+                       ("فريق القيادة", "فريق القيادة ومحاضر المشروع")]),
     ("تسليم المهام", [("تسليم المهام", "تسليم المهام")]),
     ("المراسلات", [("سجل الصادر", "سجل الصادر")]),
     ("الإعدادات", [("إعداد المؤسسة", "المؤسسة"), ("الوثائق", "نماذج الوثائق"),
@@ -647,7 +656,15 @@ MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "
              "السبورة المرجعية": "سبورة لوحات بطاقة معلومات المؤسسة خلايا يقظة إنصات استعمال الزمن الجماعي",
              "الوثائق القانونية للجمعيات": "تجديد المكتب جمع عام محضر تصريح آباء نجاح رياضية تعاونية",
              "جدول الحراسة": "حراسة استراحة دخول خروج", "النقل المدرسي": "حافلة سائق دوار نقل",
-             "استعمالات الزمن": "جدول الحصص حصيص مواد توقيت استعمال الزمن"}
+             "استعمالات الزمن": "جدول الحصص حصيص مواد توقيت استعمال الزمن",
+             "الصحة والسلامة": "حادثة حوادث مدرسية تصريح تأمين إصابة",
+             "طلبات الموظفين": "إذن بالتغيب أبوة زواج فحص طبي مضاد ورقة شخصية",
+             "الأعوان": "عون حارس منظفة طباخة شركة مناولة حصيلة شهرية جدول الخدمة",
+             "خليتا اليقظة والإنصات": "خلية يقظة إنصات مصالحة وساطة رصد مواكبة حالات محضر",
+             "التحفيز والتهاني": "شهادة تقديرية تهنئة تشجيع لوحة الشرف متفوقين",
+             "الانفتاح والشراكة": "شراكة اتفاقية شريك جمعية جماعة",
+             "الإعلام والتواصل": "إعلان بلاغ إخبار",
+             "فريق القيادة": "فريق قيادة المشروع محضر تشكيل مصادقة مجلس التدبير"}
 
 
 class BarreLaterale(QFrame):
@@ -724,7 +741,34 @@ class FenetrePrincipale(QMainWindow):
         self.page_sabboura = PageSabboura(self)
         self.page_asso_legal, self.page_garde = PageAssoLegal(self), PageGarde(self)
         self.page_transport, self.page_emplois = PageTransport(self), PageEmplois(self)
-        self.pages = {"لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
+        cs = icones.COULEURS
+        self.page_sante = PageRegistres(
+            self, "الصحة والسلامة المدرسية", "سجل الحوادث المدرسية والتصريح بكل حادثة. اختر سطراً من الجدول "
+            "لتعديله أو لتوليد تصريحه.", ["accidents"], cs["التلاميذ"])
+        self.page_demandes = PageRegistres(
+            self, "طلبات الموظفين والورقة الشخصية", "الطلبات التي لا يغطيها ملف «الرخص»، والورقة الشخصية لكل "
+            "موظف(ة). صياغة الطلبات عامة: راجعها في Word قبل التوقيع.", ["demandes"], cs["الموارد البشرية"])
+        self.page_agents = PageRegistres(
+            self, "أعوان الحراسة والنظافة", "بطاقات الأعوان والشركات المشغلة، ثم الحصيلة الشهرية وتقييم الخدمة.",
+            ["agents", "suivi_agents"], cs["الموارد البشرية"])
+        self.page_cellules = PageRegistres(
+            self, "خليتا اليقظة والإنصات", "تركيبة الخليتين، اجتماعاتهما، والحالات المرصودة وما اتُّخذ فيها.",
+            ["cellule_membres", "cellule_reunions", "cellule_cas"], cs["الحياة المدرسية"])
+        self.page_tahfiz = PageRegistres(
+            self, "التحفيز والتهاني", "سجّل كل تحفيز ثم اطبع شهادته المزخرفة.", ["tahfiz"], cs["الحياة المدرسية"])
+        self.page_partenariats = PageRegistres(
+            self, "الانفتاح والشراكة", "اتفاقيات الشراكة وحالتها.", ["partenariats"], cs["الحياة المدرسية"])
+        self.page_annonces = PageRegistres(
+            self, "الإعلام والتواصل", "اكتب الإعلان مرة واحدة واطبعه جاهزاً للتعليق.", ["annonces"],
+            cs["الحياة المدرسية"])
+        self.page_equipe = PageRegistres(
+            self, "فريق القيادة ومحاضر المشروع", "أعضاء فريق قيادة مشروع المؤسسة المندمج، ومحضر تشكيله، ومحضر "
+            "مصادقة مجلس التدبير.", ["equipe"], cs["مشروع المؤسسة"])
+        self.pages = {"الصحة والسلامة": self.page_sante, "طلبات الموظفين": self.page_demandes,
+                      "الأعوان": self.page_agents, "خليتا اليقظة والإنصات": self.page_cellules,
+                      "التحفيز والتهاني": self.page_tahfiz, "الانفتاح والشراكة": self.page_partenariats,
+                      "الإعلام والتواصل": self.page_annonces, "فريق القيادة": self.page_equipe,
+                      "لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
                       "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "التنظيم التربوي": self.page_tanzim, "محاضر نهاية الأسدوس": self.page_deliberations,
@@ -753,6 +797,17 @@ class FenetrePrincipale(QMainWindow):
                     w = page_defilante(PageAVenir(lib, *A_VENIR[nom]))
                 self.emplacement[nom] = self.pile.addWidget(w)
                 self.section_de[nom] = i
+        # الرحاب: صفحة استقبال لكل قسم له أكثر من صفحة (2026-11-14). Alt+1…9 ثم Alt+0 تفتحها
+        from PySide6.QtGui import QKeySequence, QShortcut
+        self.rahbat, self.pile_rahba = {}, {}
+        for i, (titre, fils) in enumerate(SECTIONS):
+            touche = f"Alt+{(i + 1) % 10}" if i < 10 else ""
+            if len(fils) > 1:
+                self.rahbat[i] = PageRahba(self, i, titre, fils, touche)
+                self.pile_rahba[i] = self.pile.addWidget(page_defilante(self.rahbat[i]))
+            if touche:
+                QShortcut(QKeySequence(touche), self, activated=lambda i=i: self.ouvrir_rahba(i))
+        self.bandeau_page = BandeauPage(self, SECTIONS)
         self._boutons_suppression()
         self._disposition = h
         self.barre = self._barre_laterale()
@@ -764,6 +819,7 @@ class FenetrePrincipale(QMainWindow):
         dv.setSpacing(0)
         self.bandeau_archive = BandeauArchive(self)   # الاطلاع على سنة ماضية (طلب المدير 2026-11-12)
         dv.addWidget(self.bandeau_archive)
+        dv.addWidget(self.bandeau_page)
         dv.addWidget(self.pile, 1)
         h.addWidget(droite, 1)
         self.setCentralWidget(centre)
@@ -866,7 +922,7 @@ class FenetrePrincipale(QMainWindow):
             bv.setSpacing(1)
             sous = []
             if deroulant:
-                b.clicked.connect(lambda _=False, i=i: self.basculer(i))
+                b.clicked.connect(lambda _=False, i=i: self.cliquer_section(i))
                 for page, lib in fils:
                     sb = BoutonSous(lib if page in self.pages else f"{lib}  ·  قريباً")
                     sb.setCursor(Qt.PointingHandCursor)
@@ -945,6 +1001,34 @@ class FenetrePrincipale(QMainWindow):
             bloc.setVisible(o and bool(self.sous[k]))
             self.boutons[k].ouvrir(o)
 
+    def cliquer_section(self, i: int) -> None:
+        """النقر على قسم: يفتح فروعه ويعرض رحبته؛ النقرة الثانية تطوي الفروع والصفحة تبقى."""
+        if self.est_ouvert(i):
+            self.basculer(i, False)
+        else:
+            self.ouvrir_rahba(i)
+
+    def rahba_courante(self) -> int | None:
+        k = self.pile.currentIndex()
+        return next((i for i, n in self.pile_rahba.items() if n == k), None)
+
+    def ouvrir_rahba(self, i: int) -> None:
+        """يعرض رحبة القسم i (بطاقة لكل صفحة). القسم ذو الصفحة الواحدة يفتح صفحته مباشرة."""
+        if i not in self.rahbat:
+            self.aller(i)
+            return
+        self.basculer(i, True)
+        coche = self.groupe.checkedButton()
+        if coche is not None:   # لا صفحة مفتوحة: نرفع التحديد عن آخر فرع
+            self.groupe.setExclusive(False)
+            coche.setChecked(False)
+            self.groupe.setExclusive(True)
+        for k, b in enumerate(self.boutons):
+            b.marquer(k == i)
+        self.rahbat[i].rafraichir()
+        self.pile.setCurrentIndex(self.pile_rahba[i])
+        self.bandeau_page.afficher(i, None)
+
     def aller_a(self, nom: str) -> None:
         """يفتح صفحة باسمها، أو قسماً رئيسياً باسمه (أول فرع مبرمج فيه)."""
         if nom not in self.emplacement:
@@ -960,6 +1044,7 @@ class FenetrePrincipale(QMainWindow):
         for k, b in enumerate(self.boutons):
             b.marquer(k == i)
         self.pile.setCurrentIndex(self.emplacement[nom])
+        self.bandeau_page.afficher(i, nom)
         self._rafraichir(nom)
 
     # ---------- البحث في الصفحات ----------

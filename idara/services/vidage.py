@@ -75,7 +75,11 @@ COMPOSANTS = [
               "SELECT COUNT(*) FROM sabboura"),
     Composant("vie_admin", "استعمالات الزمن، الحراسة، النقل، مكاتب الجمعيات",
               "ما أُدخل في صفحات استعمالات الزمن (والحصيص)، جدول الحراسة، النقل المدرسي، والوثائق القانونية للجمعيات.",
-              "SELECT COUNT(*) FROM fiche_json"),
+              "SELECT COUNT(*) FROM fiche_json WHERE cle NOT LIKE 'reg:%'"),
+    Composant("registres", "السجلات الإدارية (الأعوان، الطلبات، الحوادث، الخلايا، التحفيز، الشراكات، الإعلانات)",
+              "كل أسطر السجلات المضافة يوم 2026-11-14: الأعوان وحصيلتهم، طلبات الموظفين، الحوادث المدرسية، "
+              "خليتا اليقظة والإنصات، التحفيز، الشراكات، الإعلانات، وفريق قيادة المشروع.",
+              "SELECT COUNT(*) FROM fiche_json WHERE cle LIKE 'reg:%'"),
     Composant("inventaire", "سجل الجرد",
               "كل أسطر سجل الجرد (التجهيزات القائمة والممحوة).",
               "SELECT COUNT(*) FROM inventaire"),
@@ -186,6 +190,9 @@ def _executer(conn, cle: str, unite: str | None) -> int:
         return _vider_personnel(conn)
     if cle == "anciens":
         _supprimer_eleves(conn, _ids(conn, "SELECT id FROM eleve WHERE source='avant_massar'"))
+        return n
+    if cle in ("vie_admin", "registres"):   # كلاهما في fiche_json: السجلات مفاتيحها «reg:»
+        conn.execute("DELETE FROM fiche_json WHERE cle " + ("LIKE" if cle == "registres" else "NOT LIKE") + " 'reg:%'")
         return n
     tables = {
         "resultats": ["resultat", "conseil_niveau", "isa_classe", "deliberation"],
