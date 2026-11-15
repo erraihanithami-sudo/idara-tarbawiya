@@ -2032,3 +2032,54 @@ def test_rihab_et_registres(app, config_tmp, monkeypatch):
     assert v.cible is not None and v.supprimer() is False
     assert v.generer("suivi") is None and f.page_demandes.message.objectName() == "erreur"   # لا أسطر بعد
     f.close()
+
+
+def test_editeur_de_documents(app, config_tmp, monkeypatch, tmp_path):
+    """طلب المدير 2026-11-15: كل وثيقة تُفتح في محرر البرنامج، تُعدَّل وتُطبع منه، بلا علامات اتجاه ظاهرة."""
+    from idara.services import bureautique
+    from idara.services import registres as rg
+    from idara.ui.editeur import EditeurDocument, fichier_modifie
+    f = _fenetre_avec_eleves(config_tmp)
+    externes = []
+    monkeypatch.setattr(bureautique, "ouvrir_externe", lambda p: externes.append(p))
+    monkeypatch.setattr(bureautique, "ouvreur", f.ouvrir_document)
+    rg.enregistrer(f.conn, "agents", {"nom": "عون تجريبي", "fonction": "الحراسة", "horaire": "8:00 - 16:00"})
+    f.aller_a("الأعوان")
+    p = f.page_agents.vue().generer("service")   # التوليد يفتح المحرر لا برنامجاً خارجياً
+    assert p is not None and not externes and len(f.editeurs) == 1
+    e = f.editeurs[0]
+    assert isinstance(e, EditeurDocument) and not e.isHidden() and e.chemin == p
+    texte = e.edit.toPlainText()
+    assert "جدول الخدمة" in texte and "عون تجريبي" in texte and "8:00 - 16:00" in texte
+    assert not any(c in texte for c in "\u2066\u2069") and e.etat.text() == "الوثيقة كما وُلّدت"
+    assert e.edit.document().rootFrame().childFrames(), "الجدول لم يُنقل إلى المحرر"
+    # تعديل ثم حفظ: يُعاد فتحه كما تُرك، والأصل لا يتغير
+    avant = p.read_bytes()
+    c = e.edit.textCursor()
+    c.movePosition(c.MoveOperation.End)
+    c.insertText(" ملاحظة مضافة باليد")
+    assert e.etat.text() == "تعديلات غير محفوظة"
+    e.enregistrer()
+    assert fichier_modifie(p).exists() and p.read_bytes() == avant and e.etat.text() == "نسخة معدَّلة محفوظة"
+    e2 = f.ouvrir_document(p)
+    assert "ملاحظة مضافة باليد" in e2.edit.toPlainText() and e2.b_original.isEnabled()
+    e2.revenir()
+    assert "ملاحظة مضافة باليد" not in e2.edit.toPlainText() and not fichier_modifie(p).exists()
+    # التنسيق
+    e2.edit.selectAll()
+    e2.gras()
+    e2.taille(+2)
+    assert e2.edit.fontWeight() > 400
+    # ملف للإرسال دون أي برنامج خارجي، بالاتجاه الصحيح للصفحة
+    pdf = e2.exporter_pdf(tmp_path / "وثيقة.pdf")
+    assert pdf.exists() and pdf.read_bytes()[:4] == b"%PDF" and pdf.stat().st_size > 1500
+    assert e2.imprimante(tmp_path / "x.pdf").pageLayout().orientation().name == "Portrait"
+    e2.ouvrir_externe()
+    assert externes == [p]
+    # وثيقة لا يفهمها المحرر: تُفتح خارجياً بدل رسالة خطأ
+    faux = tmp_path / "تالف.docx"
+    faux.write_bytes(b"ceci n'est pas un docx")
+    assert f.ouvrir_document(faux) is None and externes[-1] == faux
+    for x in f.editeurs:
+        x.close()
+    f.close()

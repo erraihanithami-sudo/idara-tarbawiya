@@ -394,6 +394,18 @@ def main(sortie: Path) -> None:
     photo(f, "64_cellules")
     f.aller_a("التحفيز والتهاني")
     photo(f, "65_tahfiz")
+    from idara.services import registres as _rg   # محرر الوثائق (2026-11-15)
+    try:
+        _rg.enregistrer(f.conn, "agents", {"nom": "عون تجريبي", "fonction": "الحراسة", "societe": "شركة وهمية",
+                                           "telephone": "0600000000", "horaire": "8:00 - 16:00"})
+        ed = f.ouvrir_document(_rg.generer(f.conn, f.dossier, "agents", "liste"))
+        if ed is not None:
+            app.processEvents()
+            photo(ed, "66_editeur")
+            ed.exporter_pdf(sortie / "66_editeur.pdf")
+            ed.close()
+    except Exception as e:  # noqa: BLE001
+        print("editeur:", repr(e))
     f.filtrer_nav("محضر")
     photo(f, "53_recherche_nav")
     f.filtrer_nav("")

@@ -255,7 +255,7 @@ class PageAssociations(QWidget):
         self.b_ouvrir.clicked.connect(lambda: self.ouvrir())
         self.b_export = QPushButton("تصدير السجلات (Excel)")
         self.b_export.clicked.connect(lambda: self.exporter())
-        self.b_registres = QPushButton("السجلات (Word)")
+        self.b_registres = QPushButton("السجلات")
         m = QMenu(self.b_registres)
         for k, (lib, n) in da.REGISTRES_DOC.items():
             m.addAction(f"{lib} (الملحق {n})", lambda k=k: self.generer_registre(k))

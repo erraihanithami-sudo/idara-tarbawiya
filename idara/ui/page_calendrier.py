@@ -67,7 +67,7 @@ class PageCalendrier(QWidget):
         b.clicked.connect(lambda: self.marquer_selection(self.t_stations, True))
         b2 = QPushButton("إلغاء التعليم")
         b2.clicked.connect(lambda: self.marquer_selection(self.t_stations, False))
-        self.b_programme = QPushButton("توليد برنامج العمل السنوي (Word)")
+        self.b_programme = QPushButton("توليد برنامج العمل السنوي")
         self.b_programme.setObjectName("principal")
         self.b_programme.clicked.connect(lambda: self.generer())
         for x in (b, b2, self.b_programme):

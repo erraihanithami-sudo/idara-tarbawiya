@@ -1001,6 +1001,23 @@ class FenetrePrincipale(QMainWindow):
             bloc.setVisible(o and bool(self.sous[k]))
             self.boutons[k].ouvrir(o)
 
+    def ouvrir_document(self, chemin):
+        """يفتح وثيقة Word في محرر البرنامج (تعديل وطبع مباشر). إن تعذر تحويلها تُفتح خارج البرنامج."""
+        from pathlib import Path
+
+        from idara.services import bureautique
+        from idara.ui.editeur import EditeurDocument
+        try:
+            e = EditeurDocument(Path(chemin), self)
+        except Exception:  # noqa: BLE001 — وثيقة لا يفهمها المحرر: لا نمنع المدير من فتحها
+            bureautique.ouvrir_externe(chemin)
+            return None
+        self.editeurs = [x for x in getattr(self, "editeurs", []) if x.isVisible()] + [e]
+        e.show()
+        e.raise_()
+        e.activateWindow()
+        return e
+
     def cliquer_section(self, i: int) -> None:
         """النقر على قسم: يفتح فروعه ويعرض رحبته؛ النقرة الثانية تطوي الفروع والصفحة تبقى."""
         if self.est_ouvert(i):

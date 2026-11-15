@@ -50,7 +50,7 @@ class PageParents(QWidget):
         self.recherche.textChanged.connect(lambda _: self.afficher())
         h.addWidget(self.classe)
         h.addWidget(self.recherche, 1)
-        b = QPushButton("لائحة أولياء الأمور (Word)")
+        b = QPushButton("لائحة أولياء الأمور")
         b.setToolTip("للقسم المختار، أو لكل الأقسام (صفحة لكل قسم)")
         b.clicked.connect(lambda: self.generer())
         h.addWidget(b)

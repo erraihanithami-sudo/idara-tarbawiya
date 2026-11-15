@@ -125,7 +125,7 @@ class PageInventaire(QWidget):
         self.total = QLabel()
         self.total.setObjectName("etiquette")
         h.addWidget(self.total, 1)
-        b = QPushButton("توليد سجل الجرد (Word)")
+        b = QPushButton("توليد سجل الجرد")
         b.setObjectName("principal")
         b.setToolTip("للنوع المختار في الفرز، أو لكل الأنواع")
         b.clicked.connect(lambda: self.generer())

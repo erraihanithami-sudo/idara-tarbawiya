@@ -234,7 +234,7 @@ def lister(conn: sqlite3.Connection, classe_id: int | None = None, texte: str = 
 
 
 def generer_liste(conn: sqlite3.Connection, dossier: DossierDonnees, classe_id: int | None = None) -> Path:
-    """لائحة أولياء الأمور (Word): ر.ت، التلميذ، رمز مسار، الولي، صلة القرابة، الهاتف، حسب القسم."""
+    """لائحة أولياء الأمور: ر.ت، التلميذ، رمز مسار، الولي، صلة القرابة، الهاتف، حسب القسم."""
     from idara.services.docs_association import _cellule, _nouveau, _ombre, para, saut_page, tableau
     from idara.services.soutien import _entete
     ls = lister(conn, classe_id)

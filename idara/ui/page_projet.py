@@ -129,11 +129,11 @@ class PageProjet(QWidget):
         # 5. التقارير
         c, v = carte("التقارير")
         h = QHBoxLayout()
-        b = QPushButton("وثيقة لوحة القيادة (Word)")
+        b = QPushButton("وثيقة لوحة القيادة")
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.generer_tableau_bord())
         h.addWidget(b)
-        for lib, final in (("التقرير التركيبي للإنجاز (Word)", False), ("حصيلة نهاية المشروع (Word)", True)):
+        for lib, final in (("التقرير التركيبي للإنجاز", False), ("حصيلة نهاية المشروع", True)):
             b = QPushButton(lib)
             b.clicked.connect(lambda _=False, fi=final: self.generer(fi))
             h.addWidget(b)

@@ -67,7 +67,7 @@ class PageDeliberations(QWidget):
         v.addWidget(self.table)
         h = QHBoxLayout()
         for lib, fn, principal in (("حفظ قرارات المجلس", lambda: self.enregistrer(), False),
-                                   ("قرار ومحضر مجلس القسم (Word)", lambda: self.generer_classe(), True)):
+                                   ("قرار ومحضر مجلس القسم", lambda: self.generer_classe(), True)):
             b = QPushButton(lib)
             if principal:
                 b.setObjectName("principal")
@@ -80,7 +80,7 @@ class PageDeliberations(QWidget):
         c, v = carte("محضر نتائج المستوى")
         for k, o in ev.ORDINAUX.items():
             self.niveau.addItem(o, k)
-        b = QPushButton("محضر نتائج المستوى (Word)")
+        b = QPushButton("محضر نتائج المستوى")
         b.clicked.connect(lambda: self.generer_niveau())
         v.addLayout(_grille([("المستوى", self.niveau)]))
         v.addWidget(b)

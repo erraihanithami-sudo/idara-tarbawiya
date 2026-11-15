@@ -2,7 +2,7 @@
 الشخصية، الحوادث المدرسية، خليتا اليقظة والإنصات، التحفيز والتهاني، الشراكات، الإعلانات، فريق قيادة المشروع.
 
 كل سجل = حقول + وثائق. الأسطر تُحفظ في fiche_json (مفتاح «reg:<السجل>:<السنة>»)، فلا جدول جديد لكل سجل.
-الوثائق تُبنى بالبرنامج. صياغاتها عامة (لا نماذج رسمية بين يدي): تُراجع في Word قبل التوقيع.
+الوثائق تُبنى بالبرنامج. صياغاتها عامة (لا نماذج رسمية بين يدي): تُراجع قبل التوقيع.
 لا نقط مكان المعطيات الناقصة: الحقل الفارغ لا يُطبع.
 """
 
@@ -94,7 +94,7 @@ REGISTRES: dict[str, Registre] = {r.cle: r for r in (
                                                    "إجراء فحص طبي مضاد"), requis=True),
               Champ("du", "من", "date"), Champ("au", "إلى", "date"),
               Champ("motif", "السبب أو التوضيح", "long")),
-             (Doc("demande", "الطلب (Word)", "طلب السطر المحدد، باسم الموظف(ة) ومعطياته.", "ligne"),
+             (Doc("demande", "الطلب", "طلب السطر المحدد، باسم الموظف(ة) ومعطياته.", "ligne"),
               Doc("suivi", "لائحة تتبع الطلبات", "كل الطلبات المسجلة هذه السنة."),
               Doc("fiche_personnelle", "الورقة الشخصية", "بطاقة المعطيات الإدارية للموظف(ة) المختار(ة).",
                   "personnel")),
@@ -168,7 +168,7 @@ REGISTRES: dict[str, Registre] = {r.cle: r for r in (
               Champ("destinataires", "الموجه إليهم", "choix", ("الأساتذة", "أولياء الأمور", "التلاميذ", "العموم"),
                     requis=True),
               Champ("texte", "نص الإعلان", "long", requis=True, colonne=False)),
-             (Doc("annonce", "الإعلان (Word)", "الإعلان المحدد، جاهز للتعليق أو التوزيع.", "ligne"),
+             (Doc("annonce", "الإعلان", "الإعلان المحدد، جاهز للتعليق أو التوزيع.", "ligne"),
               Doc("registre", "سجل الإعلانات", "كل إعلانات السنة.")),
              filtre="destinataires"),
     Registre("equipe", "فريق قيادة المشروع",
@@ -593,7 +593,7 @@ def _gen_fiche_personnelle(conn, dossier, r, doc, lignes, ligne, filtre, cible) 
     paires = [
         ("المؤسسة", etab.nom_ar if etab else ""), ("رمز المؤسسة", _ltr(etab.code_etab) if etab and etab.code_etab else ""),
         ("الاسم العائلي والشخصي", f"{p.nom_ar} {p.prenom_ar}".strip()),
-        ("Nom et prénom", _ltr(f"{p.nom_fr} {p.prenom_fr}".strip().upper()) if p.nom_fr or p.prenom_fr else ""),
+        ("الاسم بالحروف اللاتينية", _ltr(f"{p.nom_fr} {p.prenom_fr}".strip().upper()) if p.nom_fr or p.prenom_fr else ""),
         ("رقم التأجير", _ltr(p.ppr) if p.ppr else ""), ("رقم البطاقة الوطنية", _ltr(p.cin) if p.cin else ""),
         ("تاريخ الازدياد", dt(p.date_naissance)), ("الجنس", {"M": "ذكر", "F": "أنثى"}.get(p.sexe, "")),
         ("تاريخ التوظيف", dt(p.date_recrutement)), ("الإطار الحالي", rh.cadre_accorde(p.cadre, p.sexe) if p.cadre else ""),

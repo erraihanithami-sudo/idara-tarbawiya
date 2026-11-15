@@ -120,6 +120,8 @@ def main() -> int:
 
     def ouvrir_principale(dossier: DossierDonnees) -> None:
         f = FenetrePrincipale(dossier)
+        from idara.services import bureautique
+        bureautique.ouvreur = f.ouvrir_document   # كل وثيقة مولَّدة تُفتح في محرر البرنامج
         f.reinitialisation.connect(ouvrir_assistant)   # بعد التصفير: مساعد الإعداد الأول
         fenetres["principale"] = f
         f.showMaximized()

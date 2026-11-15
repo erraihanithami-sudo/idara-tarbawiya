@@ -116,7 +116,7 @@ class PageFa(QWidget):
         for c in self.cartes.values():
             racine.addWidget(c)
         h = QHBoxLayout()
-        b = QPushButton("توليد محضر الفائض + توقيعات الأساتذة (Word)")
+        b = QPushButton("توليد محضر الفائض + توقيعات الأساتذة")
         b.setObjectName("principal")
         b.setToolTip("الصفحة الأولى: المحضر والترتيب والنتيجة؛ الصفحة الثانية: توقيعات الأساتذة العاملين بعد الاطلاع.")
         b.clicked.connect(lambda: self.generer_pv())

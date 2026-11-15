@@ -176,8 +176,8 @@ class PageSoutien(QWidget):
         self.prof_registre = QComboBox()
         v.addLayout(_grille([("سجل الدعم للأستاذ(ة)", self.prof_registre)]))
         h = QHBoxLayout()
-        for lib, fn in (("سجل الدعم (Word)", self.generer_registre), ("برنامج الدعم (Word)", self.generer_programme),
-                        ("تقرير المرحلة (Word)", self.generer_rapport)):
+        for lib, fn in (("سجل الدعم", self.generer_registre), ("برنامج الدعم", self.generer_programme),
+                        ("تقرير المرحلة", self.generer_rapport)):
             b = QPushButton(lib)
             b.clicked.connect(lambda _=False, fn=fn: fn())
             h.addWidget(b)

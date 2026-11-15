@@ -93,7 +93,7 @@ class PageSabboura(QWidget):
                                 "يدوياً، وتُطبع لوحة لوحة أو كاملة.")
         self.setLayout(racine)
         h = QHBoxLayout()
-        b = QPushButton("توليد السبورة كاملة (Word)")
+        b = QPushButton("توليد السبورة كاملة")
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.generer(tout=True))
         h.addWidget(b)
@@ -132,7 +132,7 @@ class PageSabboura(QWidget):
         self.b_actualiser = QPushButton("تحديث من البرنامج")
         self.b_actualiser.setToolTip("يعيد ما يأتي من البرنامج ويحتفظ بما أدخلتموه يدوياً")
         self.b_actualiser.clicked.connect(self.actualiser)
-        b_gen = QPushButton("توليد هذه اللوحة (Word)")
+        b_gen = QPushButton("توليد هذه اللوحة")
         b_gen.clicked.connect(lambda: self.generer())
         for w in (self.b_enr, self.b_ajouter, self.b_supprimer, self.b_actualiser, b_gen):
             h.addWidget(w)

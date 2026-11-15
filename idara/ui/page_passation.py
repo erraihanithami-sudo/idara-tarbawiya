@@ -47,7 +47,7 @@ class PagePassation(QWidget):
             g.addWidget(w, 1, j)
         v.addLayout(g)
         h = QHBoxLayout()
-        self.b_generer = QPushButton("توليد المحضر (Word)")
+        self.b_generer = QPushButton("توليد المحضر")
         self.b_generer.setObjectName("principal")
         self.b_generer.clicked.connect(lambda: self.generer())
         h.addWidget(self.b_generer)

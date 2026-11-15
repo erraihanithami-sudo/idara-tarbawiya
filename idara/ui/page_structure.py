@@ -52,7 +52,7 @@ class PageStructure(QWidget):
         self.b_suppr.clicked.connect(lambda: self.supprimer())
         h.addWidget(self.b_suppr)
         h.addStretch()
-        b = QPushButton("توليد وثيقة البنية المادية (Word)")
+        b = QPushButton("توليد وثيقة البنية المادية")
         b.clicked.connect(lambda: self.generer())
         h.addWidget(b)
         v.addLayout(h)

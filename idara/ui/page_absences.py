@@ -68,7 +68,7 @@ class PageAbsences(QWidget):
         b = QPushButton("حفظ نسب الشهر")
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer())
-        self.b_rapport = QPushButton("توليد التقرير الشهري (Word)")
+        self.b_rapport = QPushButton("توليد التقرير الشهري")
         self.b_rapport.clicked.connect(lambda: self.generer())
         h.addWidget(b)
         h.addWidget(self.b_rapport)

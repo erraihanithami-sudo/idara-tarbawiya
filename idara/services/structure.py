@@ -134,7 +134,7 @@ def pour_passation(conn: sqlite3.Connection) -> list[list[str]]:
 
 
 def generer(conn: sqlite3.Connection, dossier: DossierDonnees) -> Path:
-    """وثيقة البنية المادية للمؤسسة (Word)."""
+    """وثيقة البنية المادية للمؤسسة."""
     from idara.services.docs_association import _cellule, _nouveau, _ombre, para, tableau as tab
     from idara.services.soutien import _entete, _signature
     if not saisi(conn):

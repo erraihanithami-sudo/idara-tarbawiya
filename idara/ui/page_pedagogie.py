@@ -315,7 +315,7 @@ class PageVieScolaire(QWidget):
         for lib, fn in (("تسجيل نادٍ جديد", lambda: self.enregistrer_club(True)),
                         ("حفظ التعديل", lambda: self.enregistrer_club(False)),
                         ("حذف النادي", lambda: self.supprimer_club()),
-                        ("لائحة الأعضاء (Word)", lambda: self.liste_club())):
+                        ("لائحة الأعضاء", lambda: self.liste_club())):
             b = bouton(lib)
             b.clicked.connect(fn)
             h.addWidget(b)
@@ -346,8 +346,8 @@ class PageVieScolaire(QWidget):
         # ---- الأنشطة ----
         c, v = carte("البرنامج السنوي للأنشطة وإنجازها")
         h = QHBoxLayout()
-        for lib, fn in (("البرنامج السنوي (Word)", lambda: self.document("programme")),
-                        ("حصيلة الأنشطة (Word)", lambda: self.document("bilan"))):
+        for lib, fn in (("البرنامج السنوي", lambda: self.document("programme")),
+                        ("حصيلة الأنشطة", lambda: self.document("bilan"))):
             b = bouton(lib)
             b.setObjectName("principal")
             b.clicked.connect(fn)
@@ -612,7 +612,7 @@ class PageRiyada(QWidget):
         h = QHBoxLayout()
         for lib, fn, prin in (("تحميل ملف النتائج (Excel)", lambda: self.choisir_resultats(), True),
                               ("حفظ الأعداد", lambda: self.enregistrer_comptes(), False),
-                              ("تقرير المؤشر وتحديد الهدف (Word)", lambda: self.rapport_isa(), True)):
+                              ("تقرير المؤشر وتحديد الهدف", lambda: self.rapport_isa(), True)):
             b = QPushButton(lib)
             if prin:
                 b.setObjectName("principal")
@@ -679,7 +679,7 @@ class PageRiyada(QWidget):
         self.felicit.setChecked(True)
         v.addWidget(self.felicit)
         h = QHBoxLayout()
-        b = QPushButton("توليد المراسلات (Word)")
+        b = QPushButton("توليد المراسلات")
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.lettres())
         h.addWidget(b)
@@ -716,8 +716,8 @@ class PageRiyada(QWidget):
         v.addWidget(self.pieces)
         h = QHBoxLayout()
         for lib, fn, prin in (("حفظ الملف", lambda: self.enregistrer_dossier(), False),
-                              ("ملف الشارة (Word)", lambda: self.document("dossier"), True),
-                              ("لائحة التلاميذ ذوي الصعوبات (Word)", lambda: self.document("difficultes"), True)):
+                              ("ملف الشارة", lambda: self.document("dossier"), True),
+                              ("لائحة التلاميذ ذوي الصعوبات", lambda: self.document("difficultes"), True)):
             b = bouton(lib)
             if prin:
                 b.setObjectName("principal")
@@ -733,7 +733,7 @@ class PageRiyada(QWidget):
         self.obs.setFixedHeight(80)
         v.addWidget(self.obs)
         h = QHBoxLayout()
-        b = QPushButton("توليد التقرير التركيبي (Word)")
+        b = QPushButton("توليد التقرير التركيبي")
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.document("synthese"))
         h.addWidget(b)

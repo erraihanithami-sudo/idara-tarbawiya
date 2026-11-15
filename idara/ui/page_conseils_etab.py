@@ -128,8 +128,8 @@ class PageConseilsEtab(QWidget):
         for lib, fn, p in (("تسجيل اجتماع جديد", lambda: self.enregistrer(True), False),
                            ("حفظ التعديل", lambda: self.enregistrer(False), False),
                            ("حذف الاجتماع", lambda: self.supprimer(), False),
-                           ("المحضر (Word)", lambda: self.pv(), True),
-                           ("استدعاء الأعضاء (Word)", lambda: self.convocation(), True)):
+                           ("المحضر", lambda: self.pv(), True),
+                           ("استدعاء الأعضاء", lambda: self.convocation(), True)):
             b = bouton(lib)
             if p:
                 b.setObjectName("principal")

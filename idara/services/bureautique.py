@@ -17,9 +17,33 @@ class ErreurBureautique(RuntimeError):
     pass
 
 
+# دالة يسجلها البرنامج عند تشغيله لفتح وثائق Word في محرره الداخلي (2026-11-15). None: الفتح خارجي دائماً
+ouvreur = None
+
+
+def finir(chemin: Path) -> None:
+    """يحذف علامات الاتجاه التي كانت تظهر «LRI/PDI» في Word. لا يفشل الفتح بسببه."""
+    from idara.services import finition
+    try:
+        finition.nettoyer_marques(Path(chemin))
+    except Exception:  # noqa: BLE001, S110 — ملف مفتوح في Word أو تالف: يُفتح كما هو
+        pass
+
+
 def ouvrir(chemin: Path) -> None:
-    """يفتح الملف بالبرنامج المرتبط به (Word للوثائق)."""
+    """يفتح الوثيقة في محرر البرنامج إن سُجّل، وإلا بالبرنامج المرتبط بها على الحاسوب."""
     chemin = Path(chemin)
+    if ouvreur is not None and chemin.suffix.lower() == ".docx":
+        finir(chemin)
+        ouvreur(chemin)
+        return
+    ouvrir_externe(chemin)
+
+
+def ouvrir_externe(chemin: Path) -> None:
+    """يفتح الملف بالبرنامج المرتبط به على الحاسوب (لتعديل القوالب، ولما لا يفهمه المحرر)."""
+    chemin = Path(chemin)
+    finir(chemin)
     if sys.platform == "win32":
         os.startfile(str(chemin))  # noqa: S606
     else:
@@ -53,6 +77,7 @@ def word_disponible() -> bool:
 
 def convertir_pdf(docx: Path, pdf: Path | None = None) -> Path:
     docx = Path(docx).resolve()
+    finir(docx)
     pdf = Path(pdf).resolve() if pdf else docx.with_suffix(".pdf")
     word = _word()
     try:
@@ -71,6 +96,7 @@ def convertir_pdf(docx: Path, pdf: Path | None = None) -> Path:
 
 
 def imprimer(docx: Path, copies: int = 1) -> None:
+    finir(docx)
     word = _word()
     try:
         doc = word.Documents.Open(str(Path(docx).resolve()), ReadOnly=True, AddToRecentFiles=False)

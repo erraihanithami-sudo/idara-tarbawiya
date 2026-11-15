@@ -194,7 +194,7 @@ def par_mois(liste: list[Station]) -> list[tuple[str, list[Station]]]:
 
 
 def generer_programme(conn: sqlite3.Connection, dossier) -> Path:
-    """برنامج العمل السنوي (Word): المحطات الوزارية والمحلية مرتبة حسب الأشهر. نموذج من إعداد التطبيق، لا نموذج
+    """برنامج العمل السنوي: المحطات الوزارية والمحلية مرتبة حسب الأشهر. نموذج من إعداد التطبيق، لا نموذج
     رسمي مفترض."""
     from idara.services import etablissement as etab_srv
     from idara.services.docs_association import _cellule, _nouveau, _ombre, para, tableau

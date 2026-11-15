@@ -175,7 +175,11 @@ class PageDocuments(QWidget):
         return chemin
 
     def modifier(self, code: str) -> None:
-        self._ouvrir(dc.chemin_modele(self.f.dossier, code))
+        try:   # القالب يُعدَّل ببرنامج الحاسوب، لا بمحرر البرنامج
+            bureautique.ouvrir_externe(dc.chemin_modele(self.f.dossier, code))
+        except OSError as e:
+            self._message(f"تعذر فتح الملف: {e}", erreur=True)
+            return
         self._message("بعد الحفظ في Word وإغلاق الملف، عُد إلى هذه الصفحة لتحديث حالة القالب.")
 
     def importer(self, code: str) -> None:

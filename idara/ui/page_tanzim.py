@@ -73,7 +73,7 @@ class PageTanzim(QWidget):
         self.l_manquants.setObjectName("erreur")
         self.l_manquants.setWordWrap(True)
         v.addWidget(self.l_manquants)
-        self.b_generer = QPushButton("توليد وثيقة التنظيم التربوي (Word)")
+        self.b_generer = QPushButton("توليد وثيقة التنظيم التربوي")
         self.b_generer.setObjectName("principal")
         self.b_generer.clicked.connect(lambda: self.generer())
         v.addWidget(self.b_generer)
