@@ -2067,9 +2067,12 @@ def test_editeur_de_documents(app, config_tmp, monkeypatch, tmp_path):
     assert "ملاحظة مضافة باليد" not in e2.edit.toPlainText() and not fichier_modifie(p).exists()
     # التنسيق
     e2.edit.selectAll()
-    e2.gras()
+    poids = int(e2.edit.fontWeight())
+    e2.gras()   # يبدّل: الغامق يصير عادياً والعكس
+    assert (int(e2.edit.fontWeight()) > 400) != (poids > 400)
     e2.taille(+2)
-    assert e2.edit.fontWeight() > 400
+    e2.souligner()
+    assert e2.edit.fontUnderline()
     # ملف للإرسال دون أي برنامج خارجي، بالاتجاه الصحيح للصفحة
     pdf = e2.exporter_pdf(tmp_path / "وثيقة.pdf")
     assert pdf.exists() and pdf.read_bytes()[:4] == b"%PDF" and pdf.stat().st_size > 1500

@@ -377,10 +377,10 @@ def _tableau_liste(d, r: Registre, lignes: list[dict], cles: tuple = (), largeur
     from idara.services.soutien import _table
     champs = [r.champ(k) for k in cles] if cles else [c for c in r.champs if c.colonne]
     poids = [_POIDS.get(c.type, 2.0) for c in champs]
-    dispo = largeur - 1.0
+    dispo = largeur - 1.3
     _table(d, ["ر.ت", *[c.libelle for c in champs]],
            [[str(i), *[afficher(c, l.get(c.cle)) for c in champs]] for i, l in enumerate(lignes, 1)],
-           [1.0] + [round(dispo * p / sum(poids), 2) for p in poids], taille=taille)
+           [1.3] + [round(dispo * p / sum(poids), 2) for p in poids], taille=taille)
 
 
 def _tableau_fiche(d, r: Registre, l: dict, sauf: tuple = ()) -> None:
