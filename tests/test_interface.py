@@ -1062,6 +1062,30 @@ def test_page_fiche_eleve(app, config_tmp, monkeypatch):
     f.close()
 
 
+def test_page_dossier_prof(app, config_tmp, monkeypatch):
+    """طلب ملف أستاذ وإرساله من صفحة الموارد البشرية. أسماء وهمية."""
+    from idara.services import bureautique
+    from idara.services import conges as cg
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("ملفات الأساتذة")
+    p = f.page_dossier_prof
+    assert not p.rappel.isHidden()
+    assert p.generer() is None and "المؤسسة المرسل إليها" in p.message.text()
+    p.cible.setText("مدرسة وهمية")
+    assert p.generer() is None and "أستاذاً واحداً" in p.message.text()
+    p.ajouter("أستاذة تجريبية", "1234567", "")
+    n = cg.prochain_numero(f.conn)
+    assert p.generer() and len(ouverts) == 1 and cg.prochain_numero(f.conn) == n + 1
+    p.sens.setCurrentIndex(p.sens.findData("envoi"))
+    assert p.rappel.isHidden()
+    p.table.setCurrentCell(0, 0)
+    p.supprimer()
+    assert p.table.rowCount() == 0
+    f.close()
+
+
 def test_bouton_ouvrir_exercice(app, config_tmp, monkeypatch):
     """النقر على «فتح سنة مالية جديدة» (لا الاستدعاء المباشر): زر Qt يمرر checked=False."""
     from PySide6.QtWidgets import QDialog
