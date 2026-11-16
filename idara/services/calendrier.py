@@ -186,6 +186,38 @@ def vacances(conn: sqlite3.Connection) -> list[Station]:
     return [s for s in stations(conn, inclure_locales=False) if s.type == "conge"]
 
 
+def jours_etude_mois(conn: sqlite3.Connection, mois: str) -> tuple[int, list[str]]:
+    """أيام الدراسة في شهر «YYYY-MM» انطلاقاً من لائحة العطل (طلب المدير 2026-11-15).
+
+    أيام الشهر بين الانطلاق الفعلي للدراسة ونهايتها بالسلك الابتدائي، ناقص أيام الأحد والعطل البينية والأعياد
+    (المقرر الوزاري، ويدخل فيها ما سجله المدير محلياً بنوع «عطلة» أو «عيد»). السبت يوم دراسة.
+    يرجع (العدد، أسماء العطل المحتسبة).
+    """
+    y, m = (int(x) for x in mois.split("-"))
+    debut, fin = date(y, m, 1), (date(y + (m == 12), m % 12 + 1, 1) - timedelta(days=1))
+    toutes = stations(conn)
+    rentree = [s.debut for s in toutes if s.type == "rentree" and "الفعلي" in s.titre]
+    fins = [s.debut for s in toutes if s.type == "fin" and "الابتدائي" in s.titre]
+    if rentree:
+        debut = max(debut, rentree[0])
+    if fins:
+        fin = min(fin, fins[0])
+    if debut > fin:
+        return 0, []
+    feries = [s for s in toutes if s.type in ("conge", "fete")]
+    n, motifs = 0, []
+    jour = debut
+    while jour <= fin:
+        if jour.weekday() != 6:
+            s = next((x for x in feries if x.debut <= jour <= x.fin), None)
+            if s is None:
+                n += 1
+            elif s.titre not in motifs:
+                motifs.append(s.titre)
+        jour += timedelta(days=1)
+    return n, motifs
+
+
 def par_mois(liste: list[Station]) -> list[tuple[str, list[Station]]]:
     res: dict[tuple[int, int], list[Station]] = {}
     for s in liste:

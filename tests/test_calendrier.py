@@ -69,3 +69,15 @@ def test_programme_annuel(base, dossier):  # noqa: F811
     assert "برنامج العمل السنوي برسم السنة الدراسية 2026/2027" in entete and "047.26" in entete
     assert "الامتحان الموحد الإقليمي لنيل شهادة الدروس الابتدائية" in texte and "حفل نهاية السنة" in texte
     assert "شتنبر 2026" in entete and "يوليوز 2027" in entete
+
+
+def test_jours_etude_depuis_les_vacances(base):  # noqa: F811
+    """طلب المدير 2026-11-15: عدد أيام الدراسة من لائحة العطل (الأحد والعطل البينية والأعياد لا تُحتسب)."""
+    from idara.services import calendrier as cal
+    n, motifs = cal.jours_etude_mois(base, "2026-11")
+    assert n == 23 and motifs == ["ذكرى المسيرة الخضراء", "عيد الاستقلال"]   # 30 − 5 آحاد − عيدان
+    n, motifs = cal.jours_etude_mois(base, "2026-09")
+    assert n == 21 and motifs == []    # من الانطلاق الفعلي (7 شتنبر) إلى 30 شتنبر دون الآحاد
+    n, motifs = cal.jours_etude_mois(base, "2026-10")
+    assert "الفترة البينية الأولى" in motifs and "عيد الوحدة" in motifs and n == 27 - 6 - 1
+    assert cal.jours_etude_mois(base, "2027-07") == (0, [])   # بعد نهاية الدراسة

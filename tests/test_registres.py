@@ -35,8 +35,7 @@ def test_saisie_validation_et_filtre(base):  # noqa: F811
     rg.enregistrer(base, "agents", {"nom": "عون معدَّل", "fonction": "الحراسة"}, a)
     assert rg.lire(base, "agents", a)["nom"] == "عون معدَّل" and rg.lire(base, "agents", a)["societe"] == ""
     assert rg.propositions(base, rg.registre("suivi_agents").champ("agent")) == ["عون معدَّل", "عونة تجريبية"]
-    with pytest.raises(rg.ErreurRegistre, match="عدداً"):
-        rg.enregistrer(base, "suivi_agents", {"mois": "نونبر", "agent": "عون معدَّل", "absences": "اثنان"})
+    assert "absences" not in [c.cle for c in rg.registre("suivi_agents").champs]   # لا تتبع لحضور الأعوان
     with pytest.raises(rg.ErreurRegistre, match="تاريخ غير صحيح"):
         rg.enregistrer(base, "annonces", {"date": "2026-13-40", "titre": "ع", "destinataires": "العموم", "texte": "ن"})
     with pytest.raises(rg.ErreurRegistre, match="قبل تاريخ البداية"):
@@ -55,9 +54,9 @@ def test_documents(base, dossier):  # noqa: F811
     rg.enregistrer(base, "agents", {"nom": "عون تجريبي", "fonction": "الحراسة", "horaire": "8:00 - 16:00"})
     c, t = _lire(rg.generer(base, dossier, "agents", "service"))
     assert "عون تجريبي" in c and "توقيت العمل" in c and "الشركة المشغلة" not in c and "جدول الخدمة" in t
-    rg.enregistrer(base, "suivi_agents", {"mois": "نونبر", "agent": "عون تجريبي", "absences": "2", "appreciation": "جيد"})
+    rg.enregistrer(base, "suivi_agents", {"mois": "نونبر", "agent": "عون تجريبي", "appreciation": "جيد"})
     c, t = _lire(rg.generer(base, dossier, "suivi_agents", "bilan", filtre="نونبر"))
-    assert "2" in c and "نونبر" in t
+    assert "جيد" in c and "نونبر" in t and "أيام الغياب" not in c
     with pytest.raises(rg.ErreurRegistre, match="لا أسطر"):
         rg.generer(base, dossier, "suivi_agents", "bilan", filtre="ماي")
     # حادثة مدرسية: التصريح لا يطبع الحقول الفارغة

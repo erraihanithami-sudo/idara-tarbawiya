@@ -5,9 +5,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
 from PySide6.QtGui import QColor, QImage
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDoubleSpinBox, QGridLayout, QHBoxLayout, QPushButton,
-                               QTableWidgetItem,
-                               QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDoubleSpinBox, QGridLayout, QHBoxLayout, QLabel,
+                               QPushButton, QTableWidgetItem, QWidget)
 
 from idara.services import absences as ab
 from idara.services import bureautique
@@ -59,7 +58,18 @@ class PageAbsences(QWidget):
         self.jours.setSingleStep(0.5)
         self.jours.setSpecialValueText("غير محدد")
         self.jours.setSuffix(" يوماً")
-        v.addLayout(_grille([("الشهر", self.mois), ("أيام الدراسة الفعلية (اختياري)", self.jours)]))
+        v.addLayout(_grille([("الشهر", self.mois), ("أيام الدراسة الفعلية", self.jours)]))
+        # 2026-11-15: العدد يُحسب من لائحة العطل (الأحد والعطل البينية والأعياد لا تُحتسب)، ويبقى قابلاً للتعديل
+        h = QHBoxLayout()
+        b = QPushButton("احتساب من لائحة العطل")
+        b.setToolTip("أيام الشهر بين انطلاق الدراسة ونهايتها، ناقص الآحاد والعطل والأعياد المسجلة في برنامج العمل")
+        b.clicked.connect(lambda: self.calculer_jours())
+        h.addWidget(b)
+        self.l_jours = QLabel()
+        self.l_jours.setObjectName("etiquette")
+        self.l_jours.setWordWrap(True)
+        h.addWidget(self.l_jours, 1)
+        v.addLayout(h)
         self.table = tableau(["الوحدة", "القسم", "عدد التلاميذ", "نسبة الحضور %"], etirer=1)
         self.table.setEditTriggers(QAbstractItemView.AllEditTriggers)
         self.table.setMinimumHeight(360)
@@ -107,13 +117,33 @@ class PageAbsences(QWidget):
         self.mois.blockSignals(False)
         self.afficher()
 
+    def calculer_jours(self) -> int | None:
+        from idara.services import calendrier as cal
+        m = self.mois.currentData()
+        if not m:
+            return None
+        try:
+            n, motifs = cal.jours_etude_mois(self.f.conn, m)
+        except cal.ErreurCalendrier as e:
+            self.l_jours.setText(str(e))
+            return None
+        self.jours.setValue(n)
+        self.l_jours.setText("محسوب من لائحة العطل" + (f" (دون: {'، '.join(motifs)})" if motifs else "")
+                             + ". يُحفظ مع نسب الشهر.")
+        return n
+
     def afficher(self) -> None:
         m = self.mois.currentData()
         if not m:
             return
         self.groupe = etab_srv.est_groupe(self.f.conn)
         self.table.setColumnHidden(0, not self.groupe)
-        self.jours.setValue(ab.jours_etude(self.f.conn, m) or 0)
+        enregistre = ab.jours_etude(self.f.conn, m)
+        if enregistre:
+            self.jours.setValue(enregistre)
+            self.l_jours.setText("العدد المحفوظ لهذا الشهر.")
+        else:
+            self.calculer_jours()
         self.lignes = ab.lignes(self.f.conn, m)
         self.table.setRowCount(len(self.lignes))
         for i, x in enumerate(self.lignes):

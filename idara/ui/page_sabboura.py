@@ -8,7 +8,6 @@ from PySide6.QtGui import QColor, QFont, QImage, QLinearGradient, QPainter, QPai
 from PySide6.QtWidgets import (QAbstractItemView, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
                                QListWidgetItem, QPushButton, QTableWidgetItem, QVBoxLayout, QWidget)
 
-from idara import marque
 from idara.services import bureautique
 from idara.services import sabboura as sb
 from idara.ui import theme
@@ -19,7 +18,7 @@ from idara.ui.saisie import TableauRapide, message
 
 
 def ruban_png(titre: str, largeur: int = 1300, hauteur: int = 230) -> bytes:
-    """شريط العنوان كما في النموذج: شريط برتقالي مستدير، وعلى يمينه دائرة بيضاء فيها رمز البرنامج، والعنوان بخط عريض."""
+    """شريط العنوان كما في النموذج: شريط برتقالي مستدير، وعلى يمينه دائرة بيضاء فيها نجمة زليج، والعنوان بخط عريض."""
     img = QImage(largeur, hauteur, QImage.Format_ARGB32)
     img.fill(Qt.transparent)
     p = QPainter(img)
@@ -46,16 +45,15 @@ def ruban_png(titre: str, largeur: int = 1300, hauteur: int = 230) -> bytes:
     p.drawEllipse(centre, r * 0.86, r * 0.86)
     p.setBrush(QColor("white"))
     p.drawEllipse(centre, r * 0.78, r * 0.78)
-    cote = r * 1.1
-    k = cote / marque.COTE
-    x0, y0 = centre.x() - cote / 2, centre.y() - cote / 2
-    for nature, couleur, geo in marque.formes(False):
-        p.setBrush(QColor(couleur))
-        if nature in ("tuile", "rect"):
-            a, b, c, d, rr = geo
-            p.drawRoundedRect(QRectF(x0 + a * k, y0 + b * k, (c - a) * k, (d - b) * k), rr * k, rr * k)
-        else:
-            p.drawPolygon(QPolygonF([QPointF(x0 + x * k, y0 + y * k) for x, y in geo]))
+    # نجمة زليج داخل الدائرة: الوثائق المولّدة لا تحمل أيقونة البرنامج (توجيهات المدير 2026-11-15)
+    import math
+    etoile = [QPointF(centre.x() + (r * 0.5 if k % 2 == 0 else r * 0.38) * math.cos(math.pi / 8 + k * math.pi / 8),
+                      centre.y() + (r * 0.5 if k % 2 == 0 else r * 0.38) * math.sin(math.pi / 8 + k * math.pi / 8))
+              for k in range(16)]
+    p.setBrush(QColor("#F08A00"))
+    p.drawPolygon(QPolygonF(etoile))
+    p.setBrush(QColor("white"))
+    p.drawEllipse(centre, r * 0.14, r * 0.14)
     # العنوان
     f = QFont(theme.police_titres() or "Arial")
     f.setPixelSize(int(bande.height() * 0.48))

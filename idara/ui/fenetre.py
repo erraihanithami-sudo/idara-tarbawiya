@@ -750,7 +750,7 @@ class FenetrePrincipale(QMainWindow):
             self, "طلبات الموظفين والورقة الشخصية", "الطلبات التي لا يغطيها ملف «الرخص»، والورقة الشخصية لكل "
             "موظف(ة). صياغة الطلبات عامة: راجعها في Word قبل التوقيع.", ["demandes"], cs["الموارد البشرية"])
         self.page_agents = PageRegistres(
-            self, "أعوان الحراسة والنظافة", "بطاقات الأعوان والشركات المشغلة، ثم الحصيلة الشهرية وتقييم الخدمة.",
+            self, "أعوان الحراسة والنظافة", "بطاقات الأعوان والشركات المشغلة، وجدول الخدمة، وتقييم الخدمة الشهري.",
             ["agents", "suivi_agents"], cs["الموارد البشرية"])
         self.page_cellules = PageRegistres(
             self, "خليتا اليقظة والإنصات", "تركيبة الخليتين، اجتماعاتهما، والحالات المرصودة وما اتُّخذ فيها.",
@@ -855,8 +855,11 @@ class FenetrePrincipale(QMainWindow):
         self.nom_etab = QLabel()
         self.nom_etab.setObjectName("navSous")
         self.nom_etab.setWordWrap(True)
+        self.l_conception = QLabel(marque.CONCEPTION)
+        self.l_conception.setObjectName("navConception")
         noms.addWidget(a)
         noms.addWidget(s)
+        noms.addWidget(self.l_conception)
         noms.addWidget(self.nom_etab)
         tete.addLayout(noms, 1)
         v.addLayout(tete)
@@ -956,7 +959,7 @@ class FenetrePrincipale(QMainWindow):
         v.addWidget(defil, 1)
 
         bas = FondZellige()
-        bas.setMinimumHeight(110)
+        bas.setMinimumHeight(130)
         bv = QVBoxLayout(bas)
         bv.setContentsMargins(24, 16, 24, 16)
         self.etat_sauvegarde = QLabel()
@@ -965,6 +968,11 @@ class FenetrePrincipale(QMainWindow):
         b = QPushButton("نسخ إلى قرص خارجي")
         b.clicked.connect(self.exporter)
         bv.addWidget(b)
+        self.l_droits = QLabel(f"{marque.DROITS}  ·  الإصدار ⁦{__version__}⁩")
+        self.l_droits.setObjectName("navDroits")
+        self.l_droits.setAlignment(Qt.AlignHCenter)
+        self.l_droits.setWordWrap(True)
+        bv.addWidget(self.l_droits)
         v.addWidget(bas)
         self.rafraichir_entete()
         return barre

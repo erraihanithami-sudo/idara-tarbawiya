@@ -135,6 +135,8 @@ QScrollArea#defilNav QScrollBar::add-page:vertical, QScrollArea#defilNav QScroll
     background: transparent; }}
 #navTitre {{ color: {NAV_TEXTE}; font-weight: 700; font-size: 12.5pt; background: transparent; }}
 #navSous {{ color: {NAV_TEXTE2}; font-size: 9pt; background: transparent; }}
+#navConception {{ color: {NAV_TEXTE}; font-size: 8.5pt; font-weight: 600; background: transparent; padding-top: 2px; }}
+#navDroits {{ color: {NAV_TEXTE2}; font-size: 8pt; background: transparent; padding-top: 4px; }}
 #badge {{ background: {BADGE_FOND}; color: {BADGE_TEXTE}; border-radius: 9px; padding: 1px 8px;
     font-size: 8.5pt; font-weight: 600; }}
 QPushButton#boutonAnnee {{ background: {BADGE_FOND}; color: {BADGE_TEXTE}; border: 0; border-radius: 12px;
