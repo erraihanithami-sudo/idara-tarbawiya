@@ -210,6 +210,35 @@ class PageTableauBord(QWidget):
             cv.addLayout(ligne)
         self.v.addWidget(c)
 
+    def _garde(self) -> None:
+        """حراسة اليوم: المناطق والأساتذة المكلفون (توجيه المدير 2026-11-15). لا تظهر إن لم يُملأ الجدول."""
+        from idara.services import garde as gd
+        try:
+            j = gd.du_jour(self.f.conn)
+        except Exception:  # noqa: BLE001
+            return
+        self.garde_jour = j
+        if not j["lignes"] or not any(n for _, n in j["lignes"]):
+            return
+        c, cv = carte("حراسة اليوم" + (f" · الأسبوع {j['semaine']} من الدورة" if j["semaine"] else ""))
+        g = QGridLayout()
+        g.setHorizontalSpacing(24)
+        for k, (zone, nom) in enumerate(j["lignes"]):
+            z = QLabel(zone)
+            z.setObjectName("etiquette")
+            n = QLabel(nom or "غير محدد")
+            n.setStyleSheet("font-weight:600;")
+            g.addWidget(z, (k // 2), (k % 2) * 2)
+            g.addWidget(n, (k // 2), (k % 2) * 2 + 1)
+        cv.addLayout(g)
+        h = QHBoxLayout()
+        b = QPushButton("جدول الحراسة")
+        b.clicked.connect(lambda: self.f.aller_a("جدول الحراسة"))
+        h.addWidget(b)
+        h.addStretch()
+        cv.addLayout(h)
+        self.v.addWidget(c)
+
     def _rappels(self) -> None:
         """التذكيرات بمحطات المقرر الوزاري والمؤسسة (اقتراح المدير 2026-11-03)."""
         try:
@@ -290,6 +319,7 @@ class PageTableauBord(QWidget):
         self.v.addLayout(grille)
 
         self._aujourdhui()
+        self._garde()
         self._rappels()
         self._jauges(ind)
         # التوزيع حسب القسم
@@ -658,7 +688,7 @@ MOTS_CLES = {"بطاقة التلميذ": "مسار تطور مستوى رائز
              "أولياء الأمور": "ولي الأب الأم هاتف وصاية آباء",
              "السبورة المرجعية": "سبورة لوحات بطاقة معلومات المؤسسة خلايا يقظة إنصات استعمال الزمن الجماعي",
              "الوثائق القانونية للجمعيات": "تجديد المكتب جمع عام محضر تصريح آباء نجاح رياضية تعاونية",
-             "جدول الحراسة": "حراسة استراحة دخول خروج", "النقل المدرسي": "حافلة سائق دوار نقل",
+             "جدول الحراسة": "حراسة استراحة دخول خروج منطقة مناطق مذكرة داخلية اليوم", "النقل المدرسي": "حافلة سائق دوار نقل",
              "استعمالات الزمن": "جدول الحصص حصيص مواد توقيت استعمال الزمن",
              "الصحة والسلامة": "حادثة حوادث مدرسية تصريح تأمين إصابة",
              "طلبات الموظفين": "إذن بالتغيب أبوة زواج فحص طبي مضاد ورقة شخصية",

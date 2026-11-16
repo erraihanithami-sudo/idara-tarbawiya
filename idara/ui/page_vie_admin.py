@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QPlainTextEdit, QPushButton, QTableWidgetItem, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel,
+                               QLineEdit, QPlainTextEdit, QPushButton, QSpinBox, QStyledItemDelegate,
+                               QTableWidgetItem, QWidget)
 
 from idara.services import bureautique
+from idara.services import garde as gd
+from idara.services import textes as tx
 from idara.services import personnel as rh
 from idara.services import vie_admin as va
 from idara.ui.composants import bouton, carte
@@ -202,92 +205,264 @@ class PageAssoLegal(QWidget):
             return None
 
 
-# ====================== جدول الحراسة ======================
+# ====================== جدول الحراسة (بالمناطق، توجيه المدير 2026-11-15) ======================
+
+class _DelegueProf(QStyledItemDelegate):
+    """خانة الجدول: قائمة الأساتذة مع إمكان الكتابة الحرة."""
+
+    def __init__(self, page):
+        super().__init__(page)
+        self.page = page
+
+    def createEditor(self, parent, option, index):
+        c = QComboBox(parent)
+        c.setEditable(True)
+        c.addItems([""] + [n for n, _ in self.page.profs])
+        return c
+
+    def setEditorData(self, editor, index):
+        editor.setCurrentText(index.data() or "")
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, " ".join(editor.currentText().split()))
+
 
 class PageGarde(QWidget):
     def __init__(self, fenetre):
         super().__init__()
         self.f = fenetre
+        self.g: dict = {}
+        self.semaine = 1
         racine, self.message = _page(
-            "جدول الحراسة", "في كل خانة الأساتذة المكلفون بالحراسة (مفصولون بفاصلة). عناوين الفترات تُعدَّل بالنقر "
-                            "المزدوج على رأس العمود.")
+            "جدول الحراسة", "قسّم المؤسسة إلى مناطق (من 1 إلى 10)، واختر دورة من 1 إلى 4 أسابيع: أمام كل منطقة "
+                            "أستاذ(ة) في كل يوم. التوزيع الآلي يعدل بين الأساتذة ويناوب بينهم على المناطق.")
         self.setLayout(racine)
-        c, v = carte("الحراسة حسب الأيام والفترات")
-        self.table = TableauRapide(len(va.JOURS), 6)
-        self.table.setVerticalHeaderLabels(list(va.JOURS))
+
+        self.c_jour, v = carte("حراسة اليوم")
+        self.l_jour = QLabel()
+        self.l_jour.setWordWrap(True)
+        self.l_jour.setTextFormat(Qt.RichText)
+        v.addWidget(self.l_jour)
+        h = QHBoxLayout()
+        b = QPushButton("طبع ورقة حراسة اليوم")
+        b.clicked.connect(lambda: self.generer("jour"))
+        h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        racine.addWidget(self.c_jour)
+
+        c, v = carte("المناطق والدورة")
+        self.nb_zones, self.semaines = QSpinBox(), QSpinBox()
+        self.nb_zones.setRange(1, gd.ZONES_MAX)
+        self.semaines.setRange(1, gd.SEMAINES_MAX)
+        self.nb_zones.valueChanged.connect(lambda _: self._redimensionner())
+        self.semaines.valueChanged.connect(lambda _: self._redimensionner())
+        self.debut = ChampDate()
+        self.debut.setToolTip("الاثنين الذي يبدأ فيه الأسبوع 1 من الدورة: منه يُحسب أسبوع اليوم")
+        self.jours = {}
+        hj = QHBoxLayout()
+        for j in gd.JOURS:
+            cb = QCheckBox(j)
+            cb.toggled.connect(lambda _: self._redimensionner())
+            self.jours[j] = cb
+            hj.addWidget(cb)
+        hj.addStretch()
+        g = QGridLayout()
+        g.setHorizontalSpacing(16)
+        for k, (lib, w) in enumerate((("عدد المناطق", self.nb_zones), ("أسابيع الدورة", self.semaines),
+                                      ("بداية الدورة (الأسبوع 1)", self.debut))):
+            g.addWidget(etiquette(lib, w), 0, k)
+            g.addWidget(w, 1, k)
+        v.addLayout(g)
+        v.addWidget(QLabel("أيام الحراسة:"))
+        v.addLayout(hj)
+        self.t_zones = TableauRapide(0, 1)
+        self.t_zones.setHorizontalHeaderLabels(["تحديد المنطقة (اختياري): الباب الرئيسي، الساحة الشمالية..."])
+        self.t_zones.horizontalHeader().setStretchLastSection(True)
+        self.t_zones.verticalHeader().setVisible(True)
+        self.t_zones.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        self.t_zones.setMaximumHeight(200)
+        v.addWidget(self.t_zones)
+        racine.addWidget(c)
+
+        c, v = carte("الجدول: الأستاذ(ة) المكلف(ة) أمام كل منطقة")
+        h = QHBoxLayout()
+        self.pilules = QHBoxLayout()
+        h.addLayout(self.pilules)
+        h.addStretch()
+        b = QPushButton("توزيع آلي عادل")
+        b.setToolTip("يملأ كل أسابيع الدورة بأساتذة المؤسسة النشيطين، دوراً بعد دور")
+        b.clicked.connect(lambda: self.repartir())
+        h.addWidget(b)
+        v.addLayout(h)
+        self.table = TableauRapide(0, 0)
         self.table.verticalHeader().setVisible(True)
         self.table.setEditTriggers(QAbstractItemView.AllEditTriggers)
-        self.table.horizontalHeader().sectionDoubleClicked.connect(self.renommer)
-        self.table.setMinimumHeight(300)
+        self.table.setItemDelegate(_DelegueProf(self))
+        self.table.setMinimumHeight(260)
         v.addWidget(self.table)
+        self.bilan = QLabel()
+        self.bilan.setObjectName("etiquette")
+        self.bilan.setWordWrap(True)
+        v.addWidget(self.bilan)
         self.consignes = QPlainTextEdit()
-        self.consignes.setFixedHeight(80)
-        v.addWidget(etiquette("توجيهات (تُطبع أسفل الجدول)", self.consignes))
+        self.consignes.setFixedHeight(120)
+        v.addWidget(etiquette("مقتضيات المذكرة الداخلية (سطر لكل مقتضى)", self.consignes))
         v.addWidget(self.consignes)
         h = QHBoxLayout()
         b = QPushButton("حفظ")
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer(True))
         h.addWidget(b)
-        b = QPushButton("توليد جدول الحراسة")
-        b.clicked.connect(lambda: self.generer())
-        h.addWidget(b)
+        for doc, lib in (("tableau", "جدول الحراسة"), ("note", "المذكرة الداخلية وتوقيعات الأساتذة")):
+            b = QPushButton(lib)
+            b.clicked.connect(lambda _=False, d=doc: self.generer(d))
+            h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
-        self.bilan = QLabel()
-        self.bilan.setObjectName("etiquette")
-        self.bilan.setWordWrap(True)
-        v.addWidget(self.bilan)
         racine.addWidget(c)
         racine.addStretch()
         self.rafraichir()
 
+    # ---------- العرض ----------
+
     def rafraichir(self) -> None:
-        g = va.lire_garde(self.f.conn)
-        self.periodes = list(g["periodes"])
-        self.table.setColumnCount(len(self.periodes))
-        self.table.setHorizontalHeaderLabels(self.periodes)
-        for i, j in enumerate(va.JOURS):
-            for k, val in enumerate(g["grille"][j]):
-                self.table.setItem(i, k, _item(val))
-        self.consignes.setPlainText(g["consignes"])
+        self.profs = gd.enseignants(self.f.conn)
+        self.g = gd.lire(self.f.conn)
+        for w in (self.nb_zones, self.semaines, *self.jours.values()):
+            w.blockSignals(True)
+        self.nb_zones.setValue(self.g["nb_zones"])
+        self.semaines.setValue(self.g["semaines"])
+        for j, cb in self.jours.items():
+            cb.setChecked(j in self.g["jours"])
+        for w in (self.nb_zones, self.semaines, *self.jours.values()):
+            w.blockSignals(False)
+        self.debut.definir(self.g["debut"] or None)
+        self.consignes.setPlainText(self.g["consignes"])
+        self.semaine = min(self.semaine, self.g["semaines"])
+        self._zones()
+        self._pilules()
+        self._remplir()
         self._bilan()
+        self._jour()
+
+    def _zones(self) -> None:
+        nz = self.g["nb_zones"]
+        self.t_zones.setRowCount(nz)
+        self.t_zones.setVerticalHeaderLabels([f"المنطقة {k + 1}" for k in range(nz)])
+        for k in range(nz):
+            self.t_zones.setItem(k, 0, QTableWidgetItem(self.g["zones"][k]))
+
+    def _pilules(self) -> None:
+        while self.pilules.count():
+            w = self.pilules.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        self.b_semaines = {}
+        for s in range(1, self.g["semaines"] + 1):
+            b = QPushButton(f"الأسبوع {s}")
+            b.setCheckable(True)
+            b.setChecked(s == self.semaine)
+            b.clicked.connect(lambda _=False, s=s: self.choisir_semaine(s))
+            self.b_semaines[s] = b
+            self.pilules.addWidget(b)
+
+    def _remplir(self) -> None:
+        nz, jours = self.g["nb_zones"], self.g["jours"]
+        self.table.setColumnCount(nz)
+        self.table.setHorizontalHeaderLabels([gd.libelle_zone(self.g["zones"], k) for k in range(nz)])
+        self.table.setRowCount(len(jours))
+        self.table.setVerticalHeaderLabels(jours)
+        grille = self.g["grille"][str(self.semaine)]
+        for i, j in enumerate(jours):
+            for k in range(nz):
+                self.table.setItem(i, k, _item(grille[j][k]))
 
     def _bilan(self) -> None:
-        b = va.bilan_garde(self.f.conn)
-        self.bilan.setText("عدد فترات الحراسة لكل أستاذ: " + " · ".join(f"{n} ({k})" for n, k in b) if b else "")
+        b = gd.bilan(self.f.conn)
+        self.bilan.setText("أيام الحراسة لكل أستاذ(ة) خلال الدورة (المحفوظة): "
+                           + " · ".join(f"{n} ({k})" for n, k in b) if b else "")
 
-    def renommer(self, col: int, nom: str | None = None) -> None:
-        if nom is None:
-            from PySide6.QtWidgets import QInputDialog
-            nom, ok = QInputDialog.getText(self, "فترة الحراسة", "عنوان الفترة:", text=self.periodes[col])
-            if not ok:
-                return
-        if nom.strip():
-            self.periodes[col] = nom.strip()
-            self.table.setHorizontalHeaderLabels(self.periodes)
+    def _jour(self) -> None:
+        j = gd.du_jour(self.f.conn)
+        titre = f"<b>{j['jour']} {tx.date_ar(j['date'])}</b>" + (
+            f" · الأسبوع {j['semaine']} من الدورة" if j["semaine"] and self.g["semaines"] > 1 else "")
+        if j["lignes"] and any(n for _, n in j["lignes"]):
+            lignes = "".join(f"<br>● {z}: <b>{n or 'غير محدد'}</b>" for z, n in j["lignes"])
+            self.l_jour.setText(titre + lignes)
+        else:
+            self.l_jour.setText(f"{titre}<br>{j['motif']}")
+        self.jour = j
+
+    # ---------- التعديل ----------
+
+    def _lire_ecran(self) -> None:
+        """ينقل ما على الشاشة إلى self.g (الأسبوع المعروض والمناطق والإعدادات)."""
+        self.table.setCurrentItem(None)
+        self.t_zones.setCurrentItem(None)
+        if self.table.rowCount() and self.table.columnCount():
+            grille = self.g["grille"].setdefault(str(self.semaine), {})
+            for i in range(self.table.rowCount()):
+                j = self.table.verticalHeaderItem(i).text()
+                grille[j] = [self.table.item(i, k).text() if self.table.item(i, k) else ""
+                             for k in range(self.table.columnCount())]
+        self.g["zones"] = [self.t_zones.item(k, 0).text() if self.t_zones.item(k, 0) else ""
+                           for k in range(self.t_zones.rowCount())]
+        self.g["consignes"] = self.consignes.toPlainText()
+        try:
+            self.g["debut"] = self.debut.iso()
+        except ValueError:
+            self.g["debut"] = "؟"   # يرفضه الحفظ برسالة واضحة
+
+    def _redimensionner(self) -> None:
+        self._lire_ecran()
+        jours = [j for j in gd.JOURS if self.jours[j].isChecked()] or [gd.JOURS[0]]
+        self.g.update(nb_zones=self.nb_zones.value(), semaines=self.semaines.value(), jours=jours)
+        self.g["zones"] = (self.g["zones"] + [""] * gd.ZONES_MAX)[:self.g["nb_zones"]]
+        self.g["grille"] = gd._grille_vide(self.g["semaines"], jours, self.g["nb_zones"], self.g["grille"])
+        self.semaine = min(self.semaine, self.g["semaines"])
+        self._zones()
+        self._pilules()
+        self._remplir()
+
+    def choisir_semaine(self, s: int) -> None:
+        self._lire_ecran()
+        self.semaine = s
+        for k, b in self.b_semaines.items():
+            b.setChecked(k == s)
+        self._remplir()
+
+    def repartir(self) -> bool:
+        self._lire_ecran()
+        try:
+            self.g["grille"] = gd.repartir([n for n, _ in self.profs], self.g["nb_zones"], self.g["semaines"],
+                                           self.g["jours"])
+        except gd.ErreurGarde as e:
+            message(self.message, str(e), True)
+            return False
+        self._remplir()
+        message(self.message, "وُزّع الأساتذة على المناطق. راجع الجدول ثم احفظ.")
+        return True
 
     def enregistrer(self, afficher: bool = False) -> bool:
-        self.table.setCurrentItem(None)
-        grille = {j: [(self.table.item(i, k).text() if self.table.item(i, k) else "")
-                      for k in range(self.table.columnCount())] for i, j in enumerate(va.JOURS)}
+        self._lire_ecran()
         try:
-            va.enregistrer_garde(self.f.conn, {"periodes": self.periodes, "grille": grille,
-                                               "consignes": self.consignes.toPlainText()})
-        except va.ErreurVieAdmin as e:
+            gd.enregistrer(self.f.conn, self.g)
+        except gd.ErreurGarde as e:
             message(self.message, str(e), True)
             return False
         self._bilan()
+        self._jour()
         if afficher:
             message(self.message, "حُفظ جدول الحراسة.")
         return True
 
-    def generer(self):
+    def generer(self, doc: str = "tableau"):
         if not self.enregistrer():
             return None
         try:
-            return _ouvrir(self, va.generer_garde(self.f.conn, self.f.dossier), "وُلّد جدول الحراسة")
-        except (va.ErreurVieAdmin, OSError) as e:
+            return _ouvrir(self, gd.generer(self.f.conn, self.f.dossier, doc), "وُلّدت " + gd.DOCS[doc])
+        except (gd.ErreurGarde, OSError) as e:
             message(self.message, str(e), True)
             return None
 

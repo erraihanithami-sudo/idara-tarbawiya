@@ -467,6 +467,27 @@ def main(sortie: Path) -> None:
             ed.close()
     except Exception as e:  # noqa: BLE001
         print("editeur:", repr(e))
+    # الحراسة بالمناطق (توجيه 2026-11-15): أساتذة وهميون
+    try:
+        from datetime import date as _date, timedelta as _td
+        from idara.services import garde as _gd
+        _g = _gd.lire(f.conn)
+        _g.update(nb_zones=5, zones=["الباب الرئيسي", "الساحة الشمالية", "الساحة الجنوبية", "المرافق الصحية",
+                                     "الملعب"], semaines=4,
+                  debut=(_date.today() - _td(days=_date.today().weekday())).isoformat())
+        _g["grille"] = _gd.repartir([f"أستاذ(ة) وهمي(ة) {i}" for i in range(1, 16)], 5, 4, _g["jours"])
+        _gd.enregistrer(f.conn, _g)
+        f.page_garde.rafraichir()
+        f.aller_a("جدول الحراسة")
+        photo(f, "71_garde_zones")
+        import shutil as _sh3
+        _sh3.copy(_gd.generer(f.conn, f.dossier, "tableau"), sortie / "71_garde_tableau.docx")
+        _sh3.copy(_gd.generer(f.conn, f.dossier, "note"), sortie / "71_garde_note.docx")
+        f.tableau.rafraichir()
+        f.aller_a("لوحة القيادة")
+        photo(f, "72_tableau_garde_jour")
+    except Exception as e:  # noqa: BLE001
+        print("garde:", repr(e))
     f.filtrer_nav("محضر")
     photo(f, "53_recherche_nav")
     f.filtrer_nav("")

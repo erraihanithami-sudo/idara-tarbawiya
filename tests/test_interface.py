@@ -1967,12 +1967,34 @@ def test_pages_vie_admin(app, config_tmp, monkeypatch):
     assert va.lire_asso(f.conn, "najah")["membres"][0][0] == "رئيس تجريبي"
     # الحراسة
     f.aller_a("جدول الحراسة")
+    from idara.services import garde as gd
     g = f.page_garde
     assert g.generer() is None and "فارغ" in g.message.text()
+    assert g.table.columnCount() == 4 and g.table.rowCount() == 6 and len(g.b_semaines) == 4
+    g.nb_zones.setValue(2)
+    g.semaines.setValue(2)
+    g.jours["السبت"].setChecked(False)
+    assert g.table.columnCount() == 2 and g.table.rowCount() == 5 and len(g.b_semaines) == 2
+    g.t_zones.item(0, 0).setText("الباب الرئيسي")
     g.table.item(0, 0).setText("أستاذ التجريبي")
-    g.renommer(0, "دخول الصباح")
-    assert g.generer() is not None and "أستاذ التجريبي (1)" in g.bilan.text()
-    assert va.lire_garde(f.conn)["periodes"][0] == "دخول الصباح"
+    g.table.item(0, 1).setText("أستاذ التجريبي")
+    assert not g.enregistrer() and "بمنطقتين" in g.message.text()
+    g.table.item(0, 1).setText("أستاذة ثانية")
+    g.choisir_semaine(2)
+    g.table.item(1, 0).setText("أستاذ ثالث")
+    g.choisir_semaine(1)
+    assert g.table.item(0, 1).text() == "أستاذة ثانية"   # التنقل بين الأسابيع لا يضيع المدخلات
+    g.debut.setText("02/11/2026")
+    assert g.generer("tableau") is not None and "أستاذ التجريبي (1)" in g.bilan.text()
+    l = gd.lire(f.conn)
+    assert l["zones"][0] == "الباب الرئيسي" and l["grille"]["2"]["الثلاثاء"][0] == "أستاذ ثالث"
+    assert l["debut"] == "2026-11-02" and "السبت" not in l["jours"]
+    assert g.generer("note") is not None
+    g.repartir()   # أساتذة المؤسسة الوهميون أقل من منطقتين أو أكثر: رسالة أو جدول ممتلئ
+    assert g.table.item(0, 0).text() or "أقل من عدد المناطق" in g.message.text()
+    assert "حراسة اليوم" not in g.l_jour.text() and g.l_jour.text()
+    f.tableau.rafraichir()
+    assert f.tableau.garde_jour["jour"]
     # النقل
     f.aller_a("النقل المدرسي")
     t = f.page_transport

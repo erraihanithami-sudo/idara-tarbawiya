@@ -2,7 +2,7 @@
 
 1. الوثائق القانونية للجمعيات (جمعية النجاح، الجمعية الرياضية، جمعية الآباء، التعاونية المدرسية): أعضاء المكتب،
    تصريح بتجديد المكتب، لائحة الأعضاء، محضر الجمع العام. الموقّع هو رئيس الجمعية لا المدير.
-2. جدول الحراسة: الأيام × فترات الحراسة، في كل خانة الأساتذة المكلفون.
+2. جدول الحراسة: أعيد تصميمه بالمناطق (services/garde.py، توجيه المدير 2026-11-15).
 3. النقل المدرسي: وسائل النقل (الرقم، السائق، الهاتف، المسار، الدواوير) والمستفيدون، لائحة لكل وسيلة.
 4. استعمالات الزمن: حصص كل أستاذ (اليوم، من، إلى، المادة، المستوى)، مراقبة الحصيص الأسبوعي والتعارض،
    وثيقة استعمال الزمن، وتغذية لوحة «استعمال الزمن الجماعي» في السبورة المرجعية.
@@ -154,76 +154,9 @@ def generer_asso(conn: sqlite3.Connection, dossier: DossierDonnees, cle: str, do
     return _sauver(d, dossier, "الوثائق القانونية للجمعيات", f"{DOCS_ASSO[doc]}_{nom}".replace(" ", "_"))
 
 
-# ====================== 2. جدول الحراسة ======================
+# ====================== 2. جدول الحراسة: انتقل إلى services/garde.py (المناطق، 2026-11-16) ======================
 
 JOURS = ("الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت")
-PERIODES_GARDE = ("الدخول الصباحي", "استراحة الصباح", "الخروج الصباحي", "الدخول المسائي", "استراحة المساء",
-                  "الخروج المسائي")
-
-
-def lire_garde(conn: sqlite3.Connection, unite: str = "") -> dict:
-    d = fiches.lire(conn, f"garde:{unite}") or {}
-    periodes = [p for p in d.get("periodes", PERIODES_GARDE) if p]
-    grille = d.get("grille") or {}
-    return {"periodes": periodes, "consignes": d.get("consignes", ""),
-            "grille": {j: [(grille.get(j) or [""] * len(periodes) + [""] * 9)[k] for k in range(len(periodes))]
-                       for j in JOURS}}
-
-
-def enregistrer_garde(conn: sqlite3.Connection, donnees: dict, unite: str = "") -> None:
-    periodes = [" ".join(str(p).split()) for p in donnees.get("periodes", PERIODES_GARDE) if str(p).strip()]
-    if not periodes:
-        raise ErreurVieAdmin("فترة حراسة واحدة على الأقل.")
-    grille = {j: [" ".join(str(v or "").split()) for v in (donnees.get("grille", {}).get(j) or [])][:len(periodes)]
-              for j in JOURS}
-    for j in JOURS:
-        grille[j] += [""] * (len(periodes) - len(grille[j]))
-    fiches.ecrire(conn, f"garde:{unite}", {"periodes": periodes, "grille": grille,
-                                           "consignes": str(donnees.get("consignes") or "").strip()})
-
-
-def bilan_garde(conn: sqlite3.Connection, unite: str = "") -> list[tuple[str, int]]:
-    """عدد فترات الحراسة لكل أستاذ (للتوزيع العادل)."""
-    g = lire_garde(conn, unite)
-    n: dict[str, int] = {}
-    for j in JOURS:
-        for c in g["grille"][j]:
-            for nom in c.replace("،", ",").split(","):
-                nom = nom.strip()
-                if nom:
-                    n[nom] = n.get(nom, 0) + 1
-    return sorted(n.items(), key=lambda x: (-x[1], x[0]))
-
-
-def generer_garde(conn: sqlite3.Connection, dossier: DossierDonnees, unite: str = "") -> Path:
-    from docx.enum.section import WD_ORIENT
-    from docx.shared import Cm
-
-    from idara.services.docs_association import _nouveau, para
-    from idara.services.soutien import _entete, _signature, _table
-    g = lire_garde(conn, unite)
-    if not any(c for j in JOURS for c in g["grille"][j]):
-        raise ErreurVieAdmin("جدول الحراسة فارغ: أدخل أستاذاً واحداً على الأقل.")
-    a = annee_srv.annee_courante(conn)
-    d = _nouveau()
-    s = d.sections[0]
-    s.orientation = WD_ORIENT.LANDSCAPE
-    s.page_width, s.page_height = s.page_height, s.page_width
-    s.left_margin = s.right_margin = Cm(1.2)
-    s.top_margin = s.bottom_margin = Cm(1.0)
-    _entete(d, conn, dossier, "جدول الحراسة", (f"{unite} · " if unite else "") + f"السنة الدراسية {a['libelle']}"
-            if a else unite)
-    n = len(g["periodes"])
-    _table(d, ["اليوم", *g["periodes"]], [[j, *g["grille"][j]] for j in JOURS if any(g["grille"][j])],
-           [2.6] + [round(24.2 / n, 2)] * n, taille=10)
-    if g["consignes"]:
-        para(d, "", apres=4)
-        para(d, "توجيهات:", gras=True, taille=11, apres=0)
-        for l in g["consignes"].splitlines():
-            if l.strip():
-                para(d, l.strip(), taille=10, apres=0)
-    _signature(d, conn)
-    return _sauver(d, dossier, "جدول الحراسة", "جدول_الحراسة" + (f"_{unite}" if unite else ""))
 
 
 # ====================== 3. النقل المدرسي ======================

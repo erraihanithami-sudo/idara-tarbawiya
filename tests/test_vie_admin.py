@@ -36,21 +36,6 @@ def test_associations(base, dossier):  # noqa: F811
     assert sb.lire(base, "sportive")["lignes"] == [["رئيسة الرياضية", "الرئيس"]]
 
 
-def test_garde(base, dossier):  # noqa: F811
-    g = va.lire_garde(base)
-    assert len(g["periodes"]) == 6 and g["grille"]["الاثنين"] == [""] * 6
-    with pytest.raises(va.ErreurVieAdmin, match="فارغ"):
-        va.generer_garde(base, dossier)
-    g["grille"]["الاثنين"][0] = "ذ. الأول، ذة. الثانية"
-    g["grille"]["الثلاثاء"][1] = "ذ. الأول"
-    g["consignes"] = "الحضور عشر دقائق قبل الدخول"
-    va.enregistrer_garde(base, g)
-    assert va.bilan_garde(base) == [("ذ. الأول", 2), ("ذة. الثانية", 1)]
-    d, c, t = _cellules(va.generer_garde(base, dossier))
-    assert "الدخول الصباحي" in c and "ذ. الأول، ذة. الثانية" in c and "السبت" not in c and "الحضور عشر دقائق" in t
-    assert d.sections[0].page_width > d.sections[0].page_height
-
-
 def test_transport(base, dossier):  # noqa: F811
     ls = va.eleves_transport(base)
     e1, e2 = ls[0]["eleve_id"], ls[1]["eleve_id"]
