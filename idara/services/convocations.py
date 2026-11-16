@@ -10,6 +10,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from docx.enum.table import WD_ROW_HEIGHT_RULE
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
@@ -113,8 +114,9 @@ def _carte(c, e: dict, t: float, entete: str, objet: str, quand: str, ordre: str
     if ordre:
         _ligne(c, [("جدول الأعمال: ", True), (ordre, False)], t * 0.92)
     _ligne(c, [("ونظراً لأهمية اللقاء، نرجو حضوركم في الموعد.", False)], t, apres=t * 0.25)
-    _ligne(c, [((f"{ville}، في " if ville else "في ") + tx.date_ar(datetime.now().date()), False),
-               ("          المدير(ة):", True)], t * 0.9, apres=0)
+    _ligne(c, [((f"{ville}، في " if ville else "في ") + tx.date_ar(datetime.now().date()), False)], t * 0.9, apres=0)
+    sig = _ligne(c, [("المدير(ة):", True)], t * 0.9, apres=0)
+    sig.alignment = WD_ALIGN_PARAGRAPH.RIGHT   # في فقرة من اليمين إلى اليسار: «right» تعني الجهة اليسرى
 
 
 def generer(conn: sqlite3.Connection, dossier: DossierDonnees, occasion: str, numero: str, le: str, heure: str,

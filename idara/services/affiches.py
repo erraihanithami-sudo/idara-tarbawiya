@@ -409,7 +409,7 @@ def _mise_en_page(d: Dessin, th: Theme, c: Contenu) -> None:
     if th.cle == "arche":
         bx, bw = 52, L - 104
         if entete:
-            d.textes.append(Texte((bx, 46, bw, 9), entete, 12, th.encre, gras=True))
+            d.textes.append(Texte((44, 47, L - 88, 8), entete, 11, th.encre, gras=True))
         d.textes.append(Texte((bx, 57, bw, 10), c.surtitre, 15, th.accent, gras=True, titre=True))
         d.textes.append(Texte((bx - 8, 68, bw + 16, 46), c.titre, 40, th.titre, gras=True, titre=True))
         y = 132
