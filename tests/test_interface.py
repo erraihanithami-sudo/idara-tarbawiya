@@ -2135,6 +2135,19 @@ def test_editeur_de_documents(app, config_tmp, monkeypatch, tmp_path):
     assert p is not None and not externes and len(f.editeurs) == 1
     e = f.editeurs[0]
     assert isinstance(e, EditeurDocument) and not e.isHidden() and e.chemin == p
+    # داخل النافذة نفسها: معاينة للقراءة أولاً، ثم «تعديل الوثيقة»، و«رجوع» إلى الصفحة السابقة
+    assert f.pile.currentIndex() == f.indice_doc and e.parent() is f.page_doc
+    assert e.edit.isReadOnly() and e.outils.isHidden()
+    e.b_modifier.click()
+    assert not e.edit.isReadOnly() and not e.outils.isHidden()
+    e.b_modifier.click()
+    assert e.edit.isReadOnly()
+    imgs = e.exporter_image(tmp_path / "صورة.png")
+    assert imgs and imgs[0].exists() and imgs[0].read_bytes()[:4] == b"\x89PNG"
+    e.b_retour.click()
+    assert f.page_courante() == "الأعوان" and not f.editeurs
+    p = f.page_agents.vue().generer("service")
+    e = f.editeurs[0]
     texte = e.edit.toPlainText()
     assert "جدول الخدمة" in texte and "عون تجريبي" in texte and "8:00 - 16:00" in texte
     assert not any(c in texte for c in "\u2066\u2069") and e.etat.text() == "الوثيقة كما وُلّدت"

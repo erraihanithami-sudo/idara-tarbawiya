@@ -1,5 +1,9 @@
 """محرر الوثائق داخل البرنامج (طلب المدير 2026-11-15): كل وثيقة مولَّدة تُفتح هنا، تُعدَّل وتُطبع مباشرة.
 
+منذ توجيهات 2026-11-16 (نموذج «الورقة الشخصية»): المحرر مدمج في نافذة البرنامج نفسها لا في نافذة مستقلة. تُفتح
+الوثيقة معاينةً للقراءة، وفوقها: رجوع، تعديل الوثيقة، حفظ PDF، حفظ كصورة، طباعة. «تعديل الوثيقة» يُظهر أدوات
+التنسيق ويجعل الورقة قابلة للكتابة.
+
 الوثيقة تُحوَّل من Word إلى صفحة يحررها QTextEdit (idara.services.finition.en_html). التعديلات تُحفظ بجانب
 الملف الأصلي («‎.تعديل.html‎») فيُعاد فتحها كما تُركت؛ الملف الأصلي لا يُمَس، وزر «فتح في Word» يفتحه هو.
 ما لا يظهر هنا: إطار الصفحة المزخرف، مربعات النص، والصور العائمة؛ لتلك يبقى Word.
@@ -9,11 +13,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QMarginsF, QSizeF, Qt
-from PySide6.QtGui import QFont, QPageLayout, QPageSize, QTextCharFormat, QTextCursor
+from PySide6.QtCore import QMarginsF, QRectF, QSizeF, Qt
+from PySide6.QtGui import QColor, QFont, QImage, QPageLayout, QPageSize, QPainter, QTextCharFormat, QTextCursor
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
 from PySide6.QtWidgets import (QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QTextEdit,
-                               QVBoxLayout)
+                               QVBoxLayout, QWidget)
 
 from idara.services import bureautique, finition
 from idara.ui.saisie import message
@@ -26,18 +30,20 @@ def fichier_modifie(chemin: Path) -> Path:
     return chemin.with_name(chemin.stem + ".تعديل.html")
 
 
-class EditeurDocument(QDialog):
-    def __init__(self, chemin: Path, parent=None):
+class EditeurDocument(QWidget):
+    """معاينة الوثيقة وتحريرها داخل النافذة. retour: ما يُنفَّذ عند «رجوع» (العودة إلى الصفحة السابقة)."""
+
+    def __init__(self, chemin: Path, parent=None, retour=None):
         super().__init__(parent)
         self.chemin = Path(chemin)
+        self.retour = retour
         self.page = finition.en_html(self.chemin)
         self.setWindowTitle(f"محرر الوثائق · ⁦{self.chemin.name}⁩")
         self.setLayoutDirection(Qt.RightToLeft)
-        self.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
         g, _, d, _ = self.page.marges_mm
         self.largeur_contenu = round((self.page.largeur_mm - g - d) * PX_PAR_MM)
         v = QVBoxLayout(self)
-        v.setContentsMargins(14, 12, 14, 12)
+        v.setContentsMargins(24, 16, 24, 16)
         v.setSpacing(8)
 
         def bouton(texte, action, aide="", principal=False, largeur=None):
@@ -53,20 +59,23 @@ class EditeurDocument(QDialog):
 
         h = QHBoxLayout()
         h.setSpacing(6)
+        self.b_retour = bouton("رجوع", self.revenir_page, "العودة إلى الصفحة التي فُتحت منها الوثيقة")
+        h.addWidget(self.b_retour)
+        titre = QLabel(self.chemin.stem.split("_", 2)[-1].replace("_", " "))
+        titre.setObjectName("titreCarte")
+        h.addWidget(titre, 1)
+        self.b_modifier = bouton("تعديل الوثيقة", self.basculer_edition, "الكتابة على الورقة وأدوات التنسيق")
+        self.b_modifier.setCheckable(True)
+        self.b_pdf = bouton("حفظ PDF", self.exporter_pdf, "ملف للقراءة فقط يُرسل بالبريد أو واتساب")
+        self.b_image = bouton("حفظ كصورة", self.exporter_image, "صورة لكل صفحة (للنشر أو الإرسال)")
         self.b_imprimer = bouton("طباعة", self.imprimer, "اختيار الطابعة وعدد النسخ ثم الطبع", True)
-        self.b_apercu = bouton("معاينة قبل الطبع", self.apercu)
-        self.b_pdf = bouton("حفظ بصيغة تُرسَل", self.exporter_pdf, "ملف للقراءة فقط يُرسل بالبريد أو واتساب")
-        self.b_enregistrer = bouton("حفظ التعديلات", self.enregistrer, "تُحفظ بجانب الوثيقة وتُفتح بها في المرة المقبلة")
-        for b in (self.b_imprimer, self.b_apercu, self.b_pdf, self.b_enregistrer):
+        for b in (self.b_modifier, self.b_pdf, self.b_image, self.b_imprimer):
             h.addWidget(b)
-        h.addStretch()
-        self.b_original = bouton("العودة إلى الأصل", self.revenir, "حذف التعديلات المحفوظة وعرض الوثيقة كما وُلّدت")
-        h.addWidget(self.b_original)
-        h.addWidget(bouton("فتح في برنامج الحاسوب", self.ouvrir_externe,
-                           "يفتح الملف الأصلي (دون تعديلات هذا المحرر) ببرنامج تحرير النصوص المثبت"))
         v.addLayout(h)
 
-        h = QHBoxLayout()
+        self.outils = QWidget()
+        h = QHBoxLayout(self.outils)
+        h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(6)
         for texte, action, aide in (
                 ("تراجع", lambda: self.edit.undo(), "Ctrl+Z"), ("إعادة", lambda: self.edit.redo(), "Ctrl+Y"),
@@ -76,6 +85,17 @@ class EditeurDocument(QDialog):
                 ("وسط", lambda: self.aligner(Qt.AlignHCenter), ""),
                 ("يسار", lambda: self.aligner(Qt.AlignLeft | Qt.AlignAbsolute), "")):
             h.addWidget(bouton(texte, action, aide))
+        h.addStretch()
+        self.b_enregistrer = bouton("حفظ التعديلات", self.enregistrer, "تُحفظ بجانب الوثيقة وتُفتح بها في المرة المقبلة",
+                                    True)
+        h.addWidget(self.b_enregistrer)
+        self.b_original = bouton("العودة إلى الأصل", self.revenir, "حذف التعديلات المحفوظة وعرض الوثيقة كما وُلّدت")
+        h.addWidget(self.b_original)
+        h.addWidget(bouton("معاينة الطبع", self.apercu))
+        h.addWidget(bouton("فتح في برنامج الحاسوب", self.ouvrir_externe,
+                           "يفتح الملف الأصلي (دون تعديلات هذا المحرر) ببرنامج تحرير النصوص المثبت"))
+        v.addWidget(self.outils)
+        h = QHBoxLayout()
         h.addStretch()
         self.etat = QLabel()
         self.etat.setObjectName("pastille")
@@ -109,9 +129,26 @@ class EditeurDocument(QDialog):
 
         self.edit.document().modificationChanged.connect(lambda _: self._etat())
         self.charger()
-        ecran = self.screen().availableGeometry() if self.screen() else None
-        self.resize(min(self.edit.width() + 90, ecran.width() - 40 if ecran else 1200),
-                    min(900, ecran.height() - 60 if ecran else 800))
+        self.basculer_edition(False)
+
+    # ---------- المعاينة والتحرير ----------
+    def basculer_edition(self, actif: bool | None = None) -> None:
+        actif = self.b_modifier.isChecked() if actif is None else actif
+        self.b_modifier.setChecked(actif)
+        self.edit.setReadOnly(not actif)
+        self.outils.setVisible(actif)
+        self.edit.setTextInteractionFlags(Qt.TextEditorInteraction if actif else
+                                          Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        if actif:
+            self.edit.setFocus()
+
+    def revenir_page(self) -> None:
+        if self.edit.document().isModified():
+            self.enregistrer()   # لا تضيع تعديلات المدير بالرجوع
+        if self.retour is not None:
+            self.retour(self)
+        else:
+            self.close()
 
     # ---------- التحميل والحفظ ----------
     def charger(self) -> None:
@@ -210,6 +247,48 @@ class EditeurDocument(QDialog):
         d.setLayoutDirection(Qt.RightToLeft)
         d.paintRequested.connect(self.rendre)
         d.exec()
+
+    def pages_images(self, echelle: float = 2.0) -> list[QImage]:
+        """كل صفحة صورةً بحجم الورقة (هوامشها بيضاء)، بنفس تقطيع الطبع."""
+        doc = self.edit.document().clone(self)
+        doc.setDocumentMargin(0)
+        g, h_, d, b = (m * PX_PAR_MM for m in self.page.marges_mm)
+        larg = self.largeur_contenu
+        haut = max(100.0, self.page.hauteur_mm * PX_PAR_MM - h_ - b)
+        doc.setPageSize(QSizeF(larg, haut))
+        images = []
+        for i in range(max(1, doc.pageCount())):
+            img = QImage(int((larg + g + d) * echelle), int((haut + h_ + b) * echelle), QImage.Format_RGB32)
+            img.fill(QColor("white"))
+            p = QPainter(img)
+            p.setRenderHint(QPainter.Antialiasing)
+            p.setRenderHint(QPainter.TextAntialiasing)
+            p.scale(echelle, echelle)
+            p.translate(g, h_ - i * haut)
+            doc.drawContents(p, QRectF(0, i * haut, larg, haut))
+            p.end()
+            images.append(img)
+        doc.deleteLater()
+        return images
+
+    def exporter_image(self, cible: Path | None = None) -> list[Path] | None:
+        if cible is None:
+            nom, _ = QFileDialog.getSaveFileName(self, "حفظ كصورة", str(self.chemin.with_suffix(".png")),
+                                                 "صورة (*.png *.jpg)")
+            if not nom:
+                return None
+            cible = Path(nom)
+        cible = Path(cible)
+        if cible.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+            cible = cible.with_suffix(".png")
+        chemins = []
+        for i, img in enumerate(self.pages_images()):
+            c = cible if i == 0 else cible.with_name(f"{cible.stem}_{i + 1}{cible.suffix}")
+            img.save(str(c))
+            chemins.append(c)
+        message(self.message, f"حُفظت {len(chemins)} صورة: ⁦{chemins[0].name}⁩" if len(chemins) > 1
+                else f"حُفظت الصورة: ⁦{chemins[0].name}⁩")
+        return chemins
 
     def exporter_pdf(self, cible: Path | None = None) -> Path | None:
         if cible is None:

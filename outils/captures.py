@@ -450,7 +450,7 @@ def main(sortie: Path) -> None:
         _ed = f.ouvrir_document(_doc)
         if _ed is not None:
             _ed.exporter_pdf(sortie / "69_convocations.pdf")
-            _ed.close()
+            f.fermer_document()
         _sh.copy(_doc, sortie / "69_convocations.docx")
     except Exception as e:  # noqa: BLE001
         import traceback
@@ -462,9 +462,13 @@ def main(sortie: Path) -> None:
         ed = f.ouvrir_document(_rg.generer(f.conn, f.dossier, "agents", "liste"))
         if ed is not None:
             app.processEvents()
-            photo(ed, "66_editeur")
+            photo(f, "66_editeur_apercu")
+            ed.b_modifier.click()
+            app.processEvents()
+            photo(f, "66_editeur_modification")
             ed.exporter_pdf(sortie / "66_editeur.pdf")
-            ed.close()
+            ed.exporter_image(sortie / "66_editeur_image.png")
+            ed.b_retour.click()
     except Exception as e:  # noqa: BLE001
         print("editeur:", repr(e))
     # الحراسة بالمناطق (توجيه 2026-11-15): أساتذة وهميون

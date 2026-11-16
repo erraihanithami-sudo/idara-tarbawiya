@@ -844,6 +844,14 @@ class FenetrePrincipale(QMainWindow):
                 self.pile_rahba[i] = self.pile.addWidget(page_defilante(self.rahbat[i]))
             if touche:
                 QShortcut(QKeySequence(touche), self, activated=lambda i=i: self.ouvrir_rahba(i))
+        # معاينة الوثائق وتحريرها داخل النافذة (توجيه المدير 2026-11-15، نموذج «الورقة الشخصية»)
+        self.page_doc = QWidget()
+        self.page_doc.setObjectName("fond")
+        self._v_doc = QVBoxLayout(self.page_doc)
+        self._v_doc.setContentsMargins(0, 0, 0, 0)
+        self.indice_doc = self.pile.addWidget(self.page_doc)
+        self.avant_doc: int | None = None
+        self.editeurs = []
         self.bandeau_page = BandeauPage(self, SECTIONS)
         self._boutons_suppression()
         self._disposition = h
@@ -1047,21 +1055,50 @@ class FenetrePrincipale(QMainWindow):
             self.boutons[k].ouvrir(o)
 
     def ouvrir_document(self, chemin):
-        """يفتح وثيقة Word في محرر البرنامج (تعديل وطبع مباشر). إن تعذر تحويلها تُفتح خارج البرنامج."""
+        """يعرض الوثيقة داخل النافذة: معاينة، ثم تعديل أو حفظ PDF أو صورة أو طبع، و«رجوع» إلى الصفحة السابقة.
+        إن تعذر تحويلها تُفتح خارج البرنامج. إن كانت نافذة حوار مفتوحة، تُعرض في نافذة مستقلة فوقها."""
         from pathlib import Path
 
         from idara.services import bureautique
         from idara.ui.editeur import EditeurDocument
+        modal = QApplication.activeModalWidget()
         try:
-            e = EditeurDocument(Path(chemin), self)
+            e = EditeurDocument(Path(chemin), None, retour=self.fermer_document)
         except Exception:  # noqa: BLE001 — وثيقة لا يفهمها المحرر: لا نمنع المدير من فتحها
             bureautique.ouvrir_externe(chemin)
             return None
-        self.editeurs = [x for x in getattr(self, "editeurs", []) if x.isVisible()] + [e]
+        if modal is not None:
+            from PySide6.QtWidgets import QDialog
+            dlg = QDialog(modal)
+            dlg.setWindowTitle(e.windowTitle())
+            dlg.setLayoutDirection(Qt.RightToLeft)
+            QVBoxLayout(dlg).addWidget(e)
+            e.retour = lambda _e: dlg.close()
+            dlg.resize(1100, 860)
+            dlg.show()
+            self.editeurs = [x for x in self.editeurs if x.isVisible()] + [e]
+            return e
+        if self.pile.currentIndex() != self.indice_doc:
+            self.avant_doc = self.pile.currentIndex()
+        for x in [x for x in self.editeurs if x.parent() is self.page_doc]:
+            self._v_doc.removeWidget(x)
+            x.close()
+            x.deleteLater()
+        self._v_doc.addWidget(e)
+        self.editeurs = [x for x in self.editeurs if x.isVisible() and x.parent() is not self.page_doc] + [e]
+        self.pile.setCurrentIndex(self.indice_doc)
         e.show()
-        e.raise_()
-        e.activateWindow()
         return e
+
+    def fermer_document(self, e=None) -> None:
+        """«رجوع»: يغلق المعاينة ويعيد الصفحة التي فُتحت منها."""
+        for x in [x for x in self.editeurs if x.parent() is self.page_doc]:
+            self._v_doc.removeWidget(x)
+            x.close()
+            x.deleteLater()
+        self.editeurs = [x for x in self.editeurs if x.parent() is not self.page_doc and x.isVisible()]
+        if self.pile.currentIndex() == self.indice_doc:
+            self.pile.setCurrentIndex(self.avant_doc if self.avant_doc is not None else 0)
 
     def cliquer_section(self, i: int) -> None:
         """النقر على قسم: يفتح فروعه ويعرض رحبته؛ النقرة الثانية تطوي الفروع والصفحة تبقى."""
