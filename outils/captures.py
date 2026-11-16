@@ -394,6 +394,46 @@ def main(sortie: Path) -> None:
     photo(f, "64_cellules")
     f.aller_a("التحفيز والتهاني")
     photo(f, "65_tahfiz")
+    # الإعلانات المزخرفة والاستدعاءات (2026-11-15)
+    try:
+        from PySide6.QtCore import QRectF as _R
+        from PySide6.QtGui import QPainter as _P, QPixmap as _PM
+        from idara.services import affiches as _af
+        from idara.services import convocations as _cv
+        from idara.ui import affiche_qt as _aq
+        f.aller_a("الإعلام والتواصل")
+        va = f.page_annonces.vue("affiche")
+        va.choisir_theme("arche")
+        va.date.definir("2026-09-07")
+        va.heure.setText("8:30 صباحاً")
+        va.lieu.setText("ساحة المؤسسة")
+        va.actualiser()
+        app.processEvents()
+        photo(f, "67_affiches_page")
+        _c = va.contenu()
+        _c.note = "المرجو إحضار اللوازم المدرسية"
+        planche = _PM(5 * 520, 2 * 735)
+        planche.fill(Qt.gray)
+        _q = _P(planche)
+        for _k, _cle in enumerate(_af.THEMES):
+            _aq.peindre(_q, _af.composer(_cle, _c), _R(10 + (_k % 5) * 520, 10 + (_k // 5) * 735, 500, 707))
+        _q.end()
+        planche.save(str(sortie / "68_affiches_planche.png"))
+        _aq.exporter_pdf(_af.composer("zellige", _c), "A3", sortie / "68_affiche_A3.pdf")
+        f.page_annonces.choisir("convocations")
+        app.processEvents()
+        photo(f, "69_convocations")
+        import shutil as _sh
+        _doc = _cv.generer(f.conn, f.dossier, "rencontre", "02", "2026-11-21", "10:00", "قاعة الاجتماعات",
+                           "تتبع النتائج", 6, None, [e["id"] for e in _cv.eleves(f.conn)[:6]])
+        _ed = f.ouvrir_document(_doc)
+        if _ed is not None:
+            _ed.exporter_pdf(sortie / "69_convocations.pdf")
+            _ed.close()
+        _sh.copy(_doc, sortie / "69_convocations.docx")
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        print("affiches:", traceback.format_exc())
     from idara.services import registres as _rg   # محرر الوثائق (2026-11-15)
     try:
         _rg.enregistrer(f.conn, "agents", {"nom": "عون تجريبي", "fonction": "الحراسة", "societe": "شركة وهمية",

@@ -55,6 +55,7 @@ from idara.ui.page_passation import PagePassation
 from idara.ui.page_sabboura import PageSabboura
 from idara.ui.page_vie_admin import PageAssoLegal, PageEmplois, PageGarde, PageTransport
 from idara.ui.page_projet import PageProjet
+from idara.ui.page_communication import PageCommunication
 from idara.ui.page_registre import PageRegistres
 from idara.ui.rihab import BandeauPage, PageRahba
 from idara.ui.page_pv_rh import PagePvRh
@@ -663,7 +664,7 @@ MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "
              "خليتا اليقظة والإنصات": "خلية يقظة إنصات مصالحة وساطة رصد مواكبة حالات محضر",
              "التحفيز والتهاني": "شهادة تقديرية تهنئة تشجيع لوحة الشرف متفوقين",
              "الانفتاح والشراكة": "شراكة اتفاقية شريك جمعية جماعة",
-             "الإعلام والتواصل": "إعلان بلاغ إخبار",
+             "الإعلام والتواصل": "إعلان مزخرف ملصق استدعاء أولياء الأمور جمع عام أبواب مفتوحة لقاء تواصلي بلاغ",
              "فريق القيادة": "فريق قيادة المشروع محضر تشكيل مصادقة مجلس التدبير"}
 
 
@@ -758,9 +759,7 @@ class FenetrePrincipale(QMainWindow):
             self, "التحفيز والتهاني", "سجّل كل تحفيز ثم اطبع شهادته المزخرفة.", ["tahfiz"], cs["الحياة المدرسية"])
         self.page_partenariats = PageRegistres(
             self, "الانفتاح والشراكة", "اتفاقيات الشراكة وحالتها.", ["partenariats"], cs["الحياة المدرسية"])
-        self.page_annonces = PageRegistres(
-            self, "الإعلام والتواصل", "اكتب الإعلان مرة واحدة واطبعه جاهزاً للتعليق.", ["annonces"],
-            cs["الحياة المدرسية"])
+        self.page_annonces = PageCommunication(self, cs["الحياة المدرسية"])
         self.page_equipe = PageRegistres(
             self, "فريق القيادة ومحاضر المشروع", "أعضاء فريق قيادة مشروع المؤسسة المندمج، ومحضر تشكيله، ومحضر "
             "مصادقة مجلس التدبير.", ["equipe"], cs["مشروع المؤسسة"])

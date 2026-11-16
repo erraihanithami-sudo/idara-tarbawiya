@@ -2086,3 +2086,76 @@ def test_editeur_de_documents(app, config_tmp, monkeypatch, tmp_path):
     for x in f.editeurs:
         x.close()
     f.close()
+
+
+def test_affiches_et_convocations(app, config_tmp, monkeypatch, tmp_path):
+    """طلب المدير 2026-11-15: إعلانات مزخرفة (10 قوالب، A4/A3) واستدعاءات أولياء الأمور (عدة في الصفحة)."""
+    import re
+
+    from docx import Document
+    from PySide6.QtCore import QRectF
+    from PySide6.QtGui import QPainter, QPixmap
+
+    from idara.services import affiches as af
+    from idara.services import bureautique
+    from idara.ui import affiche_qt
+    from idara.ui.saisie import selectionner
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("الإعلام والتواصل")
+    p = f.page_annonces
+    v = p.vue()
+    assert p.cle == "affiche" and len(v.vignettes) == 10 and v.vignettes["zellige"].isChecked()
+    assert v.titre.text().startswith("الدخول المدرسي") and not v.apercu.pixmap().isNull()
+    v.choisir_theme("nuit")
+    v.occasion.setCurrentIndex(v.occasion.findData("examen"))
+    assert v.theme == "nuit" and v.titre.text() == "الامتحان الموحد" and "الامتحان" in v.texte.toPlainText()
+    v.date.definir("2026-11-21")
+    v.heure.setText("8:30")
+    c = v.contenu()
+    assert c.date == "السبت 21 نونبر 2026" and c.etablissement and [l for l, _ in c.infos()] == ["التاريخ", "الساعة"]
+    for fmt, points in (("A4", (595, 842)), ("A3", (842, 1191))):   # حجم الصفحة الحقيقي في الملف
+        v.format.setCurrentIndex(v.format.findData(fmt))
+        pdf = v.enregistrer_pdf(tmp_path / f"{fmt}.pdf", ouvrir=False)
+        brut = pdf.read_bytes()
+        m = re.search(rb"/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)", brut)
+        assert brut[:4] == b"%PDF" and len(brut) > 3000 and m
+        assert abs(float(m[1]) - points[0]) < 2 and abs(float(m[2]) - points[1]) < 2
+    img = v.enregistrer_image(tmp_path / "إعلان.png")
+    assert QPixmap(str(img)).width() == 2480
+    assert v.enregistrer_pdf() is not None and len(ouverts) == 1   # في الأرشيف ثم يُفتح
+    v.titre.setText("")
+    assert v.enregistrer_pdf(tmp_path / "x.pdf", ouvrir=False) is None and p.message.objectName() == "erreur"
+    # النص الطويل يُصغَّر حتى يدخل صندوقه، والعنوان القصير يبقى بحجمه
+    d = af.composer("officiel", af.Contenu(titre="عنوان", texte="كلمة " * 500))
+    pm = QPixmap(420, 594)
+    q = QPainter(pm)
+    tailles = dict(zip([t.texte[:5] for t in d.textes], affiche_qt.peindre(q, d, QRectF(0, 0, 420, 594))))
+    q.end()
+    assert tailles["كلمة "] < int(22 * 0.3528 * 2) and tailles["عنوان"] == int(44 * 0.3528 * 2)
+    # الاستدعاءات
+    p.pilules["convocations"].click()
+    cvu = p.vue()
+    assert p.cle == "convocations" and v.isHidden() and cvu.numero.isHidden() and cvu.table.rowCount() > 0
+    cvu.occasion.setCurrentIndex(cvu.occasion.findData("portes"))
+    assert not cvu.numero.isHidden() and cvu.numero.count() == 4
+    cvu.occasion.setCurrentIndex(cvu.occasion.findData("rencontre"))
+    assert [cvu.numero.itemText(i) for i in range(cvu.numero.count())] == ["01", "02", "03", "04", "05"]
+    assert cvu.generer() is None and p.message.objectName() == "erreur"   # التاريخ مطلوب
+    cvu.date.definir("2026-11-21")
+    cvu.heure.setText("10:00")
+    cvu.numero.setCurrentIndex(2)
+    selectionner(cvu.table, 0)
+    assert len(cvu.choisis()) == 1 and "المحدَّدون: 1" in cvu.nb.text()
+    doc = cvu.generer()
+    cellules = [c.text for t in Document(doc).tables for r in t.rows for c in r.cells if c.text.strip()]
+    assert len(cellules) == 1 and "اللقاء التواصلي رقم 03" in cellules[0] and len(ouverts) == 2
+    cvu.table.clearSelection()
+    cvu.par_page.setCurrentIndex(cvu.par_page.findData(8))
+    assert cvu.choisis() is None and "كل المعروضين" in cvu.nb.text()
+    doc = cvu.generer()
+    assert sum(1 for t in Document(doc).tables for r in t.rows for c in r.cells if c.text.strip()) == cvu.table.rowCount()
+    p.pilules["annonces"].click()   # سجل الإعلانات النصية ما زال في مكانه
+    assert p.vue().r.cle == "annonces"
+    f.close()
