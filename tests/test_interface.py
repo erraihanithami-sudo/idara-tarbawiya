@@ -1008,6 +1008,9 @@ def test_page_riyada_isa2_calcule(app, config_tmp, monkeypatch, tmp_path):
     assert m == "ar"
     fic = _fichier(tmp_path / "post.xlsx", cl, [("A", "A", "B"), ("B", "C", "B"), ("C", "A", "B")])
     assert p.importer_resultats([fic]) and "3 تلميذاً" in p.message.text()
+    assert p.comptes.item(0, 6).text() == "لا يُحتسب"   # الرائز البعدي: توزيع دون ISA2 (توجيه المدير)
+    p.phase_r.setCurrentIndex(p.phase_r.findData(1))
+    assert p.importer_resultats([fic])
     assert p.comptes.item(0, 7).text() == f"{isa_srv.Calcul(1, 1, 1).isa:.2f}%" and "إلى" in p.comptes.item(0, 8).text() \
         and "OB" in p.comptes.item(0, 8).toolTip()
     p.phase_r.setCurrentIndex(p.phase_r.findData(-1))   # الرائز القبلي يدوياً
@@ -1019,6 +1022,43 @@ def test_page_riyada_isa2_calcule(app, config_tmp, monkeypatch, tmp_path):
     p.comptes.item(0, 2).setText("x")
     assert not p.enregistrer_comptes() and "أرقاماً" in p.message.text()
     assert p.rapport_isa() and len(ouverts) == 1
+    f.close()
+
+
+def test_page_fiche_eleve(app, config_tmp, monkeypatch):
+    """بطاقة التلميذ: الاختيار، الجدولان والمبيانان، إدخال مستويات المراحل، الطبع. بيانات وهمية."""
+    from idara.services import bureautique
+    from idara.services import fiche_eleve as fe
+    from idara.ui.saisie import selectionner
+    from tests.fabrique_tarl import classeur_niveaux
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    t = f.page_tarl
+    assert t.importer([classeur_niveaux(config_tmp / "t.xlsx", {"2APG-1": [
+        ("X000000001", "أ", "حرف", "كلمة", "débutant", "lettre", "رقمان", "جمع")]})])
+    f.aller_a("بطاقة التلميذ")
+    assert f.page_courante() == "بطاقة التلميذ"
+    p = f.page_fiche_eleve
+    assert p.c_fiche.isHidden() and p.liste.rowCount() >= 1
+    assert p.generer() is None   # لا تلميذ مختار
+    p.recherche.setText("X000000001")
+    assert p.liste.rowCount() == 1
+    selectionner(p.liste, 0)
+    assert not p.c_fiche.isHidden() and p.t_tarl.rowCount() == 3 and not p.g_tarl.isHidden()
+    assert p.t_tarl.item(0, 1).text() == "حرف" and p.t_tarl.item(0, 4).text() == "+1"
+    assert p.g_etapes.isHidden()
+    p.t_etapes.item(0, 0).setText("C")
+    p.t_etapes.item(0, 2).setText("b")
+    assert p.enregistrer() and not p.g_etapes.isHidden()
+    assert fe.parcours(f.conn, p.eid)["etapes"] == {"ar": {-1: "C", 1: "B"}}
+    p.t_etapes.item(1, 3).setText("Z")
+    assert not p.enregistrer() and "A أو B أو C" in p.message.text()
+    p.t_etapes.item(1, 3).setText("")
+    g = p.g_tarl.grab()
+    assert not g.isNull()
+    assert p.generer() and len(ouverts) == 1
+    assert p.generer(tous=True) is None and "اختر قسماً" in p.message.text()
     f.close()
 
 

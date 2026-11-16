@@ -1,10 +1,10 @@
 """مؤسسات الريادة: مؤشر ISA2 حسب مراحل التعليم الصريح، مراسلة الأساتذة بنتائج المرحلة، ملف شارة الريادة،
 والتقرير التركيبي لأداء المؤسسة والتعلمات الأساس.
 
-- ISA2: يُدخله المدير لكل قسم ومادة ومرحلة (الرائز البعدي ثم المراحل)، كما يقرؤه في مسار. لا يُحتسب هنا:
-  صيغة احتسابه من اختصاص مسار.
+- نسبة التحكم: يُدخلها المدير لكل قسم ومادة، للرائز القبلي والرائز البعدي ثم للمراحل، كما يقرؤها في مسار
+  (أو تُملأ نسبة الرائزين من مستويات التعلم TaRL). مؤشر ISA2 يخص المراحل وحدها (توجيهات المدير 2026-11-15).
 - مراسلة «بخصوص نتائج المرحلة»: على نموذج المدير (13 ماي 2026): جدول لكل قسم ومادة بنسبة التحكم في التعلمات
-  الأساس من الرائز البعدي إلى المرحلة المختارة، وسطر «التطور».
+  الأساس من الرائز القبلي إلى المرحلة المختارة، وسطر «التطور».
 - ملف شارة الريادة: الوثائق العشرون و«حقيبة المعلومات» كما في وثيقة «معايير الريادة».
 """
 
@@ -63,8 +63,11 @@ class ErreurRiyada(ValueError):
     """رسالة موجهة للمدير بالعربية."""
 
 
+PHASES = list(range(-1, 7))   # -1 الرائز القبلي، 0 الرائز البعدي، ثم المراحل
+
+
 def libelle_phase(p: int) -> str:
-    return "الرائز البعدي" if p == 0 else f"المرحلة {p}"
+    return {-1: "الرائز القبلي", 0: "الرائز البعدي"}.get(p, f"المرحلة {p}")
 
 
 def _aid(conn, annee: str) -> int:
@@ -74,7 +77,7 @@ def _aid(conn, annee: str) -> int:
 # ---------- ISA2 حسب المراحل ----------
 
 def _taux(v) -> float | None:
-    s = str(v or "").replace("%", "").replace(",", ".").strip()
+    s = ("" if v is None else str(v)).replace("%", "").replace(",", ".").strip()   # 0% نسبة صحيحة
     if not s:
         return None
     try:
@@ -87,7 +90,7 @@ def _taux(v) -> float | None:
 
 
 def enregistrer_isa(conn, annee: str, classe: str, phase: int, valeurs: dict[str, object]) -> None:
-    if not 0 <= int(phase) <= 8:
+    if not -1 <= int(phase) <= 8:
         raise ErreurRiyada("مرحلة غير صحيحة.")
     aid = _aid(conn, annee)
     parsed = {m: _taux(valeurs.get(m)) for m in MATIERES}
@@ -109,6 +112,35 @@ def isa(conn, annee: str) -> dict[str, dict[str, dict[int, float]]]:
                           (annee,)):
         res.setdefault(r["classe"], {}).setdefault(r["matiere"], {})[r["phase"]] = r["valeur"]
     return res
+
+
+def taux_tarl(conn, annee: str) -> dict[str, dict[str, dict[int, float]]]:
+    """نسبة بلوغ المستوى المتوقع في رائزي الموضعة (TaRL) لكل قسم ومادة: القسم ← المادة ← {-1, 0} ← النسبة.
+    تُقترح لملء خانتي الرائز القبلي والبعدي إن لم يُدخلهما المدير."""
+    res: dict = {}
+    for cl in classes(conn, annee):
+        for m in MATIERES:
+            tb = tarl.tableau_bord(conn, annee, f"c:{cl}", m)
+            for ep, p in (("pre", -1), ("post", 0)):
+                x = tb["taux_attendu"][ep]
+                if x is not None:
+                    res.setdefault(cl, {}).setdefault(m, {})[p] = x
+    return res
+
+
+def remplir_depuis_tarl(conn, annee: str, ecraser: bool = False) -> int:
+    """يملأ نسب الرائزين القبلي والبعدي من مستويات التعلم. يرجع عدد الخانات المملوءة."""
+    deja = isa(conn, annee)
+    n = 0
+    for cl, ms in taux_tarl(conn, annee).items():
+        for p in (-1, 0):
+            vals = {m: v[p] for m, v in ms.items() if p in v
+                    and (ecraser or p not in deja.get(cl, {}).get(m, {}))}
+            if vals:
+                garder = {m: deja.get(cl, {}).get(m, {}).get(p) for m in MATIERES}
+                enregistrer_isa(conn, annee, cl, p, {**{m: v for m, v in garder.items() if v is not None}, **vals})
+                n += len(vals)
+    return n
 
 
 def classes(conn, annee: str) -> list[str]:
@@ -196,11 +228,12 @@ def generer_lettres(conn, dossier: DossierDonnees, annee: str, phase: int, maths
         p = para(d, apres=8)
         ajouter(p, "الموضوع: ", gras=True)
         ajouter(p, f"بخصوص نتائج المرحلة {ordinal}.")
+        depart = "الرائز القبلي" if any(-1 in donnees[cl][m] for cl, m, _ in blocs) else "الرائز البعدي"
         corps = (f"وبعد، أتشرف بتهنئتكم بالنتائج الجيدة المحصل عليها في المرحلة {ordinal} وأوافيكم بالإحصائيات "
-                 "التفصيلية الخاصة بالمرحلة وبالتطور الحاصل انطلاقا من مرحلة الرائز البعدي حسب مؤشر ISA2."
+                 f"التفصيلية الخاصة بالمرحلة وبالتطور الحاصل انطلاقا من {depart} (مؤشر ISA2 في المراحل)."
                  if felicitations else
                  f"وبعد، أوافيكم بالإحصائيات التفصيلية الخاصة بنتائج المرحلة {ordinal} وبالتطور الحاصل انطلاقا من "
-                 "مرحلة الرائز البعدي حسب مؤشر ISA2.")
+                 f"{depart} (مؤشر ISA2 في المراحل).")
         para(d, corps, apres=8)
         for cl, m, ev_ in blocs:
             niveau, groupe = _niveau_groupe(cl)
@@ -435,7 +468,8 @@ def generer_synthese(conn, dossier: DossierDonnees, annee: str, observations: st
     if donnees:
         vide = False
         phases = sorted({p for cl in donnees.values() for m in cl.values() for p in m})
-        para(d, "3. مؤشر ISA2 حسب مراحل التعليم الصريح (نسبة التحكم في التعلمات الأساس)", gras=True, taille=16, apres=2)
+        para(d, "3. نسبة التحكم في التعلمات الأساس: الرائزان القبلي والبعدي ثم مؤشر ISA2 في مراحل التعليم الصريح",
+             gras=True, taille=16, apres=2)
         lignes = [(cl, m) for cl in sorted(donnees) for m in MATIERES if m in donnees[cl]]
         n = len(phases)
         t = tableau(d, 1 + len(lignes), 2 + n, largeurs=[2.6, 2.6] + [12.2 / n] * n)

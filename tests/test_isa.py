@@ -51,19 +51,25 @@ def test_import_calcul_rapport(base, dossier, tmp_path):  # noqa: F811
     d = isa.resultats(base, "2026/2027")[cl]
     assert (d["ar"][0].a, d["ar"][0].b, d["ar"][0].c) == (2, 1, 1)
     assert (d["ma"][0].a, d["ma"][0].b, d["ma"][0].c) == (1, 1, 1)
-    # يُكتب أيضاً في جدول المراحل الذي تستعمله المراسلات
+    # توجيهات 2026-11-15: لا ISA2 للرائز البعدي ولا القبلي؛ المراحل وحدها تُكتب في جدول المراحل
     from idara.services import riyada as ry
-    assert ry.isa(base, "2026/2027")[cl]["ar"][0] == d["ar"][0].isa
-    # القبلي (ISA0) والمرحلة الأولى يدوياً
+    assert cl not in ry.isa(base, "2026/2027") and isa.indicateur(0, d["ar"][0]) is None
+    assert isa.code_isa(-1) == isa.code_isa(0) == "" and isa.code_isa(2) == "ISA2"
+    # مستوى كل تلميذ محفوظ لبطاقته
+    niv = dict(base.execute("SELECT code_massar, niveau FROM isa_eleve WHERE phase=0 AND matiere='ar'").fetchall())
+    assert niv == {"X000000001": "A", "X000000002": "B", "X000000003": "C", "X000000004": "A"}
+    # القبلي والمرحلة الأولى يدوياً
     isa.enregistrer(base, "2026/2027", cl, "ar", -1, 0, 2, 2)
     isa.enregistrer(base, "2026/2027", cl, "ar", 1, 3, 1, 0)
-    assert -1 not in ry.isa(base, "2026/2027")[cl]["ar"]
+    assert list(ry.isa(base, "2026/2027")[cl]["ar"]) == [1]
+    assert isa.reference(isa.resultats(base, "2026/2027")[cl]["ar"])[0] == 1   # الهدف من المرحلة لا من الرائز
     with pytest.raises(isa.ErreurIsa):
         isa.enregistrer(base, "2026/2027", cl, "ar", 1, "x", 1, 0)
     isa.enregistrer(base, "2026/2027", cl, "fr", 2, 0, 0, 0)   # أعداد فارغة: لا سطر
     assert 2 not in isa.resultats(base, "2026/2027")[cl]["fr"]
     t = texte(isa.generer_rapport(base, dossier, "2026/2027"))
-    assert "مؤشر التحكم في التعلمات ISA2" in t and "الرائز القبلي" in t and "ISA0" in t and "تحديد الهدف" in t
+    assert "مؤشر التحكم في التعلمات ISA2" in t and "الرائز القبلي" in t and "ISA0" not in t and "تحديد الهدف" in t
+    assert "لا يُحتسب" in t and "المرحلة 1 (ISA2)" in t
     assert "OB ≥ 75%" in t and "+" in t
 
 

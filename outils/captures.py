@@ -266,6 +266,27 @@ def main(sortie: Path) -> None:
         annee=__import__("idara.services.annee", fromlist=["x"]).libelle_pour_date())])
     f.aller_a("التعلمات الأساس")
     photo(f, "39_tarl")
+    # بطاقة التلميذ (توجيهات 2026-11-15)
+    try:
+        from idara.services import fiche_eleve as _fe
+        from idara.ui.graphe_parcours import graphiques as _gr
+        fp = f.page_fiche_eleve
+        f.aller_a("بطاقة التلميذ")
+        fp.rafraichir()
+        fp.recherche.setText("X000000001")
+        if fp.lignes:
+            fp.charger(fp.lignes[0]["id"])
+            for ph, n in ((-1, "C"), (0, "B"), (1, "B"), (2, "A"), (3, "A")):
+                _fe.enregistrer_etape(f.conn, fp.eid, fp.p["annee"], ph, "ar", n)
+            for ph, n in ((-1, "C"), (0, "C"), (1, "B"), (2, "B")):
+                _fe.enregistrer_etape(f.conn, fp.eid, fp.p["annee"], ph, "ma", n)
+            fp.afficher()
+            photo(f, "70_fiche_eleve")
+            fp.g_etapes.grab().save(str(sortie / "70_fiche_eleve_etapes.png"))
+            import shutil as _sh2
+            _sh2.copy(_fe.generer(f.conn, f.dossier, [fp.eid], fp.p["annee"], _gr), sortie / "70_fiche_eleve.docx")
+    except Exception as e:  # noqa: BLE001
+        print("fiche_eleve:", repr(e))
     cid = vsx.enregistrer_club(f.conn, "النادي البيئي", None, "التربية على البيئة", "الأربعاء 15:00-16:00")
     vsx.enregistrer_activite(f.conn, vsx.Activite("يوم وطني أو دولي", "ذكرى المسيرة الخضراء", None, "جميع الأطر",
                                                   "جميع التلاميذ", "نونبر", statut="prevue"))

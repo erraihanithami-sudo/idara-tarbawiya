@@ -115,6 +115,7 @@ def _supprimer_eleves(conn, eleves: list[int]) -> None:
                 f"DELETE FROM examen_candidat WHERE eleve_id IN {e}",
                 f"DELETE FROM resultat WHERE eleve_id IN {e}",
                 f"DELETE FROM niveau_apprentissage WHERE eleve_id IN {e}",
+                f"DELETE FROM isa_eleve WHERE eleve_id IN {e}",
                 f"DELETE FROM observation_comportement WHERE eleve_id IN {e}",
                 f"DELETE FROM mouvement WHERE eleve_id IN {e}",
                 f"DELETE FROM eleve_avant_massar WHERE eleve_id IN {e}",
@@ -196,7 +197,7 @@ def _executer(conn, cle: str, unite: str | None) -> int:
         return n
     tables = {
         "resultats": ["resultat", "conseil_niveau", "isa_classe", "deliberation"],
-        "tarl": ["niveau_apprentissage", "tarl_parcours", "niveau_attendu", "isa_resultat"],
+        "tarl": ["niveau_apprentissage", "tarl_parcours", "niveau_attendu", "isa_resultat", "isa_eleve"],
         "activites": ["club_membre", "activite", "club"],
         "absences": ["absence_classe", "absence_mois"],
         "frais": ["frais_inscription"],

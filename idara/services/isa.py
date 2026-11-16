@@ -1,7 +1,6 @@
 """حساب مؤشر التحكم في التعلمات ISA2 من نتائج الروائز (المدرسة الرائدة)، حسب الصيغة التي زوّد بها المدير
 (2026-11-12):
 
-    ISA0 = نسبة التحكم في الرائز القبلي، ISA1 = نسبة التحكم في الرائز البعدي.
     مستويات التحكم في الكفايات: A تحكم تام، B تحكم مقنع، C تحكم ضعيف (نسب التلاميذ في كل مستوى).
     Ind  = [(3×A + 2×B + 1×C) / 3] × 100
     ISA2 = α × Ind  ؛  α = 0,8
@@ -12,9 +11,12 @@
     50% < ISA2 < 70%  : بين 5 و10 نقط، والهدف 55% ≤ OB ≤ 80%
     ISA2 ≥ 70%        : 5 نقط، والهدف OB ≥ 75%
 
+توجيهات المدير 2026-11-15: مؤشر ISA2 يُحتسب للمراحل فقط، لا للرائز القبلي ولا للرائز البعدي. نتائج الرائزين
+تبقى (توزيع A/B/C) وتظهر في التقارير وبطاقة التلميذ، دون مؤشر.
+
 تُستورد نتائج كل مرحلة من ملف Excel (تصدير مسار أو ملف المؤسسة): سطر لكل تلميذ، وعمود لكل مادة فيه مستوى
 التحكم (A/B/C، أو «تحكم تام/مقنع/ضعيف»، أو نقطة مئوية تُحوَّل حسب SEUILS). ويمكن أيضاً إدخال الأعداد يدوياً.
-النسب المحسوبة للرائز البعدي والمراحل تُكتب كذلك في جدول ISA2 حسب المراحل (isa_phase) لتستعملها المراسلات
+نسب المراحل المحسوبة تُكتب كذلك في جدول ISA2 حسب المراحل (isa_phase) لتستعملها المراسلات
 والتقارير الموجودة.
 """
 
@@ -56,9 +58,23 @@ def libelle_phase(p: int) -> str:
     return {-1: "الرائز القبلي", 0: "الرائز البعدي"}.get(p, f"المرحلة {p}")
 
 
+def est_etape(p: int) -> bool:
+    """المراحل (1 فما فوق) وحدها يُحتسب لها ISA2."""
+    return p >= 1
+
+
 def code_isa(p: int) -> str:
-    """ISA0 للقبلي، ISA1 للبعدي، ISA2 للمراحل."""
-    return {-1: "ISA0", 0: "ISA1"}.get(p, "ISA2")
+    """ISA2 للمراحل؛ لا مؤشر للرائزين القبلي والبعدي."""
+    return "ISA2" if est_etape(p) else ""
+
+
+def libelle_complet(p: int) -> str:
+    return f"{libelle_phase(p)} (ISA2)" if est_etape(p) else libelle_phase(p)
+
+
+def indicateur(p: int, k: "Calcul") -> float | None:
+    """ISA2 للمرحلة، ولا شيء للرائزين."""
+    return k.isa if est_etape(p) else None
 
 
 # ---------- الحساب ----------
@@ -115,7 +131,7 @@ def _aid(conn, annee: str) -> int:
 
 def enregistrer(conn: sqlite3.Connection, annee: str, classe: str, matiere: str, phase: int,
                 a: int, b: int, c: int, source: str = "إدخال يدوي") -> Calcul:
-    """يحفظ أعداد مستويات التحكم، ويكتب ISA2 المحسوب في جدول المراحل (للرائز البعدي والمراحل)."""
+    """يحفظ أعداد مستويات التحكم، ويكتب ISA2 المحسوب في جدول المراحل (للمراحل وحدها)."""
     if matiere not in MATIERES:
         raise ErreurIsa(f"مادة غير معروفة: {matiere}")
     if phase not in range(-1, 9):
@@ -136,7 +152,7 @@ def enregistrer(conn: sqlite3.Connection, annee: str, classe: str, matiere: str,
                          "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(annee_id, classe, phase, matiere) DO UPDATE SET "
                          "nb_a=excluded.nb_a, nb_b=excluded.nb_b, nb_c=excluded.nb_c, source=excluded.source",
                          (aid, classe, phase, matiere, a, b, c, source))
-        if phase >= 0 and calc.isa is not None:
+        if est_etape(phase) and calc.isa is not None:
             conn.execute("INSERT INTO isa_phase(annee_id, classe, phase, matiere, valeur) VALUES (?,?,?,?,?) "
                          "ON CONFLICT(annee_id, classe, phase, matiere) DO UPDATE SET valeur=excluded.valeur",
                          (aid, classe, phase, matiere, calc.isa))
@@ -162,8 +178,8 @@ def ensemble(donnees: dict, matiere: str, phase: int) -> Calcul | None:
 
 
 def reference(par_phase: dict[int, Calcul]) -> tuple[int, Calcul] | None:
-    """القيمة المرجعية لتحديد الهدف: آخر مرحلة متوفرة."""
-    ps = [p for p in sorted(par_phase) if par_phase[p].total]
+    """القيمة المرجعية لتحديد الهدف: آخر مرحلة متوفرة (الرائزان لا يدخلان)."""
+    ps = [p for p in sorted(par_phase) if par_phase[p].total and est_etape(p)]
     return (ps[-1], par_phase[ps[-1]]) if ps else None
 
 
@@ -211,6 +227,7 @@ def _matiere(texte) -> str | None:
 @dataclass
 class FichierIsa:
     comptes: dict[tuple[str, str], list[int]] = field(default_factory=dict)   # (القسم، المادة) ← [A, B, C]
+    niveaux: list[tuple[str, str, str, str]] = field(default_factory=list)    # (رمز مسار، القسم، المادة، المستوى)
     eleves: int = 0
     alertes: list[str] = field(default_factory=list)
 
@@ -261,6 +278,7 @@ def lire_fichier(chemin: Path) -> FichierIsa:
                     res.alertes.append(f"{classe}: قيمة غير مفهومة «{v}» ({MATIERES[m]}) لـ {code}.")
                     continue
                 res.comptes.setdefault((classe, m), [0, 0, 0])["ABC".index(n)] += 1
+                res.niveaux.append((code, classe, m, n))
     if not res.comptes:
         raise ErreurIsa("لم يُعثر على نتائج في الملف: يلزم عمود «رقم التلميذ» (أو «رمز مسار») وعمود لكل مادة "
                         "(العربية، الفرنسية، الرياضيات) فيه مستوى التحكم A/B/C أو النقطة.")
@@ -277,18 +295,29 @@ class RapportIsa:
 
 def importer(conn: sqlite3.Connection, annee: str, phase: int, chemins: list[Path]) -> RapportIsa:
     total: dict[tuple[str, str], list[int]] = {}
-    eleves, alertes, noms = 0, [], []
+    eleves, alertes, noms, niveaux = 0, [], [], []
     for ch in chemins:
         f = lire_fichier(Path(ch))
         eleves += f.eleves
         alertes += f.alertes
         noms.append(Path(ch).name)
+        niveaux += f.niveaux
         for k, v in f.comptes.items():
             t = total.setdefault(k, [0, 0, 0])
             for i in range(3):
                 t[i] += v[i]
     for (classe, m), (a, b, c) in total.items():
         enregistrer(conn, annee, classe, m, phase, a, b, c, source="، ".join(noms))
+    # مستوى كل تلميذ (لبطاقة التلميذ)
+    aid = _aid(conn, annee)
+    with conn:
+        for code, classe, m, n in niveaux:
+            e = conn.execute("SELECT id FROM eleve WHERE code_massar=?", (code,)).fetchone()
+            conn.execute("INSERT INTO isa_eleve(annee_id, code_massar, eleve_id, classe, phase, matiere, niveau, source) "
+                         "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(annee_id, code_massar, phase, matiere) DO UPDATE SET "
+                         "eleve_id=excluded.eleve_id, classe=excluded.classe, niveau=excluded.niveau, "
+                         "source=excluded.source", (aid, code, e[0] if e else None, classe, phase, m, n,
+                                                    "، ".join(noms)))
     journaliser(conn, "isa_import", "isa_resultat", None, f"{annee} {libelle_phase(phase)}: {len(total)} سطر")
     return RapportIsa(phase, eleves, len(total), alertes[:20])
 
@@ -314,7 +343,8 @@ def generer_rapport(conn: sqlite3.Connection, dossier: DossierDonnees, annee: st
     para(d, "تقرير حول مؤشر التحكم في التعلمات ISA2", gras=True, taille=20, centre=True, apres=0)
     para(d, f"المدرسة الرائدة — السنة الدراسية {annee}", centre=True, apres=4)
     para(d, f"طريقة الحساب: Ind = [(3×A + 2×B + 1×C) / 3] × 100 ؛ ISA2 = α × Ind ؛ α = {ALPHA:g}. "
-            "A: تحكم تام، B: تحكم مقنع، C: تحكم ضعيف (نسب التلاميذ). ISA0: الرائز القبلي، ISA1: الرائز البعدي.",
+            "A: تحكم تام، B: تحكم مقنع، C: تحكم ضعيف (نسب التلاميذ). يُحتسب المؤشر للمراحل فقط؛ الرائزان القبلي "
+            "والبعدي يظهر توزيع تلاميذهما على مستويات التحكم دون مؤشر.",
          taille=11, apres=8)
 
     # 1. حصيلة المؤسسة
@@ -325,14 +355,15 @@ def generer_rapport(conn: sqlite3.Connection, dossier: DossierDonnees, annee: st
     _cellule(t.cell(0, 0), "المادة", gras=True, taille=11)
     _ombre(t.cell(0, 0))
     for j, p in enumerate(phases, start=1):
-        _cellule(t.cell(0, j), f"{libelle_phase(p)} ({code_isa(p)})", gras=True, taille=11)
+        _cellule(t.cell(0, j), libelle_complet(p), gras=True, taille=11)
         _ombre(t.cell(0, j))
     for i, (m, lib) in enumerate(MATIERES.items(), start=1):
         _cellule(t.cell(i, 0), lib, gras=True, taille=11)
         for j, p in enumerate(phases, start=1):
             e = ensemble(donnees, m, p)
-            _cellule(t.cell(i, j), "—" if e is None else f"{_f(e.isa)}\n(A {e.pct(e.a):.0f}% · B {e.pct(e.b):.0f}% · "
-                                                         f"C {e.pct(e.c):.0f}%)", taille=10)
+            repart = "" if e is None else f"A {e.pct(e.a):.0f}% · B {e.pct(e.b):.0f}% · C {e.pct(e.c):.0f}%"
+            _cellule(t.cell(i, j), "—" if e is None else (f"{_f(e.isa)}\n({repart})" if est_etape(p) else repart),
+                     taille=10)
     para(d, apres=8)
 
     # 2. تفصيل حسب القسم
@@ -344,11 +375,14 @@ def generer_rapport(conn: sqlite3.Connection, dossier: DossierDonnees, annee: st
             avant = None
             for p in sorted(donnees[cl].get(m, {})):
                 k = donnees[cl][m][p]
-                ecart = None if avant is None or k.isa is None else round(k.isa - avant, 2)
-                lignes.append((cl.replace("-", ""), MATIERES[m], f"{libelle_phase(p)} ({code_isa(p)})", str(k.total),
+                val = indicateur(p, k)
+                ecart = None if avant is None or val is None else round(val - avant, 2)
+                lignes.append((cl.replace("-", ""), MATIERES[m], libelle_complet(p), str(k.total),
                                f"{k.a} ({k.pct(k.a):.0f}%)", f"{k.b} ({k.pct(k.b):.0f}%)", f"{k.c} ({k.pct(k.c):.0f}%)",
-                               _f(k.ind), _f(k.isa), "—" if ecart is None else f"{ecart:+.2f}"))
-                avant = k.isa
+                               _f(k.ind) if est_etape(p) else "لا يُحتسب", _f(val) if est_etape(p) else "لا يُحتسب",
+                               "—" if ecart is None else f"{ecart:+.2f}"))
+                if val is not None:
+                    avant = val
     t = tableau(d, 1 + len(lignes), len(entetes), largeurs=[1.8, 2.2, 3.6, 1.4, 2.4, 2.4, 2.4, 2.4, 2.4, 2.2])
     for j, lib in enumerate(entetes):
         _cellule(t.cell(0, j), lib, gras=True, taille=10)

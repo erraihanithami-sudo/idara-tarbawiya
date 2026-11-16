@@ -599,13 +599,14 @@ class PageRiyada(QWidget):
         c, v = carte("حساب مؤشر التحكم في التعلمات ISA2 من نتائج الروائز")
         f = QLabel("طريقة الحساب: \u2066Ind = [(3*A + 2*B + 1*C) / 3] * 100\u2069 ثم "
                    f"\u2066ISA2 = {isa_srv.ALPHA:g} * Ind\u2069 — A: تحكم تام، B: تحكم مقنع، C: تحكم ضعيف "
-                   "(نسب التلاميذ). ISA0: الرائز القبلي، ISA1: الرائز البعدي.")
+                   "(نسب التلاميذ). المؤشر يُحتسب للمراحل فقط؛ للرائزين القبلي والبعدي يظهر توزيع المستويات "
+                   "ويُحفظ مستوى كل تلميذ لبطاقته.")
         f.setObjectName("info")
         f.setWordWrap(True)
         v.addWidget(f)
         self.phase_r = QComboBox()
         for p in isa_srv.PHASES:
-            self.phase_r.addItem(f"{isa_srv.libelle_phase(p)} ({isa_srv.code_isa(p)})", p)
+            self.phase_r.addItem(isa_srv.libelle_complet(p), p)
         self.phase_r.setCurrentIndex(1)
         self.phase_r.currentIndexChanged.connect(lambda _: self.charger_comptes())
         v.addLayout(_grille([("السنة", self.annee), ("المرحلة / الرائز", self.phase_r)]))
@@ -637,9 +638,9 @@ class PageRiyada(QWidget):
         v.addWidget(self.comptes)
         racine.addWidget(c)
 
-        c, v = carte("مؤشر ISA2 حسب المراحل (إدخال مباشر للنسب كما في مسار)")
-        for p in range(0, 7):
-            self.phase.addItem(ry.libelle_phase(p), p)
+        c, v = carte("نسبة التحكم حسب الروائز والمراحل (إدخال مباشر كما في مسار)")
+        for p in ry.PHASES:
+            self.phase.addItem(ry.libelle_phase(p) + (" (ISA2)" if p >= 1 else ""), p)
         # السنة: مشتركة بين الحساب والإدخال المباشر
         self.annee.currentIndexChanged.connect(lambda _: self.charger())
         self.phase.currentIndexChanged.connect(lambda _: self.charger_saisie())
@@ -656,6 +657,10 @@ class PageRiyada(QWidget):
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer_isa())
         h.addWidget(b)
+        b = QPushButton("ملء الرائزين من مستويات التعلم")
+        b.setToolTip("نسبة بلوغ المستوى المتوقع في رائزي الموضعة القبلي والبعدي (TaRL)، للأقسام التي لم تُدخل نسبتها")
+        b.clicked.connect(lambda: self.remplir_tarl())
+        h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
         t = QLabel("التطور حسب المراحل")
@@ -669,7 +674,7 @@ class PageRiyada(QWidget):
         c, v = carte("مراسلة الأساتذة «بخصوص نتائج المرحلة» (نموذجكم)")
         self.phase_l, self.maths = QComboBox(), QComboBox()
         for p in range(1, 7):
-            self.phase_l.addItem(ry.libelle_phase(p), p)
+            self.phase_l.addItem(ry.libelle_phase(p), p)   # المراسلة تخص نتائج مرحلة؛ جدولها يبدأ من الرائز القبلي
         for k, lib in (("fr", "أساتذة الفرنسية"), ("ar", "أساتذة العربية"), ("tous", "الجميع"), ("aucun", "لا أحد")):
             self.maths.addItem(lib, k)
         self.date_l = ChampDate()
@@ -768,6 +773,17 @@ class PageRiyada(QWidget):
 
     # ---------- ISA2 من نتائج الروائز ----------
 
+    def remplir_tarl(self) -> int | None:
+        a = self.annee.currentText()
+        if not a:
+            return None
+        n = self.ry.remplir_depuis_tarl(self.f.conn, a)
+        self.charger_saisie()
+        self._evolution()
+        message(self.message, f"مُلئت {n} خانة من مستويات التعلم." if n else
+                "لا خانات فارغة للرائزين، أو لم تُستورد مستويات التعلم بعد.", not n)
+        return n
+
     def charger_comptes(self) -> None:
         a, p = self.annee.currentText(), self.phase_r.currentData()
         if not a:
@@ -782,12 +798,15 @@ class PageRiyada(QWidget):
             fixe = [cellule(cl.replace("-", ""), (cl, m)), cellule(self.isa_srv.MATIERES[m])]
             vals = ["", "", ""] if k is None else [str(k.a), str(k.b), str(k.c)]
             calc = ["", "", "", ""]
-            if k is not None and k.total:
+            etape = self.isa_srv.est_etape(p)
+            if k is not None and k.total and not etape:
+                calc = [str(k.total), "لا يُحتسب", "لا يُحتسب", ""]
+            elif k is not None and k.total:
                 o = self.isa_srv.objectif(k.isa)
                 calc = [str(k.total), f"{k.ind:.2f}%", f"{k.isa:.2f}%",
                         f"من {o['cible_min']:.2f}% إلى {o['cible_max']:.2f}%"]
             items = fixe + [cellule(x) for x in vals] + [cellule(x) for x in calc]
-            if k is not None and k.total:
+            if k is not None and k.total and etape:
                 items[8].setToolTip(f"الفئة: {o['categorie']} — التطور المرتقب من {o['min']} إلى {o['max']} نقطة "
                                     f"— الهدف حسب الجدول: {o['objectif']}")
             for j, it in enumerate(items):

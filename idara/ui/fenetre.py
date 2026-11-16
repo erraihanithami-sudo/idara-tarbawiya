@@ -490,7 +490,8 @@ SECTIONS = [
                           ("أداء المؤسسة", "الأداء العام للمؤسسة"),
                           ("تتبع الغياب", "تتبع الغياب"), ("مجالس المؤسسة", "مجالس المؤسسة"),
                           ("السبورة المرجعية", "السبورة المرجعية")]),
-    ("التلاميذ", [("التلاميذ", "وثائق التلاميذ"), ("حركية التلاميذ", "حركية التلاميذ"),
+    ("التلاميذ", [("التلاميذ", "وثائق التلاميذ"), ("بطاقة التلميذ", "بطاقة التلميذ: تتبع المسار"),
+                  ("حركية التلاميذ", "حركية التلاميذ"),
                   ("تتبع السلوك", "تتبع سلوكات التلاميذ"), ("أولياء الأمور", "معلومات أولياء الأمور"),
                   ("النقل المدرسي", "النقل المدرسي"), ("الصحة والسلامة", "الصحة والسلامة المدرسية"),
                   ("التلاميذ القدامى", "التلاميذ القدامى (ما قبل مسار)"), ("الاستيراد من مسار", "الاستيراد من مسار")]),
@@ -641,7 +642,8 @@ def normaliser_recherche(t: str) -> str:
 
 
 # كلمات إضافية للبحث (ما يكتبه المدير قد لا يكون في اسم الصفحة)
-MOTS_CLES = {"الرخص": "إجازة رخصة مرض ولادة رضاعة", "الموارد البشرية": "أساتذة أستاذ موظفين أطر xml",
+MOTS_CLES = {"بطاقة التلميذ": "مسار تطور مستوى رائز قبلي بعدي مراحل مبيان tarl isa",
+             "الرخص": "إجازة رخصة مرض ولادة رضاعة", "الموارد البشرية": "أساتذة أستاذ موظفين أطر xml",
              "محاضر نهاية الأسدوس": "محضر مداولات نتائج نقط", "الامتحان": "امتحان موحد إشهادي سادس",
              "التلاميذ": "تلميذ بحث شهادة مدرسية وثائق", "الاستيراد من مسار": "مسار لوائح استيراد",
              "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "تتبع الغياب": "غياب متغيبون نسبة", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
@@ -719,6 +721,8 @@ class FenetrePrincipale(QMainWindow):
         self.page_tarl = PageTarl(self)
         self.page_vie = PageVieScolaire(self)
         self.page_riyada = PageRiyada(self)
+        from idara.ui.page_fiche_eleve import PageFicheEleve
+        self.page_fiche_eleve = PageFicheEleve(self)
         self.page_tanzim = PageTanzim(self)
         self.page_deliberations = PageDeliberations(self)
         self.page_examen = PageExamen(self)
@@ -767,7 +771,7 @@ class FenetrePrincipale(QMainWindow):
                       "الأعوان": self.page_agents, "خليتا اليقظة والإنصات": self.page_cellules,
                       "التحفيز والتهاني": self.page_tahfiz, "الانفتاح والشراكة": self.page_partenariats,
                       "الإعلام والتواصل": self.page_annonces, "فريق القيادة": self.page_equipe,
-                      "لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves,
+                      "لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves, "بطاقة التلميذ": self.page_fiche_eleve,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
                       "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "التنظيم التربوي": self.page_tanzim, "محاضر نهاية الأسدوس": self.page_deliberations,

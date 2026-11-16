@@ -126,10 +126,12 @@ def test_isa_phases_et_lettres(base, dossier):  # noqa: F811
     cl = base.execute("SELECT code FROM classe ORDER BY code").fetchone()[0]
     with pytest.raises(ry.ErreurRiyada, match="خارج المجال"):
         ry.enregistrer_isa(base, "2026/2027", cl, 1, {"fr": "120"})
+    ry.enregistrer_isa(base, "2026/2027", cl, -1, {"fr": "41"})   # الرائز القبلي (توجيهات 2026-11-15)
+    assert ry.libelle_phase(-1) == "الرائز القبلي" and ry.PHASES[0] == -1
     ry.enregistrer_isa(base, "2026/2027", cl, 0, {"fr": "60,5", "ma": "70%"})
     ry.enregistrer_isa(base, "2026/2027", cl, 1, {"fr": "75.94", "ma": "65"})
     ry.enregistrer_isa(base, "2026/2027", cl, 3, {"fr": "65.51", "ar": "50"})
-    assert ry.isa(base, "2026/2027")[cl]["fr"] == {0: 60.5, 1: 75.94, 3: 65.51}
+    assert ry.isa(base, "2026/2027")[cl]["fr"] == {-1: 41.0, 0: 60.5, 1: 75.94, 3: 65.51}
     assert ry.evolution({0: 60.5, 1: 75.94, 3: 65.51}) == [(0, 60.5, None), (1, 75.94, 15.44), (3, 65.51, -10.43)]
     with pytest.raises(ry.ErreurRiyada, match="لا نسب ISA2"):
         ry.generer_lettres(base, dossier, "2026/2027", 3)
