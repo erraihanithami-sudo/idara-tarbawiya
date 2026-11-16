@@ -149,7 +149,8 @@ def test_navigation_deroulante(app, config_tmp):
     assert titres[:9] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي", "الحياة المدرسية",
                           "التدبير المالي والمادي", "التقييم", "مشروع المؤسسة", "تسليم المهام"]
     assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص", "المحاضر",
-                                         "طلبات الموظفين والورقة الشخصية", "أعوان الحراسة والنظافة"]
+                                         "طلبات الموظفين والورقة الشخصية", "أعوان الحراسة والنظافة",
+                                         "طلب ملف أستاذ وإرساله"]
     assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
                                          "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة",
                                          "السبورة المرجعية"]
@@ -1391,7 +1392,7 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     f = _fenetre_avec_eleves(config_tmp)
     # عدّاد الصفحات الفرعية بجانب كل قسم
     i = [t for t, _ in SECTIONS].index("الموارد البشرية")
-    assert f.boutons[i].l_badge.text() == "6" and not f.boutons[i].l_badge.isHidden()
+    assert f.boutons[i].l_badge.text() == "7" and not f.boutons[i].l_badge.isHidden()
     # البحث
     assert f.filtrer_nav("رخص") == ["الرخص"] and not f.boutons[i].isHidden()
     assert all(b.isHidden() for k, b in enumerate(f.boutons) if k != i)

@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QGridLay
 from idara.services import bureautique
 from idara.services import dossier_enseignant as de
 from idara.services import personnel as rh
-from idara.ui.composants import carte
+from idara.ui.composants import bouton, carte
 from idara.ui.formulaires import etiquette
 from idara.ui.page_pedagogie import _page
 from idara.ui.saisie import ChampDate, TableauRapide, message
@@ -58,7 +58,7 @@ class PageDossierProf(QWidget):
         b.setToolTip("لأستاذ(ة) غير مسجل(ة) بعد في لائحة الأطر")
         b.clicked.connect(lambda: self.ajouter("", "", ""))
         h.addWidget(b)
-        b = QPushButton("حذف السطر")
+        b = bouton("حذف السطر")
         b.clicked.connect(lambda: self.supprimer())
         h.addWidget(b)
         v.addLayout(h)
