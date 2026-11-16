@@ -121,7 +121,11 @@ class EditeurDocument(QWidget):
         self.edit.setAcceptRichText(True)
         self.edit.document().setDocumentMargin(MARGE_ECRAN)
         self.edit.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.edit.setFixedWidth(self.largeur_contenu + 2 * MARGE_ECRAN + 24)
+        # عرض السطر ثابت (كالورقة)، أما عرض الإطار فيتقلص مع النافذة فلا يوسعها على الشاشات الصغيرة
+        self.edit.setLineWrapMode(QTextEdit.FixedPixelWidth)
+        self.edit.setLineWrapColumnOrWidth(self.largeur_contenu + 2 * MARGE_ECRAN)
+        self.edit.setMaximumWidth(self.largeur_contenu + 2 * MARGE_ECRAN + 24)
+        self.edit.setMinimumWidth(320)
         hf.addStretch()
         hf.addWidget(self.edit)
         hf.addStretch()
