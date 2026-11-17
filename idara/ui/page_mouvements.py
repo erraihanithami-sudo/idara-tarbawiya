@@ -401,6 +401,10 @@ class PageMouvements(QWidget):
         self.table = tableau(["الحركية", "التلميذ(ة)", "رمز مسار", "القسم", "المستوى", "النوع", "التاريخ",
                               "المؤسسة", "حالة الملف أو السبب"], etirer=1)
         self.liste = self.table   # الاسم القديم (الاختبارات والصفحات الأخرى)
+        hh = self.table.horizontalHeader()   # تسعة أعمدة: كلها بعرض محتواها، والأخير يملأ الباقي
+        hh.setSectionResizeMode(hh.ResizeMode.ResizeToContents)
+        hh.setStretchLastSection(True)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.table.setSelectionMode(self.table.SelectionMode.ExtendedSelection)
         self.table.setMinimumHeight(380)
         self.table.itemSelectionChanged.connect(self._selection)
