@@ -74,9 +74,12 @@ class EditeurDocument(QWidget):
         v.addLayout(h)
 
         self.outils = QWidget()
-        h = QHBoxLayout(self.outils)
-        h.setContentsMargins(0, 0, 0, 0)
+        vo = QVBoxLayout(self.outils)
+        vo.setContentsMargins(0, 0, 0, 0)
+        vo.setSpacing(6)
+        h = QHBoxLayout()   # سطران من الأدوات، فلا يتجاوز عرضها شاشة الحاسوب المحمول
         h.setSpacing(6)
+        vo.addLayout(h)
         for texte, action, aide in (
                 ("تراجع", lambda: self.edit.undo(), "Ctrl+Z"), ("إعادة", lambda: self.edit.redo(), "Ctrl+Y"),
                 ("غامق", self.gras, "Ctrl+B"), ("تسطير", self.souligner, "Ctrl+U"),
@@ -86,6 +89,9 @@ class EditeurDocument(QWidget):
                 ("يسار", lambda: self.aligner(Qt.AlignLeft | Qt.AlignAbsolute), "")):
             h.addWidget(bouton(texte, action, aide))
         h.addStretch()
+        h = QHBoxLayout()
+        h.setSpacing(6)
+        vo.addLayout(h)
         self.b_enregistrer = bouton("حفظ التعديلات", self.enregistrer, "تُحفظ بجانب الوثيقة وتُفتح بها في المرة المقبلة",
                                     True)
         h.addWidget(self.b_enregistrer)
@@ -94,6 +100,7 @@ class EditeurDocument(QWidget):
         h.addWidget(bouton("معاينة الطبع", self.apercu))
         h.addWidget(bouton("فتح في برنامج الحاسوب", self.ouvrir_externe,
                            "يفتح الملف الأصلي (دون تعديلات هذا المحرر) ببرنامج تحرير النصوص المثبت"))
+        h.addStretch()
         v.addWidget(self.outils)
         h = QHBoxLayout()
         h.addStretch()
