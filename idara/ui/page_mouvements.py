@@ -214,8 +214,9 @@ class DialogueMouvement(QDialog):
         self.l_rem.setText("السبب ومرجع القرار *" if cat == "exclu" else
                            "السبب (اختياري)" if cat in ("interrompu", "non_rejoint") else "ملاحظات")
         if transfert:
-            self.l_classe.setVisible(cat == "parti" or bool(self.page.unite()))
-            self.classe.setVisible(self.l_classe.isVisible())
+            avec_classe = cat == "parti" or bool(self.page.unite())
+            self.l_classe.setVisible(avec_classe)
+            self.classe.setVisible(avec_classe)
 
     def _maj_hors(self) -> None:
         for w in (self.direction, self.academie):
