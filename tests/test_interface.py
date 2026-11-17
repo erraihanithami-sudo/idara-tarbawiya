@@ -550,6 +550,7 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
 
 
 def test_page_mouvements(app, config_tmp, monkeypatch):
+    """طلب المدير 2026-11-17: الصفحة تعرض جدول الحركية ببطاقات معايير ومبيانات، والإضافة في نافذة منبثقة."""
     from idara.services import bureautique
     from idara.services import mouvements as mv
     from idara.ui.saisie import selectionner
@@ -558,70 +559,108 @@ def test_page_mouvements(app, config_tmp, monkeypatch):
     f = _fenetre_avec_eleves(config_tmp)
     f.aller_a("حركية التلاميذ")
     p = f.page_mouvements
-    assert f.page_courante() == "حركية التلاميذ" and p.liste.rowCount() == 0
-    # وافد جديد
-    p.code.setText("Y000000009")
-    p._chercher_code()
-    assert "غير موجود" in p.info_eleve.text()
-    p.nom.setText("الوافد")
-    p.prenom.setText("هبة")
-    p.s_f.setChecked(True)
-    p.date_mv.setText("08/09/2026")
-    p.etab.setEditText("المؤسسة الأصلية")
-    p.niveau.setEditText("الخامس")
-    assert p.enregistrer() is not None, p.message.text()
-    assert p.liste.rowCount() == 1 and "لم يُطلب الملف" in p.liste.item(0, 1).text()
-    assert "وافدون لم يُطلب ملفهم (1): هبة الوافد" in p.alertes.text()
+    assert f.page_courante() == "حركية التلاميذ" and p.liste.rowCount() == 0 and not p.vide.isHidden()
+    assert p.c_graph.isHidden() and p.barre_sel.isHidden()
+    assert list(p.cartes) == ["arrive", "parti", "interrompu", "exclu", "non_rejoint"]
+    assert p.generer_bilan() is None and "لا حركة" in p.message.text()
+    # وافد جديد من نافذة الإضافة
+    d = p.ajouter(ouvrir=False)
+    assert d.types["arrive"].isChecked() and not d.etab.isHidden()
+    d.code.setText("Y000000009")
+    d._chercher_code()
+    assert "غير موجود" in d.info_eleve.text()
+    d.nom.setText("الوافد")
+    d.prenom.setText("هبة")
+    d.s_f.setChecked(True)
+    d.date_mv.setText("08/09/2026")
+    d.etab.setEditText("المؤسسة الأصلية")
+    d.niveau.setEditText("الخامس")
+    assert d.enregistrer() is not None, d.message.text()
+    assert p.categorie == "arrive" and p.liste.rowCount() == 1 and p.cartes["arrive"].chiffre.text() == "1"
+    assert p.liste.item(0, 0).text() == "وافد" and "لم يُطلب الملف" in p.liste.item(0, 8).text()
+    assert "وافدون لم يُطلب ملفهم (1): هبة الوافد" in p.alertes.text() and not p.c_graph.isHidden()
     selectionner(p.liste, 0)
+    assert not p.barre_sel.isHidden() and not p.b_demande.isHidden() and p.b_envoi.isHidden()
+    assert not p.b_modifier.isHidden()
     p.date_action.setText("10/09/2026")
     assert p.demande(False) is not None, p.message.text()
-    assert len(ouverts) == 1 and "أُرسل الطلب" in p.liste.item(0, 1).text()
+    assert len(ouverts) == 1 and "أُرسل الطلب" in p.liste.item(0, 8).text()
     assert "وافدون" not in p.alertes.text()
     selectionner(p.liste, 0)
     p.date_action.setText("20/09/2026")
-    assert p.marquer("dossier_recu_le") and "توصلنا" in p.liste.item(0, 1).text()
+    assert p.marquer("dossier_recu_le") and "توصلنا" in p.liste.item(0, 8).text()
+    # تعديل الحركية من الجدول
+    selectionner(p.liste, 0)
+    d = p.modifier(ouvrir=False)
+    assert d is not None and not d.code.isEnabled() and d.etab.currentText() == "المؤسسة الأصلية"
+    assert not d.types["parti"].isEnabled()
+    d.remarques.setText("ملف كامل")
+    assert d.enregistrer() is not None
     # مغادر من اللوائح
-    p.f_parti.setChecked(True)
-    p.code.setText("X000000003")
-    p._chercher_code()
-    assert p.prenom.text() == "يوسف"
-    p.date_mv.setText("15/10/2026")
-    p.etab.setEditText("قاسم أمين")
-    assert p.enregistrer() is not None, p.message.text()
-    assert p.r_parti.isChecked() and p.liste.rowCount() == 1 and p.b_envoi.isVisibleTo(p)
+    d = p.ajouter("parti", ouvrir=False)
+    d.code.setText("X000000003")
+    d._chercher_code()
+    assert d.prenom.text() == "يوسف"
+    d.date_mv.setText("15/10/2026")
+    d.etab.setEditText("قاسم أمين")
+    assert d.enregistrer() is not None, d.message.text()
+    assert p.categorie == "parti" and p.liste.rowCount() == 1
     assert "مغادرون لم يُرسل ملفهم (1)" in p.alertes.text()
     selectionner(p.liste, 0)
+    assert not p.b_envoi.isHidden() and p.b_demande.isHidden()
     p.date_action.setText("20/10/2026")
-    assert p.envoi() is not None and "أُرسل الملف" in p.liste.item(0, 1).text()
+    assert p.envoi() is not None and "أُرسل الملف" in p.liste.item(0, 8).text()
     assert mv.alertes(f.conn)["envoi"] == []
     # مغادر سابق غير وارد في اللائحة (طلب المدير 2026-11-09)
-    p.nouveau()
-    p.f_parti.setChecked(True)
-    assert p.classe.isVisibleTo(p) and p.classe.count() > 1
-    p.code.setText("Z000000001")
-    p._chercher_code()
-    assert "غير وارد في اللائحة" in p.info_eleve.text()
-    p.nom.setText("المغادر")
-    p.prenom.setText("سعيد")
-    p.s_m.setChecked(True)
-    p.niveau.setEditText("الرابع")
-    p.classe.setCurrentIndex(1)
-    p.date_mv.setText("01/10/2026")
-    p.etab.setEditText("مدرسة أخرى")
-    assert p.enregistrer() is not None, p.message.text()
+    d = p.ajouter("parti", ouvrir=False)
+    assert d.classe.isVisibleTo(d) and d.classe.count() > 1
+    d.code.setText("Z000000001")
+    d._chercher_code()
+    assert "غير وارد في اللائحة" in d.info_eleve.text()
+    d.nom.setText("المغادر")
+    d.prenom.setText("سعيد")
+    d.s_m.setChecked(True)
+    d.niveau.setEditText("الرابع")
+    d.classe.setCurrentIndex(1)
+    d.date_mv.setText("01/10/2026")
+    d.etab.setEditText("مدرسة أخرى")
+    assert d.enregistrer() is not None, d.message.text()
     assert p.liste.rowCount() == 2
-    # الإحصائيات ووثيقة الحركية (طلب المدير 2026-11-12)
-    d = p.statistiques()
-    t = d.stats["totaux"]
-    assert (t["arrive"], t["parti"]) == (1, 2)
-    assert d.tuiles["الوافدون"].chiffre.text() == "1" and d.tuiles["المغادرون"].chiffre.text() == "2"
-    assert d.t_niveaux.item(d.t_niveaux.rowCount() - 1, 0).text() == "المجموع"
-    assert d.t_mois.rowCount() == 2 and d.t_etabs.rowCount() == 3
-    d.debut.setText("01/10/2026")
-    assert d.actualiser()["totaux"]["arrive"] == 0
-    chemin = d.generer()
-    assert chemin is not None and chemin.exists() and ouverts[-1] == chemin, d.message.text()
-    d.close()
+    # غير ملتحق (الحقول الخاصة بالتحويل تختفي)
+    d = p.ajouter("non_rejoint", ouvrir=False)
+    assert d.etab.isHidden() and d.nom.isHidden() and "المعاينة" in d.l_date.text()
+    d.code.setText("X000000001")
+    assert d.enregistrer() is None and "إجباري" in d.message.text()
+    d.date_mv.setText("20/09/2026")
+    assert d.enregistrer() is not None, d.message.text()
+    assert p.categorie == "non_rejoint" and p.liste.rowCount() == 1 and p.liste.item(0, 0).text() == "غير ملتحق"
+    selectionner(p.liste, 0)
+    assert p.b_modifier.isHidden() and p.date_action.isHidden()
+    # المعايير: بطاقة «الكل»، البحث، المستوى، الفترة
+    p.filtrer(None)
+    assert p.liste.rowCount() == 4 and p.c_solde.chiffre.text() == "4" and "الفرق" in p.c_solde.libelle.text()
+    p.filtrer("arrive")
+    p.filtrer("arrive")   # ضغطة ثانية على البطاقة نفسها: الكل
+    assert p.categorie is None and p.liste.rowCount() == 4
+    p.recherche.setText("هبة")
+    assert p.liste.rowCount() == 1
+    p.recherche.clear()
+    p.niveau.setCurrentIndex(p.niveau.findData("الرابع"))
+    assert p.liste.rowCount() >= 1 and all(p.liste.item(i, 4).text() == "الرابع" for i in range(p.liste.rowCount()))
+    p.niveau.setCurrentIndex(0)
+    p.debut.setText("01/10/2026")
+    p.rafraichir()
+    assert p.liste.rowCount() == 2 and p.cartes["arrive"].chiffre.text() == "0"
+    p.debut.clear()
+    p.rafraichir()
+    # وثيقة الحركية مباشرة، والإحصائيات التفصيلية
+    chemin = p.generer_bilan()
+    assert chemin is not None and chemin.exists() and ouverts[-1] == chemin, p.message.text()
+    ds = p.statistiques()
+    t = ds.stats["totaux"]
+    assert (t["arrive"], t["parti"], t["non_rejoint"]) == (1, 2, 1)
+    assert ds.tuiles["الوافدون"].chiffre.text() == "1" and ds.tuiles["المغادرون"].chiffre.text() == "2"
+    ds.close()
     f.close()
 
 
@@ -668,8 +707,10 @@ def test_page_comportement_et_exclus(app, config_tmp, monkeypatch):
     el.changer_statut(f.conn, eid, "exclu", "2026-10-20", "", "قرار المجلس")
     f.aller_a("حركية التلاميذ")
     m = f.page_mouvements
-    m.r_autres.setChecked(True)
-    assert m.liste.rowCount() == 1 and "مفصول" in m.liste.item(0, 1).text() and m.b_demande.isHidden()
+    m.rafraichir()
+    m.filtrer("exclu")
+    assert m.liste.rowCount() == 1 and m.liste.item(0, 0).text() == "مفصول" and m.cartes["exclu"].chiffre.text() == "1"
+    assert "قرار المجلس" in m.liste.item(0, 8).text() and m.b_demande.isHidden()
     f.close()
 
 
@@ -1640,29 +1681,28 @@ def test_mouvements_par_unite_et_quitter(app, config_tmp):
     f.aller_a("حركية التلاميذ")
     p = f.page_mouvements
     assert list(p.barre_unites.boutons) == [None, "الوحدة المركزية", "وحدة فرعية"]
-    p.r_parti.setChecked(True)
+    p.filtrer("parti")
     p.rafraichir()
     assert p.liste.rowCount() == 1
     p.barre_unites.boutons["وحدة فرعية"].click()
     assert p.liste.rowCount() == 0 and "مغادرون لم يُرسل" not in p.alertes.text()
-    assert p.classe.count() == 1    # لا أقسام مسندة لهذه الوحدة
+    d = p.ajouter("arrive", ouvrir=False)
+    assert d.classe.count() == 1    # لا أقسام مسندة لهذه الوحدة
     p.barre_unites.boutons["الوحدة المركزية"].click()
-    assert p.liste.rowCount() == 1 and p.classe.count() == 2
-    # وافد جديد في وحدة دون قسم: يُطلب القسم
-    p.nouveau()
-    p.f_arrive.setChecked(True)
-    p.code.setText("Y000000077")
-    p.nom.setText("الوافد")
-    p.prenom.setText("هبة")
-    p.s_f.setChecked(True)
-    p.date_mv.setText("02/10/2026")
-    p.etab.setEditText("مدرسة أصلية")
-    assert p.enregistrer() is None and "اختر قسمه" in p.message.text()
-    p.classe.setCurrentIndex(1)
-    assert p.enregistrer() is not None, p.message.text()
-    p.r_arrive.setChecked(True)
-    p.rafraichir()
     assert p.liste.rowCount() == 1
+    # وافد جديد في وحدة دون قسم: يُطلب القسم
+    d = p.ajouter("arrive", ouvrir=False)
+    assert d.classe.count() == 2
+    d.code.setText("Y000000077")
+    d.nom.setText("الوافد")
+    d.prenom.setText("هبة")
+    d.s_f.setChecked(True)
+    d.date_mv.setText("02/10/2026")
+    d.etab.setEditText("مدرسة أصلية")
+    assert d.enregistrer() is None and "اختر قسمه" in d.message.text()
+    d.classe.setCurrentIndex(1)
+    assert d.enregistrer() is not None, d.message.text()
+    assert p.categorie == "arrive" and p.liste.rowCount() == 1
     assert f.boutons_pages["التلاميذ القدامى"].l_texte.text() == "التلاميذ القدامى (ما قبل مسار)"
     f.b_quitter.click()
     with pytest.raises(sqlite3.ProgrammingError):

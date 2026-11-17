@@ -202,11 +202,23 @@ def main(sortie: Path) -> None:
     mvs.enregistrer(f.conn, mvs.Mouvement("parti", "X000000003", date_mouvement="2026-10-15",
                                           etablissement="المؤسسة المستقبلة", direction="عمالة: فاس",
                                           academie="فاس مكناس", hors_province=True))
+    try:
+        mvs.changer_statut_sortie(f.conn, "X000000002", "non_rejoint", "2026-09-20", "لم يلتحق منذ الدخول")
+    except mvs.ErreurMouvement as e:
+        print("non_rejoint:", e)
     f.aller_a("حركية التلاميذ")
+    f.page_mouvements.rafraichir()
     photo(f, "31_mouvements")
-    f.page_mouvements.r_parti.setChecked(True)
-    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(f.page_mouvements.liste, 0)
+    _pm = f.page_mouvements
+    _pm.filtrer("parti")
+    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(_pm.liste, 0)
     photo(f, "32_mouvements_depart")
+    _pm.filtrer(None)
+    _dm = _pm.ajouter(ouvrir=False)
+    _dm.show()
+    photo(_dm, "33_mouvements_ajout")
+    _dm.close()
+    photo(_pm, "34_mouvements_complet")   # الصفحة كاملة (الجدول والمبيانات) دون تمرير
     from idara.services import comportement as cpt
     yid = f.conn.execute("SELECT id FROM eleve WHERE code_massar='X000000001'").fetchone()[0]
     cpt.enregistrer(f.conn, cpt.Observation(yid, "2026-10-05", "شغب في القسم", "", "أستاذ القسم", "تنبيه شفوي"))

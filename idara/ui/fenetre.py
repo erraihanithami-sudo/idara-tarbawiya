@@ -854,6 +854,7 @@ class FenetrePrincipale(QMainWindow):
         self.editeurs = []
         self.bandeau_page = BandeauPage(self, SECTIONS)
         self._boutons_suppression()
+        self._habiller()
         self._disposition = h
         self.barre = self._barre_laterale()
         h.addWidget(self.barre)
@@ -869,6 +870,22 @@ class FenetrePrincipale(QMainWindow):
         h.addWidget(droite, 1)
         self.setCentralWidget(centre)
         self.aller(0)
+
+    def _habiller(self) -> None:
+        """المحتوى الداخلي (طلب المدير 2026-11-17): رأس كل صفحة بلون قسمها وأيقونته، وأيقونة معبرة لكل زر
+        (تُوضع آلياً عند ظهور الزر، في الصفحات والنوافذ المنبثقة)."""
+        from idara.ui import pictos
+        from idara.ui.composants import EnTete
+        app = QApplication.instance()
+        if app is not None and getattr(app, "_decorateur", None) is None:
+            app._decorateur = pictos.Decorateur(app)
+            app.installEventFilter(app._decorateur)
+        section_de = {nom: titre for titre, fils in SECTIONS for nom, _ in fils}
+        for nom, page in self.pages.items():
+            for e in page.findChildren(EnTete):
+                e.definir_section(section_de.get(nom))
+        for b in self.findChildren(QPushButton):
+            pictos.decorer(b)
 
     def _boutons_suppression(self) -> None:
         """أزرار الحذف بالأحمر مع علامة الحذف (اقتراح المدير 2026-11-03)."""
@@ -1253,6 +1270,10 @@ class FenetrePrincipale(QMainWindow):
         # على النافذة الرئيسية فقط (نوافذها الفرعية ترثه): إعادة تنسيق التطبيق كله تمر على كل نافذة في الذاكرة
         feuille = theme.appliquer(nom)
         QApplication.instance().setFont(theme.charger_police())   # لكل مظهر خطه
+        from idara.ui import pictos
+        for b in self.findChildren(QPushButton):   # أيقونات الأزرار بألوان المظهر الجديد
+            if b.property("picto"):
+                b.setIcon(pictos.icone(b.property("picto"), "#FFFFFF" if b.objectName() == "principal" else theme.VERT))
         self.setStyleSheet(feuille)
         config_srv.ecrire_config(theme=theme.THEME_ACTUEL)
         courante = self.page_courante()

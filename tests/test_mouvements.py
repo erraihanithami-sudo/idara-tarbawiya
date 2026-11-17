@@ -215,3 +215,31 @@ def test_document_de_la_mobilite(base, dossier):
     sans = Document(mv.generer_bilan(base, dossier, listes=False))
     assert not any("ملحق" in p.text for p in sans.paragraphs)
     assert all("." * 3 not in c for c in cellules)
+
+
+def test_registre_unifie_et_non_rejoint(base):
+    """طلب المدير 2026-11-17: جدول واحد للحركية بمعايير (وافدون، مغادرون، منقطعون، مفصولون، غير ملتحقين)."""
+    _parti(base)
+    _arrive(base)
+    with pytest.raises(mv.ErreurMouvement, match="غير موجود"):
+        mv.changer_statut_sortie(base, "Z999999999", "non_rejoint", "2026-09-15")
+    with pytest.raises(mv.ErreurMouvement, match="التاريخ إجباري"):
+        mv.changer_statut_sortie(base, "X000000001", "non_rejoint", "")
+    mv.changer_statut_sortie(base, "X000000001", "non_rejoint", "2026-09-20", "لم يحضر منذ الدخول")
+    mv.changer_statut_sortie(base, "X000000002", "interrompu", "2026-10-20")
+    tous = mv.registre(base)
+    assert mv.compter(tous) == {"arrive": 1, "parti": 1, "interrompu": 1, "exclu": 0, "non_rejoint": 1}
+    assert [x["categorie"] for x in tous] == ["interrompu", "parti", "non_rejoint", "arrive"]   # الأحدث أولاً
+    nr = mv.registre(base, "non_rejoint")
+    assert len(nr) == 1 and nr[0]["etat"] == "لم يحضر منذ الدخول" and nr[0]["code_massar"] == "X000000001"
+    assert nr[0]["classe"]
+    assert [x["categorie"] for x in mv.registre(base, debut="2026-10-01")] == ["interrompu", "parti"]
+    assert mv.registre(base, texte="هبة")[0]["categorie"] == "arrive"
+    arr = mv.registre(base, "arrive")[0]
+    assert arr["a_traiter"] and arr["etat"] == "لم يُطلب الملف" and arr["mouvement_id"]
+    with pytest.raises(mv.ErreurMouvement, match="بداية الفترة"):
+        mv.registre(base, debut="2026-12-01", fin="2026-11-01")
+    s = mv.statistiques(base)
+    assert s["totaux"]["non_rejoint"] == 1 and s["totaux"]["solde"] == 1 - 1 - 1 - 1
+    assert el.STATUTS[base.execute("SELECT statut FROM inscription i JOIN eleve e ON e.id=i.eleve_id "
+                                   "WHERE e.code_massar='X000000001'").fetchone()[0]] == "غير ملتحق"

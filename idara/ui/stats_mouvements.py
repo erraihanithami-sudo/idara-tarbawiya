@@ -21,7 +21,7 @@ def png_graphique(s: dict, largeur: int = 1000, hauteur: int = 360) -> bytes | N
     niv = [(n, v) for n, v in s["niveaux"] if sum(v["arrive"].values()) or sum(v["parti"].values())]
     if not niv:
         return None
-    w = BarresGroupees([n for n, _ in niv], _series(niv), maximum=None)
+    w = BarresGroupees([n for n, _ in niv], _series(niv), maximum=None, suffixe="")
     w.setLayoutDirection(Qt.RightToLeft)
     w.resize(largeur, hauteur)
     img = QImage(largeur, hauteur, QImage.Format_ARGB32)
@@ -147,7 +147,7 @@ class DialogueStatistiques(QDialog):
         niv = [(n, x) for n, x in s["niveaux"] if sum(x["arrive"].values()) or sum(x["parti"].values())]
         if niv:
             c, cv = carte("الوافدون والمغادرون حسب المستوى")
-            cv.addWidget(BarresGroupees([n for n, _ in niv], _series(niv), maximum=None))
+            cv.addWidget(BarresGroupees([n for n, _ in niv], _series(niv), maximum=None, suffixe=""))
             v.addWidget(c)
         bas = QHBoxLayout()
         c, cv = carte("حسب الشهر")

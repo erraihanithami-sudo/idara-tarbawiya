@@ -77,7 +77,7 @@ QMenu::item:selected {{ background: {VERT_CLAIR}; color: {VERT_FONCE}; }}
 #carte {{ background: {BLANC}; border: 1px solid {BORDURE_CARTE}; border-radius: 12px; }}
 #titrePage {{ font-size: 20pt; font-weight: 600; }}
 #sousTitre {{ color: {GRIS}; }}
-#titreCarte {{ font-size: 12pt; font-weight: 600; }}
+#titreCarte {{ font-size: 12pt; font-weight: 600; border-right: 4px solid {DORE}; padding-right: 10px; }}
 #chiffre {{ font-size: 24pt; font-weight: 600; color: {VERT}; }}
 #etiquette {{ color: {GRIS}; font-size: 9.5pt; }}
 #erreur {{ color: {ROUGE_TEXTE}; background: {ROUGE_CLAIR}; border-radius: 8px; padding: 8px 12px; }}

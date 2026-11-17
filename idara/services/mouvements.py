@@ -420,11 +420,11 @@ def exemple(conn, code: str) -> dict[str, str]:
 
 def sorties_sans_transfert(conn: sqlite3.Connection, texte: str = "",
                            unite: str | None = None) -> list[sqlite3.Row]:
-    """المنقطعون والمفصولون في السنة الجارية (لا ملف يُرسل)."""
+    """المنقطعون والمفصولون وغير الملتحقين في السنة الجارية (لا ملف يُرسل)."""
     a = _annee(conn)
     lignes = conn.execute(
         "SELECT e.id AS eleve_id, e.code_massar, e.nom_ar, e.prenom_ar, i.statut, i.date_sortie, i.motif_sortie "
-        "FROM inscription i JOIN eleve e ON e.id=i.eleve_id WHERE i.annee_id=? AND i.statut IN ('interrompu','exclu') "
+        "FROM inscription i JOIN eleve e ON e.id=i.eleve_id WHERE i.annee_id=? AND i.statut IN ('interrompu','exclu','non_rejoint') "
         "ORDER BY i.date_sortie DESC", (a["id"],)).fetchall()
     ids = eleves_unite(conn, unite)
     if ids is not None:
@@ -467,12 +467,12 @@ def statistiques(conn: sqlite3.Connection, unite: str | None = None, debut: str 
     sorties = conn.execute(
         "SELECT i.eleve_id, i.statut, i.date_sortie, e.sexe, n.code AS niveau FROM inscription i "
         "JOIN eleve e ON e.id=i.eleve_id LEFT JOIN niveau n ON n.id=i.niveau_id "
-        "WHERE i.annee_id=? AND i.statut IN ('interrompu','exclu')", (a["id"],)).fetchall()
+        "WHERE i.annee_id=? AND i.statut IN ('interrompu','exclu','non_rejoint')", (a["id"],)).fetchall()
     sorties = [r for r in sorties if (ids is None or r["eleve_id"] in ids)
                and _dans_periode(r["date_sortie"], debut, fin)]
 
     def vide() -> dict:
-        return {"arrive": {"M": 0, "F": 0}, "parti": {"M": 0, "F": 0}, "interrompu": 0, "exclu": 0}
+        return {"arrive": {"M": 0, "F": 0}, "parti": {"M": 0, "F": 0}, "interrompu": 0, "exclu": 0, "non_rejoint": 0}
 
     niveaux: dict[str, dict] = {}
     mois: dict[str, dict[str, int]] = {}
@@ -498,8 +498,9 @@ def statistiques(conn: sqlite3.Connection, unite: str | None = None, debut: str 
     t = {"arrive": total("arrive"), "parti": total("parti"),
          "arrive_F": total("arrive", "F"), "parti_F": total("parti", "F"),
          "interrompu": sum(v["interrompu"] for v in niveaux.values()),
-         "exclu": sum(v["exclu"] for v in niveaux.values())}
-    t["solde"] = t["arrive"] - t["parti"] - t["interrompu"] - t["exclu"]
+         "exclu": sum(v["exclu"] for v in niveaux.values()),
+         "non_rejoint": sum(v["non_rejoint"] for v in niveaux.values())}
+    t["solde"] = t["arrive"] - t["parti"] - t["interrompu"] - t["exclu"] - t["non_rejoint"]
     t["hors_province_arrive"] = sum(1 for r in mvts if r["sens"] == "arrive" and r["hors_province"])
     t["hors_province_parti"] = sum(1 for r in mvts if r["sens"] == "parti" and r["hors_province"])
     t["envoyes"] = sum(1 for r in mvts if r["sens"] == "parti" and r["dossier_envoye_le"])
@@ -528,7 +529,7 @@ def generer_bilan(conn: sqlite3.Connection, dossier: DossierDonnees, unite: str 
     from idara.services.soutien import _entete, _signature, _table
     s = statistiques(conn, unite, debut, fin)
     t = s["totaux"]
-    if not (t["arrive"] or t["parti"] or t["interrompu"] or t["exclu"]):
+    if not (t["arrive"] or t["parti"] or t["interrompu"] or t["exclu"] or t["non_rejoint"]):
         raise ErreurMouvement("لا حركة مسجلة" + (" في هذه الفترة" if debut or fin else "") + " بعد.")
     d = _nouveau()
     sous = f"السنة الدراسية {s['annee']}" + (f" · {unite}" if unite else "")
@@ -536,25 +537,26 @@ def generer_bilan(conn: sqlite3.Connection, dossier: DossierDonnees, unite: str 
         sous += " · الفترة" + (f" من {tx.date_ar(debut)}" if debut else "") + (f" إلى {tx.date_ar(fin)}" if fin else "")
     _entete(d, conn, dossier, "حصيلة حركية التلاميذ", sous)
     para(d, "1. الحصيلة العامة", gras=True, taille=12, apres=2)
-    _table(d, ["الوافدون", "منهم إناث", "المغادرون", "منهم إناث", "المنقطعون", "المفصولون", "الفرق"],
+    _table(d, ["الوافدون", "منهم إناث", "المغادرون", "منهم إناث", "المنقطعون", "المفصولون", "غير الملتحقين",
+               "الفرق"],
            [[str(t["arrive"]), str(t["arrive_F"]), str(t["parti"]), str(t["parti_F"]), str(t["interrompu"]),
-             str(t["exclu"]), f"\u2066{t['solde']:+d}\u2069" if t["solde"] else "0"]],
-           [2.4, 2.2, 2.4, 2.2, 2.4, 2.4, 2.2], taille=10)
+             str(t["exclu"]), str(t["non_rejoint"]), f"\u2066{t['solde']:+d}\u2069" if t["solde"] else "0"]],
+           [2.2, 2, 2.2, 2, 2.2, 2.2, 2.2, 2], taille=10)
     para(d, f"من خارج الإقليم: {t['hors_province_arrive']} وافداً و{t['hors_province_parti']} مغادراً. "
             f"ملفات المغادرين المرسلة: {t['envoyes']} من {t['parti']}؛ ملفات الوافدين المتوصل بها: "
-            f"{t['recus']} من {t['arrive']}. الفرق = الوافدون − المغادرون − المنقطعون − المفصولون.",
+            f"{t['recus']} من {t['arrive']}. الفرق = الوافدون − المغادرون − المنقطعون − المفصولون − غير الملتحقين.",
          taille=9, apres=4)
     para(d, "2. حسب المستوى والنوع", gras=True, taille=12, apres=2)
     lignes = []
     for n, v in s["niveaux"]:
         a, p = v["arrive"], v["parti"]
         lignes.append([n, str(a["M"]), str(a["F"]), str(a["M"] + a["F"]), str(p["M"]), str(p["F"]),
-                       str(p["M"] + p["F"]), str(v["interrompu"] + v["exclu"])])
+                       str(p["M"] + p["F"]), str(v["interrompu"] + v["exclu"] + v["non_rejoint"])])
     lignes.append(["المجموع", str(t["arrive"] - t["arrive_F"]), str(t["arrive_F"]), str(t["arrive"]),
                    str(t["parti"] - t["parti_F"]), str(t["parti_F"]), str(t["parti"]),
-                   str(t["interrompu"] + t["exclu"])])
+                   str(t["interrompu"] + t["exclu"] + t["non_rejoint"])])
     _table(d, ["المستوى", "وافدون ذكور", "وافدات إناث", "مجموع الوافدين", "مغادرون ذكور", "مغادرات إناث",
-               "مجموع المغادرين", "المنقطعون والمفصولون"], lignes, [2.4, 2, 2, 2.1, 2, 2, 2.1, 2.4], taille=9)
+               "مجموع المغادرين", "المنقطعون والمفصولون وغير الملتحقين"], lignes, [2.4, 2, 2, 2.1, 2, 2, 2.1, 2.4], taille=9)
     if s["mois"]:
         para(d, "", apres=2)
         para(d, "3. حسب الشهر", gras=True, taille=12, apres=2)
@@ -587,3 +589,83 @@ def generer_bilan(conn: sqlite3.Connection, dossier: DossierDonnees, unite: str 
         chemin = chemin.with_name(f"{chemin.stem}_{n}.docx")
     d.save(chemin)
     return chemin
+
+
+# ---------- سجل الحركية الموحد (طلب المدير 2026-11-17: الصفحة تعرض الجدول أولاً) ----------
+
+CATEGORIES = {"arrive": "وافد", "parti": "مغادر", "interrompu": "منقطع", "exclu": "مفصول", "non_rejoint": "غير ملتحق"}
+CATEGORIES_PLURIEL = {"arrive": "الوافدون", "parti": "المغادرون", "interrompu": "المنقطعون", "exclu": "المفصولون",
+                      "non_rejoint": "غير الملتحقين"}
+
+
+def registre(conn: sqlite3.Connection, categorie: str | None = None, texte: str = "", unite: str | None = None,
+             debut: str | None = None, fin: str | None = None, niveau: str | None = None) -> list[dict]:
+    """كل حركات السنة الجارية في جدول واحد: الوافدون والمغادرون (من جدول الحركات، بحالة الملف) والمنقطعون
+    والمفصولون وغير الملتحقين (من وضعية التسجيل). الأحدث أولاً."""
+    if debut and fin and debut > fin:
+        raise ErreurMouvement("بداية الفترة بعد نهايتها.")
+    a = _annee(conn)
+    classes = {r["eleve_id"]: r for r in conn.execute(
+        "SELECT i.eleve_id, c.code AS classe, n.code AS niveau FROM inscription i LEFT JOIN classe c ON "
+        "c.id=i.classe_id LEFT JOIN niveau n ON n.id=i.niveau_id WHERE i.annee_id=?", (a["id"],))}
+    lignes: list[dict] = []
+    if categorie in (None, "arrive", "parti"):
+        for r in lister(conn, categorie, "", unite):
+            c = classes.get(r["eleve_id"])
+            lignes.append({
+                "categorie": r["sens"], "mouvement_id": r["id"], "eleve_id": r["eleve_id"],
+                "nom": f"{r['prenom_ar']} {r['nom_ar']}", "code_massar": r["code_massar"], "sexe": r["sexe"] or "",
+                "niveau": r["niveau"] or (tx.niveau_ar(c["niveau"]) if c and c["niveau"] in tx.NIVEAUX else ""),
+                "classe": (c["classe"] if c else "") or "", "date": r["date_mouvement"] or "",
+                "etablissement": (r["etablissement"] or "") + (" (خارج الإقليم)" if r["hors_province"] else ""),
+                "etat": etat(r), "a_traiter": not (r["dossier_envoye_le"] if r["sens"] == "parti"
+                                                   else r["dossier_recu_le"])})
+    if categorie in (None, "interrompu", "exclu", "non_rejoint"):
+        ids = eleves_unite(conn, unite)
+        for r in conn.execute(
+                "SELECT i.eleve_id, i.statut, i.date_sortie, i.motif_sortie, e.code_massar, e.nom_ar, e.prenom_ar, "
+                "e.sexe, c.code AS classe, n.code AS niveau FROM inscription i JOIN eleve e ON e.id=i.eleve_id "
+                "LEFT JOIN classe c ON c.id=i.classe_id LEFT JOIN niveau n ON n.id=i.niveau_id WHERE i.annee_id=? "
+                "AND i.statut IN ('interrompu','exclu','non_rejoint')", (a["id"],)):
+            if (categorie and r["statut"] != categorie) or (ids is not None and r["eleve_id"] not in ids):
+                continue
+            lignes.append({
+                "categorie": r["statut"], "mouvement_id": None, "eleve_id": r["eleve_id"],
+                "nom": f"{r['prenom_ar']} {r['nom_ar']}", "code_massar": r["code_massar"], "sexe": r["sexe"] or "",
+                "niveau": tx.niveau_ar(r["niveau"]) if r["niveau"] in tx.NIVEAUX else "",
+                "classe": r["classe"] or "", "date": r["date_sortie"] or "", "etablissement": "",
+                "etat": r["motif_sortie"] or "", "a_traiter": False})
+    lignes = [x for x in lignes if _dans_periode(x["date"], debut, fin) and (not niveau or x["niveau"] == niveau)]
+    cible = normaliser(texte)
+    if cible:
+        lignes = [x for x in lignes if any(cible in normaliser(v) for v in (
+            x["code_massar"], x["nom"], x["etablissement"], x["classe"]))]
+    return sorted(lignes, key=lambda x: (x["date"], x["nom"]), reverse=True)
+
+
+def compter(lignes: list[dict]) -> dict[str, int]:
+    return {k: sum(1 for x in lignes if x["categorie"] == k) for k in CATEGORIES}
+
+
+def changer_statut_sortie(conn: sqlite3.Connection, code_massar: str, statut: str, le: str, motif: str = "") -> int:
+    """منقطع أو مفصول أو غير ملتحق: من نافذة «إضافة حركية» (التلميذ يجب أن يكون في لوائح السنة الجارية)."""
+    if statut not in ("interrompu", "exclu", "non_rejoint"):
+        raise ErreurMouvement("وضعية غير معروفة.")
+    code = (code_massar or "").strip().upper()
+    r = conn.execute("SELECT id FROM eleve WHERE code_massar=?", (code,)).fetchone()
+    if r is None:
+        raise ErreurMouvement("التلميذ غير موجود في اللوائح: ابحث برمز مسار صحيح.")
+    if not le:
+        raise ErreurMouvement("التاريخ إجباري.")
+    try:
+        if date.fromisoformat(le) > date.today():
+            raise ErreurMouvement("التاريخ في المستقبل.")
+    except ValueError as e:
+        if isinstance(e, ErreurMouvement):
+            raise
+        raise ErreurMouvement("التاريخ غير صحيح.") from None
+    try:
+        el.changer_statut(conn, r["id"], statut, le, "", motif)
+    except el.ErreurEleve as e:
+        raise ErreurMouvement(str(e)) from e
+    return r["id"]
