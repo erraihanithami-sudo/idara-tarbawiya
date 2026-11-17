@@ -388,7 +388,7 @@ class PageGarde(QWidget):
         titre = f"<b>{j['jour']} {tx.date_ar(j['date'])}</b>" + (
             f" · الأسبوع {j['semaine']} من الدورة" if j["semaine"] and self.g["semaines"] > 1 else "")
         if j["lignes"] and any(n for _, n in j["lignes"]):
-            lignes = "".join(f"<br>● {z}: <b>{n or 'غير محدد'}</b>" for z, n in j["lignes"])
+            lignes = "".join(f"<br>&#8226; {z}: <b>{n or 'غير محدد'}</b>" for z, n in j["lignes"])
             self.l_jour.setText(titre + lignes)
         else:
             self.l_jour.setText(f"{titre}<br>{j['motif']}")

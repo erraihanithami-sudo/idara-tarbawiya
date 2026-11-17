@@ -198,7 +198,7 @@ class PageTableauBord(QWidget):
             cv.addWidget(l)
         for t in self.taches:
             ligne = QHBoxLayout()
-            l = QLabel(("● " if t["urgence"] >= 2 else "○ ") + t["texte"])
+            l = QLabel(("• " if t["urgence"] >= 2 else "◦ ") + t["texte"])
             l.setWordWrap(True)
             if t["urgence"] >= 2:
                 l.setStyleSheet(f"color:{theme.ROUGE_TEXTE}; font-weight:600;")

@@ -16,7 +16,7 @@ from pathlib import Path
 from PySide6.QtCore import QMarginsF, QRectF, QSizeF, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPageLayout, QPageSize, QPainter, QTextCharFormat, QTextCursor
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
-from PySide6.QtWidgets import (QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QTextEdit,
+from PySide6.QtWidgets import (QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QTextEdit,
                                QVBoxLayout, QWidget)
 
 from idara.services import bureautique, finition
@@ -132,7 +132,8 @@ class EditeurDocument(QWidget):
         self.edit.setLineWrapMode(QTextEdit.FixedPixelWidth)
         self.edit.setLineWrapColumnOrWidth(self.largeur_contenu + 2 * MARGE_ECRAN)
         self.edit.setMaximumWidth(self.largeur_contenu + 2 * MARGE_ECRAN + 24)
-        self.edit.setMinimumWidth(320)
+        self.edit.setMinimumWidth(min(self.largeur_contenu + 2 * MARGE_ECRAN + 24, 560))
+        self.edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         hf.addStretch()
         hf.addWidget(self.edit)
         hf.addStretch()
