@@ -601,6 +601,8 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     p.personnel.setCurrentIndex(p.personnel.findData(pid))
     p.debut.setText("01/12/2026")
     p.duree.setValue(3)
+    p.avis.setText("موافق")
+    p.mesures.setText("توزيع التلاميذ")
     n = len(ouverts)
     assert p.enregistrer_et_demande() is not None and len(ouverts) == n + 1, p.message.text()
     assert p.zone_docs.isEnabled() and p.aide_docs.isHidden()

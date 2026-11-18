@@ -470,8 +470,8 @@ class PageEleves(QWidget):
         self.docs.cellDoubleClicked.connect(self._ouvrir_doc)
         fv.addWidget(self.docs)
         fv.addStretch()
-        self.c_fiche.hide()
         self.fiche = FenetreFiche(self, "بطاقة التلميذ", "الهوية والمسار الدراسي والوثائق المولدة.", self.c_fiche, 820)
+        self.c_fiche.hide()   # بعد وضعها في النافذة: منطقة التمرير تُظهرها
         self.chercher("")
         self.compter_documents()
 
