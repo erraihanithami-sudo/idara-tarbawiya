@@ -1233,7 +1233,7 @@ def test_page_conseils_etablissement(app, config_tmp, monkeypatch):
     p = f.page_conseils_etab
     assert f.page_courante() == "مجالس المؤسسة" and p.suivi.rowCount() == 3
     p.proposer()
-    assert p.membres.item(0, 1).text() == "رئيس المجلس" and p.c_optionnels.isVisibleTo(p)
+    assert p.membres.item(0, 1).text() == "رئيس المجلس" and not p.c_optionnels.isHidden()
     assert not any(p.membres.item(i, 1) and p.membres.item(i, 1).text() == "ممثل المجلس الجماعي"
                    for i in range(p.membres.rowCount()))
     p.c_optionnels.setChecked(True)  # الأعضاء الاختياريون بخانة

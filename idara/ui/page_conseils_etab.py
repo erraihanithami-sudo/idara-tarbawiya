@@ -150,6 +150,8 @@ class PageConseilsEtab(QWidget):
         self.p_ouvrir.clicked.connect(lambda: self.ouvrir_pv(self.sid))
         self.p_suppr = QPushButton("حذف الاجتماع")
         self.p_suppr.setObjectName("danger")
+        from idara.ui import icones
+        self.p_suppr.setIcon(icones.corbeille())
         self.p_suppr.clicked.connect(lambda: self.supprimer())
         for b in (self.p_pv, self.p_convoc, self.p_ouvrir, self.p_suppr):
             bs.addWidget(b)
