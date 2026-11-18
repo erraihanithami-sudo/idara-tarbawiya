@@ -2378,7 +2378,7 @@ def test_affiches_et_convocations(app, config_tmp, monkeypatch, tmp_path):
     f.close()
 
 
-def test_editeur_apercu_et_nafidha(app, config_tmp, monkeypatch):
+def test_editeur_apercu_et_nafidha(app, config_tmp, monkeypatch, tmp_path):
     """بلاغ المدير 2026-11-18: «معاينة الطبع» كانت تُغلق البرنامج، والوثيقة المولدة من نافذة منبثقة لا تظهر كاملة."""
     from PySide6.QtPrintSupport import QPrintPreviewDialog
     from PySide6.QtWidgets import QApplication, QWidget
@@ -2395,8 +2395,9 @@ def test_editeur_apercu_et_nafidha(app, config_tmp, monkeypatch):
     e = f.editeurs[0]
     rendus = []
 
-    def exec_simule(d):   # المعاينة ترسم الصفحات ثم تُغلق
-        d.paintRequested.emit(e._imprimante_apercu)
+    def exec_simule(d):   # المعاينة ترسم الصفحات ثم تُغلق (هنا في ملف، فلا طابعة في بيئة الاختبار)
+        assert e._imprimante_apercu is not None
+        d.paintRequested.emit(e.imprimante(tmp_path / f"apercu{len(rendus)}.pdf"))
         rendus.append(d)
         return 0
     monkeypatch.setattr(QPrintPreviewDialog, "exec", exec_simule)
@@ -2404,7 +2405,7 @@ def test_editeur_apercu_et_nafidha(app, config_tmp, monkeypatch):
     e.apercu()
     gc.collect()
     e.apercu()
-    assert len(rendus) == 2 and e._imprimante_apercu is not None
+    assert len(rendus) == 2 and (tmp_path / "apercu1.pdf").stat().st_size > 1000
     e.b_retour.click()
     # وثيقة تُفتح من نافذة منبثقة: تُخفى النافذة وتُعرض الوثيقة كاملة، و«رجوع» يعيدها
     w = QWidget()
