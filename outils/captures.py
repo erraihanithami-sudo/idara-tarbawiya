@@ -140,16 +140,20 @@ def main(sortie: Path) -> None:
     r.note_insp.setText("16.5")
     r.d_tanzim["date_inspection"].setText("10/03/2025")
     r.inspecteur.setText("المفتش التجريبي")
+    r.ouvrir_nouveau()
     r.enregistrer()
-    photo(f, "21_personnel_fiche")
+    photo(r.fiche, "21_personnel_fiche")
     r.dates["date_naissance"].ouvrir_calendrier()
     QApplication.processEvents()
     __import__("PySide6.QtGui", fromlist=["x"]).QGuiApplication.primaryScreen()
     r.dates["date_naissance"].popup.grab().save(str(sortie / "21b_calendrier.png"))
     r.dates["date_naissance"].popup.close()
-    f.resize(1280, 1750)
-    photo(f, "22_personnel_fiche_complete")
-    f.resize(1280, 800)
+    photo(r.fiche.findChild(__import__("PySide6.QtWidgets", fromlist=["x"]).QScrollArea).widget(),
+          "22_personnel_fiche_complete")
+    r.fiche.hide()
+    r.rafraichir()
+    photo(f, "22b_personnel_page")
+    photo(r, "22c_personnel_page_complete")
     # تدبير الفائض
     from idara.services import personnel as rh
     for prenom, sexe, recrut, direc, etab, naiss in (
@@ -171,6 +175,7 @@ def main(sortie: Path) -> None:
     f.aller_a("الرخص")
     pc = f.page_conges
     photo(f, "24_conges_vide")
+    pc.ouvrir_nouveau()
     pc.personnel.setCurrentIndex(pc.personnel.findData(fatima.id))
     pc.debut.setText("10/11/2026")
     pc.duree.setValue(10)
@@ -184,10 +189,12 @@ def main(sortie: Path) -> None:
     pc.deposant_cin.setText("CD1")
     pc.enregistrer()
     pc.b_demande.click()
-    photo(f, "25_conge_fiche")
-    f.resize(1280, 1700)
-    photo(f, "26_conge_fiche_complete")
-    f.resize(1280, 800)
+    photo(pc.fiche, "25_conge_fiche")
+    photo(pc.fiche.findChild(__import__("PySide6.QtWidgets", fromlist=["x"]).QScrollArea).widget(),
+          "26_conge_fiche_complete")
+    pc.fiche.hide()
+    photo(f, "26b_conges_page")
+    photo(pc, "26c_conges_page_complete")
     from idara.ui.page_conges import DialogueBordereau
     d = DialogueBordereau(f, cg.pieces_proposees(f.conn, cg.lire(f.conn, pc.cid)), "ملف رخصة")
     d.show()
@@ -211,7 +218,7 @@ def main(sortie: Path) -> None:
     photo(f, "31_mouvements")
     _pm = f.page_mouvements
     _pm.filtrer("parti")
-    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(_pm.liste, 0)
+    __import__("idara.ui.saisie", fromlist=["x"]).selectionner(_pm.t_dossiers, 0)
     photo(f, "32_mouvements_depart")
     _pm.filtrer(None)
     _dm = _pm.ajouter(ouvrir=False)

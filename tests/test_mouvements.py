@@ -243,3 +243,21 @@ def test_registre_unifie_et_non_rejoint(base):
     assert s["totaux"]["non_rejoint"] == 1 and s["totaux"]["solde"] == 1 - 1 - 1 - 1
     assert el.STATUTS[base.execute("SELECT statut FROM inscription i JOIN eleve e ON e.id=i.eleve_id "
                                    "WHERE e.code_massar='X000000001'").fetchone()[0]] == "غير ملتحق"
+
+
+def test_suivi_dossiers(base, dossier):
+    """تتبع ملفات التلاميذ: مرحلة كل ملف وتواريخ مراسلاته وأرقامها في الصادر."""
+    from datetime import date as d_
+    mp = _parti(base)
+    ma = _arrive(base)
+    s = {x["sens"]: x for x in mv.suivi_dossiers(base, le=d_(2026, 11, 18))}
+    assert s["arrive"]["etape"] == "a_demander" and s["parti"]["etape"] == "a_envoyer" and s["arrive"]["jours"] is None
+    mv.generer_demande(base, dossier, [ma], "2026-10-01")
+    x = {x["sens"]: x for x in mv.suivi_dossiers(base, le=d_(2026, 10, 5))}["arrive"]
+    assert x["etape"] == "attente" and x["demande1_le"] == "2026-10-01" and "/" in x["demande1_num"] and x["jours"] == 4
+    assert {x["sens"]: x for x in mv.suivi_dossiers(base, le=d_(2026, 11, 18))}["arrive"]["etape"] == "relance"
+    mv.marquer(base, ma, "dossier_recu_le", "2026-11-10")
+    mv.generer_envoi(base, dossier, [mp], "2026-11-12")
+    s = {x["sens"]: x for x in mv.suivi_dossiers(base)}
+    assert s["arrive"]["etape"] == "recu" and s["arrive"]["recu_le"] == "2026-11-10"
+    assert s["parti"]["etape"] == "envoye" and s["parti"]["envoi_num"] and s["parti"]["envoye_le"] == "2026-11-12"

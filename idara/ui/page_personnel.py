@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout,
                                QGridLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
@@ -15,7 +16,22 @@ from idara.services import import_rh as irh
 from idara.services import personnel as rh
 from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
+from idara.ui.graphiques import Anneau, BarresGroupees
 from idara.ui.saisie import ChampDate, cellule, message, selectionner, tableau
+from idara.ui.vitrine import CarteFiltre, FenetreFiche, grille_cartes
+
+# بطاقات الأرقام: (المفتاح، العنوان، اللون، الأيقونة، سطر تعريفي)؛ المفتاح فئة أو مجموعة فئات
+GROUPES = [
+    ("tous", "كل العاملين", "#455A64", "personnes", "الموظفون العاملون حالياً"),
+    ("enseignant", "الأساتذة", "#1565C0", "document", "أساتذة التعليم الابتدائي"),
+    ("educatrice", "التعليم الأولي", "#AD1457", "personnes", "المربيات والمربون"),
+    ("directeur", "الإدارة", "#2E7D32", "valider", "المدير والأطر الإدارية"),
+    ("agents", "الأعوان والمساعدون", "#EF6C00", "personnes", "الحراس، النظافة، المساعدون"),
+    ("incomplet", "ملفات ناقصة", "#C62828", "rappel", "ينقصها ما تحتاجه وثائق الرخص"),
+]
+AGENTS = ("gardien", "proprete", "assistant", "autre")
+COULEURS_CAT = {"enseignant": "#1565C0", "educatrice": "#AD1457", "directeur": "#2E7D32", "assistant": "#6A1B9A",
+                "gardien": "#EF6C00", "proprete": "#00838F", "autre": "#757575"}
 
 
 def _combo_libre(valeurs: list[str]) -> QComboBox:
@@ -63,27 +79,52 @@ class PagePersonnel(QWidget):
         racine.setContentsMargins(40, 32, 40, 32)
         racine.setSpacing(16)
         racine.addWidget(entete("الموارد البشرية",
-                                "ملف كل موظف يُدخل مرة واحدة، ومنه تُملأ وثائق الرخص ومحضر الاستئناف ومحضر التسليم."))
-        self.effectifs = QLabel()
-        self.effectifs.setObjectName("etiquette")
-        racine.addWidget(self.effectifs)
+                                "معلومات الأطر وإحصائياتها. ملف كل موظف يُدخل مرة واحدة (في نافذة منبثقة)، ومنه "
+                                "تُملأ وثائق الرخص ومحضر الاستئناف ومحضر التسليم."))
+        # ---- بطاقات الأرقام (طلب المدير 2026-11-18: الصفحة للمعلومات والإحصائيات) ----
+        self.groupe: str | None = None
+        self.cartes: dict[str, CarteFiltre] = {}
+        for k, lib, coul, picto, note in GROUPES:
+            c_ = CarteFiltre(k, lib, coul, picto, note)
+            c_.clique.connect(self.filtrer)
+            self.cartes[k] = c_
+        racine.addLayout(grille_cartes(list(self.cartes.values()), 3))
+        h_ajout = QHBoxLayout()
+        b = QPushButton("إضافة موظف جديد")
+        b.setObjectName("principal")
+        b.clicked.connect(lambda: self.ouvrir_nouveau())
+        h_ajout.addWidget(b)
+        # خيار ثانٍ: الاستيراد من ملف XML للموارد البشرية (طلب المدير 2026-11-03)
+        b_xml = QPushButton("استيراد من ملف XML")
+        b_xml.setToolTip("ملف تصدير الموارد البشرية (DsAgentExport). تُراجَع النتيجة قبل الاعتماد.")
+        b_xml.clicked.connect(self.choisir_xml)
+        h_ajout.addWidget(b_xml)
+        self.b_ouvrir = QPushButton("فتح ملف الموظف المحدد")
+        self.b_ouvrir.setEnabled(False)
+        self.b_ouvrir.clicked.connect(lambda: self.ouvrir_fiche())
+        h_ajout.addWidget(self.b_ouvrir)
+        h_ajout.addStretch()
+        racine.addLayout(h_ajout)
         self.message = QLabel()
         self.message.setWordWrap(True)
         self.message.hide()
         racine.addWidget(self.message)
-        corps = QHBoxLayout()
-        corps.setSpacing(20)
-        racine.addLayout(corps, 1)
 
         # ---- اللائحة ----
         c, cv = carte()
+        self.titre_liste = QLabel()
+        self.titre_liste.setObjectName("titreCarte")
+        cv.addWidget(self.titre_liste)
+        self.effectifs = QLabel()
+        self.effectifs.setObjectName("etiquette")
+        self.effectifs.setWordWrap(True)
+        cv.addWidget(self.effectifs)
+        filtres = QHBoxLayout()
         self.recherche = QLineEdit()
-        self.recherche.setPlaceholderText("الاسم، رقم التأجير أو البطاقة الوطنية")
+        self.recherche.setPlaceholderText("بحث: الاسم، رقم التأجير أو البطاقة الوطنية")
         self.recherche.setClearButtonEnabled(True)
         self.recherche.textChanged.connect(self.chercher)
-        cv.addWidget(etiquette("بحث", self.recherche))
-        cv.addWidget(self.recherche)
-        filtres = QHBoxLayout()
+        filtres.addWidget(self.recherche, 2)
         self.filtre_cat = QComboBox()
         self.filtre_cat.addItem("كل الفئات", None)
         for k, (_, _, pl) in rh.CATEGORIES.items():
@@ -93,31 +134,26 @@ class PagePersonnel(QWidget):
         self.voir_partis = QCheckBox("إظهار المغادرين")
         self.voir_partis.hide()
         self.voir_partis.toggled.connect(lambda _: self.chercher())
-        filtres.addWidget(self.filtre_cat)
-        filtres.addStretch()
+        filtres.addWidget(self.filtre_cat, 1)
         cv.addLayout(filtres)
-        # قرار المدير 2026-11-03: المهمة بدل الفئة، دون عمود الملف، مع الوحدة المدرسية
-        self.liste = tableau(["الاسم", "الوحدة المدرسية", "المهمة"], etirer=0)
+        # قرار المدير 2026-11-03: المهمة بدل الفئة، مع الوحدة المدرسية؛ 2026-11-18: الجدول بعرض الصفحة
+        self.liste = tableau(["الاسم", "الوحدة المدرسية", "المهمة", "الفئة", "رقم التأجير", "الإطار", "الدرجة",
+                              "التدريس", "الهاتف", "اكتمال الملف"], etirer=0)
         h = self.liste.horizontalHeader()
-        for i, largeur in ((1, 130), (2, 90)):
-            h.setSectionResizeMode(i, h.ResizeMode.Fixed)
-            h.resizeSection(i, largeur)
-        self.liste.setMinimumHeight(420)
+        h.setSectionResizeMode(h.ResizeMode.ResizeToContents)
+        h.setStretchLastSection(True)
+        self.liste.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.liste.setMinimumHeight(360)
         self.liste.itemSelectionChanged.connect(self._selection)
+        self.liste.itemDoubleClicked.connect(lambda _: self.ouvrir_fiche())
         cv.addWidget(self.liste, 1)
-        h_ajout = QHBoxLayout()
-        b = QPushButton("+ موظف جديد")
-        b.clicked.connect(self.nouveau)
-        h_ajout.addWidget(b)
-        # خيار ثانٍ: الاستيراد من ملف XML للموارد البشرية (طلب المدير 2026-11-03)
-        b_xml = QPushButton("استيراد من ملف XML")
-        b_xml.setToolTip("ملف تصدير الموارد البشرية (DsAgentExport). تُراجَع النتيجة قبل الاعتماد.")
-        b_xml.clicked.connect(self.choisir_xml)
-        h_ajout.addWidget(b_xml)
-        cv.addLayout(h_ajout)
-        corps.addWidget(c, 5)
+        racine.addWidget(c)
+        self.c_graph, self.v_graph = carte("المبيانات")
+        self._graphes: list[QWidget] = []
+        racine.addWidget(self.c_graph)
+        racine.addStretch()
 
-        # ---- الملف ----
+        # ---- الملف: في نافذة منبثقة (طلب المدير 2026-11-18) ----
         c2, fv = carte()
         self.titre = QLabel("موظف جديد")
         self.titre.setObjectName("titreCarte")
@@ -327,7 +363,8 @@ class PagePersonnel(QWidget):
         self.message_bas.hide()
         fv.addWidget(self.message_bas)
         fv.addStretch()
-        corps.addWidget(c2, 7)
+        self.fiche = FenetreFiche(self, "ملف الموظف", "الحقول المعلَّمة بـ * إجبارية. الباقي يُطلب عند توليد وثيقة "
+                                                     "تحتاجه.", c2)
         self.rafraichir()
         self.nouveau()
 
@@ -351,20 +388,85 @@ class PagePersonnel(QWidget):
             w.clear()
             w.addItems(rh.suggestions(self.f.conn, k))
             w.setEditText(t)
+        actifs = rh.lister(self.f.conn)
+        self.incomplets = {p.id for p in actifs if rh.manquants_documents(self.f.conn, p)}
+        n = {"tous": len(actifs), "enseignant": eff["enseignant"], "educatrice": eff["educatrice"],
+             "directeur": eff["directeur"], "agents": sum(eff[k] for k in AGENTS), "incomplet": len(self.incomplets)}
+        for k, c_ in self.cartes.items():
+            c_.definir(n[k])
+        self._graphiques(actifs)
         self.chercher()
 
+    def filtrer(self, groupe: str | None) -> None:
+        self.groupe = None if groupe in (self.groupe, "tous") else groupe
+        self.chercher()
+
+    def _garder(self, p: rh.Personnel) -> bool:
+        g = self.groupe
+        return (g is None or (g == "agents" and p.categorie in AGENTS) or (g == "incomplet" and p.id in
+                getattr(self, "incomplets", set())) or p.categorie == g)
+
     def chercher(self, _=None) -> None:
-        lignes = rh.lister(self.f.conn, self.recherche.text(), self.filtre_cat.currentData(),
-                           not self.voir_partis.isChecked())
+        for k, c_ in self.cartes.items():
+            c_.definir_actif(k == (self.groupe or "tous"))
+        lignes = [p for p in rh.lister(self.f.conn, self.recherche.text(), self.filtre_cat.currentData(),
+                                       not self.voir_partis.isChecked()) if self._garder(p)]
+        titre = next((lib for k, lib, *_ in GROUPES if k == (self.groupe or "tous")), "")
+        self.titre_liste.setText(f"{titre} ({len(lignes)})")
         self.liste.setRowCount(len(lignes))
         for i, p in enumerate(lignes):
             nom = f"{p.prenom_ar} {p.nom_ar}"
             if p.statut != "actif":
                 nom += f" ({rh.STATUTS[p.statut]})"
-            self.liste.setItem(i, 0, cellule(nom, p.id))
+            it = cellule(nom, p.id)
+            it.setForeground(QColor(COULEURS_CAT.get(p.categorie, "#455A64")))
+            f_ = it.font()
+            f_.setBold(True)
+            it.setFont(f_)
+            self.liste.setItem(i, 0, it)
             self.liste.setItem(i, 1, cellule(p.unite or "—"))
             self.liste.setItem(i, 2, cellule(p.fonction or "—"))
+            self.liste.setItem(i, 3, cellule(rh.libelle_categorie(p.categorie, p.sexe)))
+            self.liste.setItem(i, 4, cellule(f"\u2066{p.ppr}\u2069" if p.ppr else "—"))
+            self.liste.setItem(i, 5, cellule(p.cadre or "—"))
+            self.liste.setItem(i, 6, cellule(p.grade or "—"))
+            self.liste.setItem(i, 7, cellule(" · ".join(x for x in (p.matiere, p.niveau_enseigne) if x) or "—"))
+            self.liste.setItem(i, 8, cellule(f"\u2066{p.telephone}\u2069" if p.telephone else "—"))
+            inc = p.id in getattr(self, "incomplets", set())
+            c8 = cellule("ناقص" if inc else "مكتمل")
+            c8.setForeground(QColor("#C62828" if inc else "#2E7D32"))
+            self.liste.setItem(i, 9, c8)
             self.liste.item(i, 0).setToolTip(f"{rh.libelle_categorie(p.categorie, p.sexe)} · رقم التأجير: {p.ppr or '—'}")
+
+    def _graphiques(self, actifs: list) -> None:
+        for w in self._graphes:
+            w.hide()
+            w.setParent(None)
+            w.deleteLater()
+        self._graphes = []
+        self.c_graph.setVisible(bool(actifs))
+        if not actifs:
+            return
+        cats = [k for k in rh.CATEGORIES if any(p.categorie == k for p in actifs)]
+        total = len(actifs)
+        cont = QWidget()
+        ligne = QHBoxLayout(cont)
+        ligne.setContentsMargins(0, 0, 0, 0)
+        parts = []
+        for k in cats:
+            n = sum(1 for p in actifs if p.categorie == k)
+            parts.append((rh.CATEGORIES[k][2], n, round(100 * n / total, 1)))
+        an = Anneau(parts, [COULEURS_CAT.get(k, "#757575") for k in cats], str(total), "موظفاً")
+        an.setMinimumHeight(230)
+        ligne.addWidget(an, 2)
+        self.g_sexe = BarresGroupees(
+            [rh.CATEGORIES[k][2] for k in cats],
+            [("ذكور", [float(sum(1 for p in actifs if p.categorie == k and p.sexe == "M")) for k in cats], "#1565C0"),
+             ("إناث", [float(sum(1 for p in actifs if p.categorie == k and p.sexe == "F")) for k in cats], "#AD1457")],
+            maximum=None, suffixe="")
+        ligne.addWidget(self.g_sexe, 3)
+        self.v_graph.addWidget(cont)
+        self._graphes.append(cont)
 
     def choisir_xml(self) -> None:
         f, _ = QFileDialog.getOpenFileName(self, "ملف XML للموارد البشرية", "", "XML (*.xml)")
@@ -398,8 +500,24 @@ class PagePersonnel(QWidget):
 
     def _selection(self) -> None:
         lignes = {i.row() for i in self.liste.selectedIndexes()}
+        self.b_ouvrir.setEnabled(len(lignes) == 1)
         if len(lignes) == 1:
             self.afficher(self.liste.item(lignes.pop(), 0).data(Qt.UserRole))
+
+    def ouvrir_nouveau(self) -> FenetreFiche:
+        self.nouveau()
+        self.fiche.definir_titre("إضافة موظف جديد")
+        self.fiche.ouvrir()
+        return self.fiche
+
+    def ouvrir_fiche(self, pid: int | None = None) -> FenetreFiche | None:
+        if pid is not None:
+            self.afficher(pid)
+        if self.pid is None:
+            return None
+        self.fiche.definir_titre("ملف الموظف: " + self.titre.text().split(" · ")[0])
+        self.fiche.ouvrir()
+        return self.fiche
 
     # ---------- الملف ----------
 
@@ -621,6 +739,7 @@ class PagePersonnel(QWidget):
         else:
             message(self.message, "حُفظ ملف الموظف.")
             message(self.message_bas, "حُفظ ملف الموظف.")
+        self.fiche.definir_titre("ملف الموظف: " + self.titre.text().split(" · ")[0])
         return pid
 
     def supprimer(self, confirmer: bool = True) -> bool:
@@ -637,6 +756,7 @@ class PagePersonnel(QWidget):
             return False
         self.rafraichir()
         self.nouveau()
+        self.fiche.hide()
         message(self.message, f"حُذف ملف «{nom}».")
         return True
 

@@ -396,7 +396,24 @@ def test_page_personnel(app, config_tmp):
     assert rh.lire(f.conn, pid).echelon == "7" and rh.lire(f.conn, pid).sans_inspection
     assert p.liste.rowCount() == 2 and "الأساتذة: 1" in p.effectifs.text()
     # قرار المدير (2026-11-03): المهمة بدل الفئة (التدريس أو الإدارة)، دون عمود الملف
-    assert p.liste.columnCount() == 3 and p.liste.horizontalHeaderItem(2).text() == "المهمة"
+    assert p.liste.columnCount() == 10 and p.liste.horizontalHeaderItem(2).text() == "المهمة"
+    # طلب المدير 2026-11-18: الصفحة للمعلومات والإحصائيات، والملف في نافذة منبثقة
+    assert p.cartes["tous"].chiffre.text() == "2" and p.cartes["enseignant"].chiffre.text() == "1"
+    assert not p.c_graph.isHidden()
+    p.filtrer("enseignant")
+    assert p.liste.rowCount() == 1 and p.liste.item(0, 3).text() == "أستاذة"
+    p.filtrer("enseignant")
+    assert p.liste.rowCount() == 2
+    p.filtrer("incomplet")
+    assert p.liste.rowCount() == int(p.cartes["incomplet"].chiffre.text())
+    p.filtrer("tous")
+    d = p.ouvrir_nouveau()
+    assert d.isVisible() and p.pid is None and d.windowTitle() == "إضافة موظف جديد"
+    d.hide()
+    selectionner(p.liste, 0)
+    assert p.b_ouvrir.isEnabled() and p.ouvrir_fiche() is d and d.windowTitle().startswith("ملف الموظف: ")
+    d.hide()
+    p.afficher(pid)
     assert p.liste.horizontalHeaderItem(1).text() == "الوحدة المدرسية" and not p.liste.isColumnHidden(1)
     assert sorted(p.liste.item(i, 2).text() for i in range(2)) == ["الإدارة", "التدريس"]
     # حذف موظف أُدخل خطأً (طلب المدير 2026-11-03)، والمدير لا يُحذف
@@ -560,7 +577,7 @@ def test_page_mouvements(app, config_tmp, monkeypatch):
     f.aller_a("حركية التلاميذ")
     p = f.page_mouvements
     assert f.page_courante() == "حركية التلاميذ" and p.liste.rowCount() == 0 and not p.vide.isHidden()
-    assert p.c_graph.isHidden() and p.barre_sel.isHidden()
+    assert p.c_graph.isHidden() and p.barre_sel.isHidden() and p.t_dossiers.isHidden()
     assert list(p.cartes) == ["arrive", "parti", "interrompu", "exclu", "non_rejoint"]
     assert p.generer_bilan() is None and "لا حركة" in p.message.text()
     # وافد جديد من نافذة الإضافة
@@ -580,15 +597,26 @@ def test_page_mouvements(app, config_tmp, monkeypatch):
     assert p.liste.item(0, 0).text() == "وافد" and "لم يُطلب الملف" in p.liste.item(0, 8).text()
     assert "وافدون لم يُطلب ملفهم (1): هبة الوافد" in p.alertes.text() and not p.c_graph.isHidden()
     selectionner(p.liste, 0)
+    assert p.b_modifier.isEnabled()
+    # تتبع ملفات التلاميذ (طلب المدير 2026-11-18): مرحلة كل ملف، والإجراءات على جدول الملفات
+    assert p.cartes_dossier["a_demander"].chiffre.text() == "1" and p.t_dossiers.rowCount() == 1
+    assert p.t_dossiers.item(0, 0).text() == "لم يُطلب الملف"
+    selectionner(p.t_dossiers, 0)
     assert not p.barre_sel.isHidden() and not p.b_demande.isHidden() and p.b_envoi.isHidden()
-    assert not p.b_modifier.isHidden()
     p.date_action.setText("10/09/2026")
     assert p.demande(False) is not None, p.message.text()
     assert len(ouverts) == 1 and "أُرسل الطلب" in p.liste.item(0, 8).text()
+    assert "10/09/2026 · رقم" in p.t_dossiers.item(0, 5).text() and p.cartes_dossier["a_demander"].chiffre.text() == "0"
     assert "وافدون" not in p.alertes.text()
-    selectionner(p.liste, 0)
+    selectionner(p.t_dossiers, 0)
     p.date_action.setText("20/09/2026")
     assert p.marquer("dossier_recu_le") and "توصلنا" in p.liste.item(0, 8).text()
+    assert p.t_dossiers.item(0, 0).text() == "توصلنا بالملف" and p.t_dossiers.item(0, 7).text() == "20/09/2026"
+    p.filtrer_dossiers("recu")
+    assert p.t_dossiers.rowCount() == 1
+    p.filtrer_dossiers("attente")
+    assert p.t_dossiers.rowCount() == 0
+    p.filtrer_dossiers(None)
     # تعديل الحركية من الجدول
     selectionner(p.liste, 0)
     d = p.modifier(ouvrir=False)
@@ -606,10 +634,12 @@ def test_page_mouvements(app, config_tmp, monkeypatch):
     assert d.enregistrer() is not None, d.message.text()
     assert p.categorie == "parti" and p.liste.rowCount() == 1
     assert "مغادرون لم يُرسل ملفهم (1)" in p.alertes.text()
-    selectionner(p.liste, 0)
+    ligne = next(i for i, x in enumerate(p.dossiers) if x["sens"] == "parti")
+    selectionner(p.t_dossiers, ligne)
     assert not p.b_envoi.isHidden() and p.b_demande.isHidden()
     p.date_action.setText("20/10/2026")
     assert p.envoi() is not None and "أُرسل الملف" in p.liste.item(0, 8).text()
+    assert p.cartes_dossier["envoye"].chiffre.text() == "1"
     assert mv.alertes(f.conn)["envoi"] == []
     # مغادر سابق غير وارد في اللائحة (طلب المدير 2026-11-09)
     d = p.ajouter("parti", ouvrir=False)
@@ -635,7 +665,7 @@ def test_page_mouvements(app, config_tmp, monkeypatch):
     assert d.enregistrer() is not None, d.message.text()
     assert p.categorie == "non_rejoint" and p.liste.rowCount() == 1 and p.liste.item(0, 0).text() == "غير ملتحق"
     selectionner(p.liste, 0)
-    assert p.b_modifier.isHidden() and p.date_action.isHidden()
+    assert not p.b_modifier.isEnabled()
     # المعايير: بطاقة «الكل»، البحث، المستوى، الفترة
     p.filtrer(None)
     assert p.liste.rowCount() == 4 and p.c_solde.chiffre.text() == "4" and "الفرق" in p.c_solde.libelle.text()

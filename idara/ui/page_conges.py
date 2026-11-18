@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QDialogButtonBox,
                                QFormLayout, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
@@ -16,7 +17,23 @@ from idara.services import personnel as rh
 from idara.services import textes as tx
 from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
+from idara.ui import pictos
+from idara.ui.graphiques import Anneau, BarresGroupees
 from idara.ui.saisie import ChampDate, cellule, message, tableau
+from idara.ui.vitrine import CarteFiltre, FenetreFiche, grille_cartes
+
+# بطاقات الأرقام (طلب المدير 2026-11-18): الحالة معيار للجدول عند الضغط
+ETATS = [
+    ("toutes", "كل الرخص", "#455A64", "document", "المسجلة في البرنامج"),
+    ("en_cours", "رخص جارية", "#1565C0", "calendrier", "لم تنته مدتها بعد"),
+    ("sans_reprise", "دون محضر استئناف", "#C62828", "rappel", "انتهت ولم يُحرر محضر الاستئناف"),
+    ("reprise", "مستأنفة", "#2E7D32", "valider", "حُرر محضر استئنافها"),
+    ("radaa", "رخص رضاعة جارية", "#AD1457", "personnes", "ساعة يومياً"),
+    ("jours", "أيام الرخص", "#EF6C00", "statistiques", "مجموع المدد (دون الرضاعة)"),
+]
+LIB_ETAT = {"reprise": "مستأنفة", "en_cours": "جارية", "sans_reprise": "دون استئناف", "prolongee": "ممدَّدة"}
+COUL_ETAT = {"reprise": "#2E7D32", "en_cours": "#1565C0", "sans_reprise": "#C62828", "prolongee": "#6A1B9A"}
+PICTO_ETAT = {"reprise": "valider", "en_cours": "calendrier", "sans_reprise": "rappel", "prolongee": "actualiser"}
 
 
 def _ouvrir(label: QLabel, doc) -> None:
@@ -153,8 +170,33 @@ class PageConges(QWidget):
         racine = QVBoxLayout(self)
         racine.setContentsMargins(40, 32, 40, 32)
         racine.setSpacing(16)
-        racine.addWidget(entete("الرخص", "ملف رخصة يُدخل مرة واحدة، ومنه يُولد الطلب وإيصال الشهادة الطبية "
-                                         "وطلب التعويض وورقة الإرسال ومحضر الاستئناف."))
+        racine.addWidget(entete("الرخص", "رخص الأطر وإحصائياتها. ملف الرخصة يُدخل مرة واحدة (في نافذة منبثقة)، ومنه "
+                                         "يُولد الطلب وإيصال الشهادة الطبية وطلب التعويض وورقة الإرسال ومحضر الاستئناف."))
+        # ---- بطاقات الأرقام (طلب المدير 2026-11-18) ----
+        self.etat_filtre: str | None = None
+        self.cartes: dict[str, CarteFiltre] = {}
+        for k, lib, coul, picto, note in ETATS:
+            c_ = CarteFiltre(k, lib, coul, picto, note)
+            c_.clique.connect(self.filtrer)
+            self.cartes[k] = c_
+        racine.addLayout(grille_cartes(list(self.cartes.values()), 3))
+        h = QHBoxLayout()
+        b = QPushButton("إضافة رخصة جديدة")
+        b.setObjectName("principal")
+        b.clicked.connect(lambda: self.ouvrir_nouveau())
+        h.addWidget(b)
+        b2 = QPushButton("محضر استئناف بعد تغيب (دون رخصة)")
+        b2.clicked.connect(lambda: self.dialogue_reprise(None))
+        h.addWidget(b2)
+        self.b_ouvrir = QPushButton("فتح ملف الرخصة المحددة")
+        self.b_ouvrir.setEnabled(False)
+        self.b_ouvrir.clicked.connect(lambda: self.ouvrir_fiche())
+        h.addWidget(self.b_ouvrir)
+        h.addStretch()
+        b3 = QPushButton("تخصيص صيغ المراسلات")
+        b3.clicked.connect(lambda: self.fiche_params.ouvrir())
+        h.addWidget(b3)
+        racine.addLayout(h)
         self.alertes = QLabel()
         self.alertes.setObjectName("alerte")
         self.alertes.setWordWrap(True)
@@ -168,27 +210,42 @@ class PageConges(QWidget):
         self.message.setWordWrap(True)
         self.message.hide()
         racine.addWidget(self.message)
-        corps = QHBoxLayout()
-        corps.setSpacing(20)
-        racine.addLayout(corps, 1)
 
         # ---- اللائحة ----
         c, cv = carte()
-        self.liste = tableau(["الرخصة", "الحالة"], etirer=0)
+        self.titre_liste = QLabel()
+        self.titre_liste.setObjectName("titreCarte")
+        cv.addWidget(self.titre_liste)
+        hf = QHBoxLayout()
+        self.recherche = QLineEdit()
+        self.recherche.setPlaceholderText("بحث: اسم الموظف أو نوع الرخصة")
+        self.recherche.setClearButtonEnabled(True)
+        self.recherche.textChanged.connect(lambda _: self.chercher())
+        hf.addWidget(self.recherche, 2)
+        self.f_type = QComboBox()
+        self.f_type.addItem("كل الأنواع", None)
+        self.f_type.currentIndexChanged.connect(lambda _: self.chercher())
+        hf.addWidget(self.f_type, 1)
+        cv.addLayout(hf)
+        self.liste = tableau(["الموظف", "الحالة", "نوع الرخصة", "من", "إلى", "المدة", "رقم الطلب",
+                              "الوثائق المولدة"], etirer=0)
         h = self.liste.horizontalHeader()
-        for i, l in ((1, 95),):
-            h.setSectionResizeMode(i, h.ResizeMode.Fixed)
-            h.resizeSection(i, l)
-        self.liste.setMinimumHeight(420)
+        h.setSectionResizeMode(h.ResizeMode.ResizeToContents)
+        h.setStretchLastSection(True)
+        self.liste.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.liste.setMinimumHeight(340)
         self.liste.itemSelectionChanged.connect(self._selection)
+        self.liste.itemDoubleClicked.connect(lambda _: self.ouvrir_fiche())
         cv.addWidget(self.liste, 1)
-        b = QPushButton("+ رخصة جديدة")
-        b.clicked.connect(self.nouveau)
-        cv.addWidget(b)
-        b2 = QPushButton("محضر استئناف بعد تغيب (دون رخصة)")
-        b2.clicked.connect(lambda: self.dialogue_reprise(None))
-        cv.addWidget(b2)
-        corps.addWidget(c, 5)
+        self.vide = QLabel("لا رخص مسجلة بعد. أضف رخصة جديدة من الزر أعلاه.")
+        self.vide.setObjectName("etiquette")
+        self.vide.setAlignment(Qt.AlignCenter)
+        cv.addWidget(self.vide)
+        racine.addWidget(c)
+        self.c_graph, self.v_graph = carte("المبيانات")
+        self._graphes: list[QWidget] = []
+        racine.addWidget(self.c_graph)
+        racine.addStretch()
 
         # ---- الملف ----
         c2, fv = carte()
@@ -263,6 +320,10 @@ class PageConges(QWidget):
         b_save.setObjectName("principal")
         b_save.clicked.connect(self.enregistrer)
         fv.addWidget(b_save, 0, Qt.AlignRight)
+        self.message_fiche = QLabel()   # نتيجة الحفظ والتوليد داخل النافذة المنبثقة
+        self.message_fiche.setWordWrap(True)
+        self.message_fiche.hide()
+        fv.addWidget(self.message_fiche)
 
         t = QLabel("الوثائق")
         t.setObjectName("titreCarte")
@@ -288,17 +349,22 @@ class PageConges(QWidget):
         self.docs.cellDoubleClicked.connect(self._ouvrir_doc)
         fv.addWidget(self.docs)
 
-        # ---- صيغ المراسلات ----
-        t = QLabel("صيغ المراسلات (تُكتب في كل الوثائق)")
-        t.setObjectName("titreCarte")
-        fv.addWidget(t)
+        self.fiche = FenetreFiche(self, "ملف الرخصة", "يُدخل مرة واحدة، ومنه تُولد كل وثائق الرخصة.", c2)
+
+        # ---- صيغ المراسلات (نافذة مستقلة) ----
+        cp, pv = carte("صيغ المراسلات (تُكتب في كل الوثائق)")
         self.params = {k: champ() for k in cg.PARAMETRES}
-        fv.addLayout(_grille([(lib, self.params[k]) for k, (lib, _) in cg.PARAMETRES.items()], 1))
+        pv.addLayout(_grille([(lib, self.params[k]) for k, (lib, _) in cg.PARAMETRES.items()], 1))
         b_p = QPushButton("حفظ الصيغ")
+        b_p.setObjectName("principal")
         b_p.clicked.connect(self.enregistrer_parametres)
-        fv.addWidget(b_p, 0, Qt.AlignRight)
-        fv.addStretch()
-        corps.addWidget(c2, 7)
+        pv.addWidget(b_p, 0, Qt.AlignRight)
+        self.message_params = QLabel()
+        self.message_params.setWordWrap(True)
+        self.message_params.hide()
+        pv.addWidget(self.message_params)
+        pv.addStretch()
+        self.fiche_params = FenetreFiche(self, "صيغ المراسلات", "الجهات والصيغ التي تُكتب في وثائق الرخص.", cp, 760)
         self.rafraichir()
         self.nouveau()
 
@@ -329,21 +395,140 @@ class PageConges(QWidget):
             f"{r['prenom_ar']} {r['nom_ar']} ({r['horaire_allaitement'] or 'الساعة غير محددة'}، "
             f"إلى {tx.date_chiffres(r['date_fin'])})" for r in radaa) if radaa else "")
         self.l_radaa.setVisible(bool(radaa))
-        lignes = cg.lister(conn)
+        types = [self.f_type.itemText(i) for i in range(1, self.f_type.count())]
+        for t in cg.types_conge(conn):
+            if t["libelle_ar"] not in types:
+                self.f_type.addItem(t["libelle_ar"], t["libelle_ar"])
         aujourdhui = date.today().isoformat()
-        self.liste.setRowCount(len(lignes))
-        for i, r in enumerate(lignes):
-            etat = ("مستأنفة" if r["reprise_id"] else "جارية" if r["date_fin"] >= aujourdhui
-                    else "دون استئناف" if any(a["id"] == r["id"] for a in attendues) else "ممدَّدة")
-            it = cellule(f"{r['prenom_ar']} {r['nom_ar']} · {tx.date_chiffres(r['date_debut'])}", r["id"])
+        ids_attendus = {a["id"] for a in attendues}
+        self.toutes = []
+        for r in cg.lister(conn):
+            etat = ("reprise" if r["reprise_id"] else "en_cours" if r["date_fin"] >= aujourdhui
+                    else "sans_reprise" if r["id"] in ids_attendus else "prolongee")
+            self.toutes.append({"r": r, "etat": etat, "docs": len(cg.documents(conn, r["id"])),
+                                "radaa": cg.est_allaitement(conn, r["type_conge_id"])})
+        n = {"toutes": len(self.toutes), "en_cours": sum(1 for x in self.toutes if x["etat"] == "en_cours"),
+             "sans_reprise": len(attendues), "reprise": sum(1 for x in self.toutes if x["etat"] == "reprise"),
+             "radaa": len(radaa),
+             "jours": sum(int(x["r"]["duree_jours"] or 0) for x in self.toutes if not x["radaa"])}
+        for k, c_ in self.cartes.items():
+            c_.definir(n[k])
+        self._graphiques()
+        self.chercher()
+
+    def filtrer(self, etat: str | None) -> None:
+        self.etat_filtre = None if etat in (self.etat_filtre, "toutes", "jours") else etat
+        self.chercher()
+
+    def chercher(self) -> None:
+        from idara.services.massar import normaliser
+        for k, c_ in self.cartes.items():
+            c_.definir_actif(k == (self.etat_filtre or "toutes"))
+        t = normaliser(self.recherche.text())
+        typ = self.f_type.currentData()
+        self.lignes = [x for x in getattr(self, "toutes", [])
+                       if (self.etat_filtre is None or (x["radaa"] and x["etat"] == "en_cours"
+                                                        if self.etat_filtre == "radaa" else
+                                                        x["etat"] == self.etat_filtre))
+                       and (not typ or x["r"]["type"] == typ)
+                       and (not t or any(t in normaliser(v) for v in (
+                           f"{x['r']['prenom_ar']}{x['r']['nom_ar']}", f"{x['r']['nom_ar']}{x['r']['prenom_ar']}",
+                           x["r"]["type"])))]
+        titre = next((lib for k, lib, *_ in ETATS if k == (self.etat_filtre or "toutes")), "")
+        self.titre_liste.setText(f"{titre} ({len(self.lignes)})")
+        self.liste.blockSignals(True)
+        self.liste.clearSelection()
+        self.liste.setRowCount(len(self.lignes))
+        for i, x in enumerate(self.lignes):
+            r = x["r"]
+            it = cellule(f"{r['prenom_ar']} {r['nom_ar']}", r["id"])
+            f_ = it.font()
+            f_.setBold(True)
+            it.setFont(f_)
             it.setToolTip(f"{r['type']}: من {tx.date_chiffres(r['date_debut'])} إلى {tx.date_chiffres(r['date_fin'])}")
             self.liste.setItem(i, 0, it)
-            self.liste.setItem(i, 1, cellule(etat))
+            e = cellule(LIB_ETAT[x["etat"]])
+            e.setForeground(QColor(COUL_ETAT[x["etat"]]))
+            e.setIcon(pictos.icone(PICTO_ETAT[x["etat"]], COUL_ETAT[x["etat"]], 16))
+            self.liste.setItem(i, 1, e)
+            for j, v in enumerate((r["type"], tx.date_chiffres(r["date_debut"]), tx.date_chiffres(r["date_fin"]),
+                                   f"{int(r['duree_jours'])} يوماً",
+                                   f"\u2066{cg.numero_affiche(r['numero'], r['code_court'])}\u2069" if r["numero"]
+                                   else "—", str(x["docs"]) if x["docs"] else "—"), start=2):
+                self.liste.setItem(i, j, cellule(v))
+        self.liste.blockSignals(False)
+        self.liste.setVisible(bool(self.toutes))
+        self.vide.setVisible(not self.toutes)
+        self._selection()
+
+    def _graphiques(self) -> None:
+        for w in self._graphes:
+            w.hide()
+            w.setParent(None)
+            w.deleteLater()
+        self._graphes = []
+        self.c_graph.setVisible(bool(self.toutes))
+        if not self.toutes:
+            return
+        par_type: dict[str, int] = {}
+        for x in self.toutes:
+            par_type[x["r"]["type"]] = par_type.get(x["r"]["type"], 0) + 1
+        total = len(self.toutes)
+        palette = ["#1565C0", "#AD1457", "#2E7D32", "#EF6C00", "#6A1B9A", "#00838F", "#C62828", "#5D4037"]
+        cont = QWidget()
+        ligne = QHBoxLayout(cont)
+        ligne.setContentsMargins(0, 0, 0, 0)
+        an = Anneau([(k, v, round(100 * v / total, 1)) for k, v in par_type.items()],
+                    palette[:len(par_type)] + ["#757575"] * max(0, len(par_type) - len(palette)), str(total), "رخصة")
+        an.setMinimumHeight(230)
+        ligne.addWidget(an, 2)
+        mois: dict[str, list[int]] = {}
+        for x in self.toutes:
+            if x["radaa"]:
+                continue
+            m = x["r"]["date_debut"][:7]
+            mois.setdefault(m, [0, 0])
+            mois[m][0] += 1
+            mois[m][1] += int(x["r"]["duree_jours"] or 0)
+        if mois:
+            from idara.services.mouvements import libelle_mois
+            cles = sorted(mois)[-10:]
+            self.g_mois = BarresGroupees([libelle_mois(m) for m in cles],
+                                         [("عدد الرخص", [float(mois[m][0]) for m in cles], "#1565C0"),
+                                          ("أيام الرخص", [float(mois[m][1]) for m in cles], "#EF6C00")],
+                                         maximum=None, suffixe="")
+            ligne.addWidget(self.g_mois, 3)
+        self.v_graph.addWidget(cont)
+        self._graphes.append(cont)
 
     def _selection(self) -> None:
         lignes = {i.row() for i in self.liste.selectedIndexes()}
+        self.b_ouvrir.setEnabled(len(lignes) == 1)
         if len(lignes) == 1:
             self.afficher(self.liste.item(lignes.pop(), 0).data(Qt.UserRole))
+
+    def _msg(self, texte: str, erreur: bool = False) -> None:
+        message(self.message, texte, erreur)
+        message(self.message_fiche, texte, erreur)
+
+    def _ouvrir(self, doc) -> None:
+        _ouvrir(self.message, doc)
+        message(self.message_fiche, self.message.text(), self.message.objectName() == "erreur")
+
+    def ouvrir_nouveau(self) -> FenetreFiche:
+        self.nouveau()
+        self.fiche.definir_titre("إضافة رخصة جديدة")
+        self.fiche.ouvrir()
+        return self.fiche
+
+    def ouvrir_fiche(self, cid: int | None = None) -> FenetreFiche | None:
+        if cid is not None:
+            self.afficher(cid)
+        if self.cid is None:
+            return None
+        self.fiche.definir_titre("ملف الرخصة: " + self.titre.text())
+        self.fiche.ouvrir()
+        return self.fiche
 
     # ---------- الملف ----------
 
@@ -433,6 +618,7 @@ class PageConges(QWidget):
         self.zone_docs.setEnabled(False)
         self.docs.setRowCount(0)
         self.message.hide()
+        self.message_fiche.hide()
 
     def afficher(self, cid: int) -> None:
         c = cg.lire(self.f.conn, cid)
@@ -498,22 +684,23 @@ class PageConges(QWidget):
                 c.demande_remplacement = cg.lire(self.f.conn, c.id).demande_remplacement
             cid = cg.enregistrer(self.f.conn, c)
         except (cg.ErreurConge, rh.ErreurPersonnel) as e:
-            message(self.message, str(e), True)
+            self._msg(str(e), True)
             return None
         self.rafraichir()
         self.afficher(cid)
-        message(self.message, "حُفظ ملف الرخصة. يمكنك الآن توليد وثائقه.")
+        self._msg("حُفظ ملف الرخصة. يمكنك الآن توليد وثائقه.")
+        self.fiche.definir_titre("ملف الرخصة: " + self.titre.text())
         return cid
 
     def _generer(self, fonction):
         try:
             doc = fonction(self.f.conn, self.f.dossier, self.cid)
         except (cg.ErreurConge, dc.ErreurDocument) as e:
-            message(self.message, str(e), True)
+            self._msg(str(e), True)
             return None
         self.rafraichir()
         self.afficher(self.cid)
-        _ouvrir(self.message, doc)
+        self._ouvrir(doc)
         return doc
 
     def dialogue_bordereau(self) -> None:
@@ -524,7 +711,7 @@ class PageConges(QWidget):
             try:
                 le = d.le.iso() or None
             except ValueError:
-                message(self.message, "التاريخ غير صحيح.", True)
+                self._msg("التاريخ غير صحيح.", True)
                 return
             self.bordereau(d.pieces(), d.objet.text(), le, d.bureau.currentData())
 
@@ -532,10 +719,10 @@ class PageConges(QWidget):
         try:
             doc = cg.generer_bordereau(self.f.conn, self.f.dossier, pieces, objet, le, self.cid, bureau)
         except (cg.ErreurConge, dc.ErreurDocument) as e:
-            message(self.message, str(e), True)
+            self._msg(str(e), True)
             return None
         self.afficher(self.cid)
-        _ouvrir(self.message, doc)
+        self._ouvrir(doc)
         return doc
 
     def dialogue_reprise(self, cid: int | None) -> None:
@@ -545,34 +732,34 @@ class PageConges(QWidget):
             try:
                 self.reprise(d.lire())
             except cg.ErreurConge as e:
-                message(self.message, str(e), True)
+                self._msg(str(e), True)
 
     def reprise(self, r: cg.Reprise):
         try:
             rid = cg.enregistrer_reprise(self.f.conn, r)
             doc = cg.generer_reprise(self.f.conn, self.f.dossier, rid)
         except (cg.ErreurConge, dc.ErreurDocument) as e:
-            message(self.message, str(e), True)
+            self._msg(str(e), True)
             return None
         self.rafraichir()
         if self.cid:
             self.afficher(self.cid)
-        _ouvrir(self.message, doc)
+        self._ouvrir(doc)
         return doc
 
     def enregistrer_parametres(self) -> None:
         try:
             cg.definir_parametres(self.f.conn, {k: w.text() for k, w in self.params.items()})
         except cg.ErreurConge as e:
-            message(self.message, str(e), True)
+            message(self.message_params, str(e), True)
             return
-        message(self.message, "حُفظت صيغ المراسلات.")
+        message(self.message_params, "حُفظت صيغ المراسلات.")
 
     def _ouvrir_doc(self, ligne: int, _col: int) -> None:
         try:
             bureautique.ouvrir(self.f.dossier.racine / self.docs.item(ligne, 0).data(Qt.UserRole))
         except OSError as e:
-            message(self.message, f"تعذر فتح الملف: {e}", True)
+            self._msg(f"تعذر فتح الملف: {e}", True)
 
 
 class PageSortants(QWidget):

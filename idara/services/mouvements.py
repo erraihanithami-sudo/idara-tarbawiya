@@ -669,3 +669,46 @@ def changer_statut_sortie(conn: sqlite3.Connection, code_massar: str, statut: st
     except el.ErreurEleve as e:
         raise ErreurMouvement(str(e)) from e
     return r["id"]
+
+
+# ---------- تتبع ملفات التلاميذ (طلب المدير 2026-11-18) ----------
+
+ETAPES_DOSSIER = {
+    "a_demander": ("لم يُطلب الملف", "arrive"), "attente": ("طُلب ولم نتوصل به", "arrive"),
+    "relance": ("يستحق التذكير", "arrive"), "recu": ("توصلنا بالملف", "arrive"),
+    "a_envoyer": ("لم يُرسل الملف", "parti"), "envoye": ("أُرسل الملف", "parti"),
+}
+
+
+def suivi_dossiers(conn: sqlite3.Connection, unite: str | None = None, le: date | None = None) -> list[dict]:
+    """سطر لكل وافد أو مغادر: مراحل ملفه (الطلب، التذكير، التوصل، الإرسال) بتواريخها وأرقام مراسلاتها في
+    سجل الصادر، ومرحلته الحالية (etape) كما في ETAPES_DOSSIER."""
+    from idara.services import conges as cg
+    le = le or date.today()
+    limite = (le - timedelta(days=DELAI_RELANCE)).isoformat()
+    nums = {r["id"]: cg.numero_affiche(r["numero"], r["code_court"]) for r in conn.execute(
+        "SELECT k.id, k.numero, a.code_court FROM courrier k JOIN annee_scolaire a ON a.id=k.annee_id "
+        "WHERE k.sens='sortant'")}
+    res = []
+    for r in lister(conn, None, "", unite):
+        if r["sens"] == "parti":
+            etape = "envoye" if r["dossier_envoye_le"] else "a_envoyer"
+        elif r["dossier_recu_le"]:
+            etape = "recu"
+        elif not r["demande1_le"]:
+            etape = "a_demander"
+        elif (r["demande2_le"] or r["demande1_le"]) <= limite:
+            etape = "relance"
+        else:
+            etape = "attente"
+        res.append({
+            "mouvement_id": r["id"], "sens": r["sens"], "eleve_id": r["eleve_id"],
+            "nom": f"{r['prenom_ar']} {r['nom_ar']}", "code_massar": r["code_massar"],
+            "etablissement": r["etablissement"] or "", "date": r["date_mouvement"] or "", "etape": etape,
+            "demande1_le": r["demande1_le"] or "", "demande1_num": nums.get(r["demande1_courrier_id"], ""),
+            "demande2_le": r["demande2_le"] or "", "demande2_num": nums.get(r["demande2_courrier_id"], ""),
+            "recu_le": r["dossier_recu_le"] or "", "envoye_le": r["dossier_envoye_le"] or "",
+            "envoi_num": nums.get(r["envoi_courrier_id"], ""),
+            "jours": (le - date.fromisoformat(r["demande2_le"] or r["demande1_le"])).days
+            if r["sens"] == "arrive" and r["demande1_le"] and not r["dossier_recu_le"] else None})
+    return res

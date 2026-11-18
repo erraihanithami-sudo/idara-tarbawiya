@@ -1211,7 +1211,7 @@ class FenetrePrincipale(QMainWindow):
             self.page_eleves.afficher(ident)
         else:
             self.aller_a("الموارد البشرية")
-            self.page_rh.afficher(ident)
+            self.page_rh.ouvrir_fiche(ident)
 
     def filtrer_nav(self, texte: str) -> list[str]:
         res = self.resultats_recherche(texte)

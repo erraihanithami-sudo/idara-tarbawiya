@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QLineEdit, QPushButton, QRadioButton, QVBoxLayout, QWidget)
@@ -27,10 +27,15 @@ from idara.ui.composants import carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.graphiques import Anneau, BarresGroupees
 from idara.ui.saisie import ChampDate, cellule, message, tableau
+from idara.ui.vitrine import CarteFiltre
 
 COULEURS = {"arrive": "#2E7D32", "parti": "#1565C0", "interrompu": "#EF6C00", "exclu": "#C62828",
             "non_rejoint": "#6A1B9A"}
 PICTOS = {"arrive": "entree", "parti": "sortie", "interrompu": "pause", "exclu": "interdit", "non_rejoint": "absent"}
+ETAPES_COULEURS = {"a_demander": "#C62828", "attente": "#1565C0", "relance": "#EF6C00", "recu": "#2E7D32",
+                   "a_envoyer": "#C62828", "envoye": "#2E7D32"}
+ETAPES_PICTOS = {"a_demander": "document", "attente": "calendrier", "relance": "rappel", "recu": "valider",
+                 "a_envoyer": "document", "envoye": "envoyer"}
 NOTES = {"arrive": "قدموا من مؤسسات أخرى", "parti": "انتقلوا إلى مؤسسات أخرى", "interrompu": "توقفوا عن الدراسة",
          "exclu": "بقرار من المجلس", "non_rejoint": "مسجلون في مسار ولم يلتحقوا"}
 
@@ -42,57 +47,6 @@ def _combo(valeurs=()) -> QComboBox:
     c.addItems(list(valeurs))
     c.setCurrentIndex(-1)
     return c
-
-
-class CarteFiltre(QFrame):
-    """بطاقة رقم تعمل معياراً: أيقونة في دائرة، العدد، الفئة، وسطر تعريفي. الضغط عليها يعرض فئتها."""
-
-    clique = Signal(str)
-
-    def __init__(self, cle: str, libelle: str, couleur: str, picto: str, note: str = ""):
-        super().__init__()
-        self.cle, self.couleur = cle, couleur
-        self.setObjectName("carteFiltre")
-        self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(96)
-        h = QHBoxLayout(self)
-        h.setContentsMargins(16, 12, 14, 12)
-        h.setSpacing(12)
-        ic = QLabel()
-        ic.setPixmap(pictos.pastille(picto, couleur, 48))
-        ic.setFixedSize(48, 48)
-        ic.setStyleSheet("background: transparent;")
-        h.addWidget(ic, 0, Qt.AlignVCenter)
-        v = QVBoxLayout()
-        v.setSpacing(0)
-        self.chiffre = QLabel("0")
-        self.chiffre.setStyleSheet(f"font-size: 22pt; font-weight: 700; color: {couleur}; background: transparent;")
-        self.libelle = QLabel(libelle)
-        self.libelle.setStyleSheet("font-weight: 700; background: transparent;")
-        v.addWidget(self.chiffre)
-        v.addWidget(self.libelle)
-        if note:
-            n = QLabel(note)
-            n.setObjectName("etiquette")
-            n.setStyleSheet("background: transparent;")
-            n.setWordWrap(True)
-            v.addWidget(n)
-        h.addLayout(v, 1)
-        self.definir_actif(False)
-
-    def definir_actif(self, actif: bool) -> None:
-        self.actif = actif
-        c = QColor(self.couleur)
-        teinte = f"rgba({c.red()}, {c.green()}, {c.blue()}, {28 if actif else 0})"
-        bord = f"2px solid {self.couleur}" if actif else "1px solid #D8D4CC"
-        self.setStyleSheet(f"QFrame#carteFiltre {{ background: qlineargradient(x1:1, y1:0, x2:0, y2:1, "
-                           f"stop:0 {teinte}, stop:1 white); border: {bord}; border-radius: 16px; "
-                           f"border-right: 6px solid {self.couleur}; }}")
-
-    def mouseReleaseEvent(self, ev):   # noqa: N802
-        if ev.button() == Qt.LeftButton:
-            self.clique.emit(self.cle)
-        super().mouseReleaseEvent(ev)
 
 
 # ======================================================================
@@ -414,7 +368,42 @@ class PageMouvements(QWidget):
         self.vide.setObjectName("etiquette")
         self.vide.setAlignment(Qt.AlignCenter)
         cv.addWidget(self.vide)
-        # إجراءات الملف للتلاميذ المحددين
+        hm = QHBoxLayout()
+        self.b_modifier = QPushButton("تعديل الحركية المحددة")
+        self.b_modifier.clicked.connect(lambda: self.modifier())
+        self.b_modifier.setEnabled(False)
+        hm.addWidget(self.b_modifier)
+        hm.addStretch()
+        cv.addLayout(hm)
+        racine.addWidget(c)
+
+        # ---- تتبع ملفات التلاميذ (طلب المدير 2026-11-18) ----
+        self.c_dossiers, dv = carte("تتبع ملفات التلاميذ: الطلب والتذكير والتوصل والإرسال")
+        aide = QLabel(f"الوافدون: يُطلب ملفهم من مؤسستهم الأصلية، ويُذكَّر بعد {mv.DELAI_RELANCE} يوماً دون توصل. "
+                      "المغادرون: يُرسل ملفهم إلى المؤسسة المستقبلة. كل مراسلة تأخذ رقمها من سجل الصادر.")
+        aide.setObjectName("etiquette")
+        aide.setWordWrap(True)
+        dv.addWidget(aide)
+        self.etape: str | None = None
+        self.cartes_dossier: dict[str, CarteFiltre] = {}
+        ge = QGridLayout()
+        ge.setSpacing(10)
+        for i, (k, (lib, sens)) in enumerate(mv.ETAPES_DOSSIER.items()):
+            c_ = CarteFiltre(k, lib, ETAPES_COULEURS[k], ETAPES_PICTOS[k], compacte=True)
+            c_.clique.connect(self.filtrer_dossiers)
+            self.cartes_dossier[k] = c_
+            ge.addWidget(c_, i // 3, i % 3)
+        dv.addLayout(ge)
+        self.t_dossiers = tableau(["المرحلة", "التلميذ(ة)", "رمز مسار", "الحركية", "المؤسسة", "طلب الملف",
+                                   "التذكير", "التوصل بالملف", "إرسال الملف"], etirer=1)
+        hd = self.t_dossiers.horizontalHeader()
+        hd.setSectionResizeMode(hd.ResizeMode.ResizeToContents)
+        hd.setStretchLastSection(True)
+        self.t_dossiers.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.t_dossiers.setSelectionMode(self.t_dossiers.SelectionMode.ExtendedSelection)
+        self.t_dossiers.setMinimumHeight(220)
+        self.t_dossiers.itemSelectionChanged.connect(self._selection_dossiers)
+        dv.addWidget(self.t_dossiers)
         self.barre_sel = QFrame()
         self.barre_sel.setObjectName("barreSelection")
         self.barre_sel.setStyleSheet("QFrame#barreSelection { background: #F3F7F6; border: 1px solid #CFE3DE; "
@@ -441,14 +430,15 @@ class PageMouvements(QWidget):
         self.b_envoye.clicked.connect(lambda: self.marquer("dossier_envoye_le"))
         self.b_annuler = QPushButton("إلغاء التأشير")
         self.b_annuler.clicked.connect(self.annuler)
-        self.b_modifier = QPushButton("تعديل")
-        self.b_modifier.clicked.connect(lambda: self.modifier())
-        for b in (self.b_demande, self.b_rappel, self.b_recu, self.b_envoi, self.b_envoye, self.b_annuler,
-                  self.b_modifier):
+        for b in (self.b_demande, self.b_rappel, self.b_recu, self.b_envoi, self.b_envoye, self.b_annuler):
             bs.addWidget(b)
         bs.addStretch()
-        cv.addWidget(self.barre_sel)
-        racine.addWidget(c)
+        dv.addWidget(self.barre_sel)
+        self.vide_dossiers = QLabel("لا وافدين ولا مغادرين بعد: ملفاتهم تظهر هنا عند تسجيل حركيتهم.")
+        self.vide_dossiers.setObjectName("etiquette")
+        self.vide_dossiers.setAlignment(Qt.AlignCenter)
+        dv.addWidget(self.vide_dossiers)
+        racine.addWidget(self.c_dossiers)
 
         # ---- المبيانات ----
         self.c_graph, self.v_graph = carte("المبيانات")
@@ -503,6 +493,7 @@ class PageMouvements(QWidget):
         self.c_solde.libelle.setText("كل الحركات · الفرق " + (f"⁦{solde:+d}⁩" if solde else "0"))
         self._graphiques(n)
         self.chercher()
+        self.afficher_dossiers()
 
     def filtrer(self, categorie: str | None) -> None:
         self.categorie = None if categorie == self.categorie else categorie
@@ -609,22 +600,76 @@ class PageMouvements(QWidget):
         rows = sorted({i.row() for i in self.table.selectedIndexes()})
         return [self.lignes[r] for r in rows if r < len(self.lignes)]
 
-    def ids(self) -> list[int]:
-        return [x["mouvement_id"] for x in self._selection_lignes() if x["mouvement_id"]]
-
     def _selection(self) -> None:
         sel = self._selection_lignes()
-        cats = {x["categorie"] for x in sel}
+        self.b_modifier.setEnabled(len(sel) == 1 and bool(sel[0]["mouvement_id"]))
+
+    # ---------- تتبع الملفات ----------
+
+    def filtrer_dossiers(self, etape: str | None) -> None:
+        self.etape = None if etape == self.etape else etape
+        self.afficher_dossiers()
+
+    def afficher_dossiers(self) -> None:
+        try:
+            tous = mv.suivi_dossiers(self.f.conn, self.unite())
+        except mv.ErreurMouvement:
+            tous = []
+        for k, c_ in self.cartes_dossier.items():
+            c_.definir(sum(1 for x in tous if x["etape"] == k))
+            c_.definir_actif(k == self.etape)
+        self.dossiers = [x for x in tous if self.etape is None or x["etape"] == self.etape]
+
+        def d_n(d, n):
+            return " · ".join(x for x in (tx.date_chiffres(d) if d else "", f"رقم \u2066{n}\u2069" if n else "") if x)
+
+        self.t_dossiers.blockSignals(True)
+        self.t_dossiers.clearSelection()
+        self.t_dossiers.setRowCount(len(self.dossiers))
+        for i, x in enumerate(self.dossiers):
+            lib = mv.ETAPES_DOSSIER[x["etape"]][0]
+            if x["etape"] == "relance":
+                lib += f" ({x['jours']} يوماً)"
+            it = cellule(lib, x["mouvement_id"])
+            coul = QColor(ETAPES_COULEURS[x["etape"]])
+            it.setForeground(coul)
+            it.setIcon(pictos.icone(ETAPES_PICTOS[x["etape"]], coul.name(), 16))
+            f = it.font()
+            f.setBold(True)
+            it.setFont(f)
+            self.t_dossiers.setItem(i, 0, it)
+            for j, val in enumerate((x["nom"], f"\u2066{x['code_massar']}\u2069", mv.CATEGORIES[x["sens"]],
+                                     x["etablissement"], d_n(x["demande1_le"], x["demande1_num"]),
+                                     d_n(x["demande2_le"], x["demande2_num"]),
+                                     tx.date_chiffres(x["recu_le"]) if x["recu_le"] else "",
+                                     d_n(x["envoye_le"], x["envoi_num"])), start=1):
+                self.t_dossiers.setItem(i, j, cellule(val))
+        self.t_dossiers.blockSignals(False)
+        self.t_dossiers.setVisible(bool(tous))
+        self.vide_dossiers.setVisible(not tous)
+        self._selection_dossiers()
+
+    def _selection_dossiers_lignes(self) -> list[dict]:
+        rows = sorted({i.row() for i in self.t_dossiers.selectedIndexes()})
+        return [self.dossiers[r] for r in rows if r < len(getattr(self, "dossiers", []))]
+
+    def ids(self) -> list[int]:
+        return [x["mouvement_id"] for x in self._selection_dossiers_lignes()]
+
+    def _selection_dossiers(self) -> None:
+        sel = self._selection_dossiers_lignes()
+        sens = {x["sens"] for x in sel}
         self.barre_sel.setVisible(bool(sel))
         self.l_sel.setText(f"المحدد: {len(sel)}")
-        arrive, parti = cats == {"arrive"}, cats == {"parti"}
+        arrive, parti = sens == {"arrive"}, sens == {"parti"}
         for b in (self.b_demande, self.b_rappel, self.b_recu):
             b.setVisible(arrive)
         for b in (self.b_envoi, self.b_envoye):
             b.setVisible(parti)
         self.b_annuler.setVisible(arrive or parti)
         self.date_action.setVisible(arrive or parti)
-        self.b_modifier.setVisible(len(sel) == 1 and bool(sel[0]["mouvement_id"]))
+        if len(sens) > 1:
+            self.l_sel.setText(f"المحدد: {len(sel)} (حدد وافدين فقط أو مغادرين فقط)")
 
     def ajouter(self, categorie: str | None = None, ouvrir: bool = True) -> DialogueMouvement:
         d = DialogueMouvement(self, None, categorie or self.categorie or "arrive")
@@ -706,8 +751,8 @@ class PageMouvements(QWidget):
         return True
 
     def annuler(self) -> bool:
-        cats = {x["categorie"] for x in self._selection_lignes()}
-        return self.marquer("dossier_recu_le" if cats == {"arrive"} else "dossier_envoye_le", annuler=True)
+        sens = {x["sens"] for x in self._selection_dossiers_lignes()}
+        return self.marquer("dossier_recu_le" if sens == {"arrive"} else "dossier_envoye_le", annuler=True)
 
     def generer_bilan(self):
         """وثيقة الحركية مباشرة من الصفحة: للوحدة المختارة وللفترة المختارة."""
