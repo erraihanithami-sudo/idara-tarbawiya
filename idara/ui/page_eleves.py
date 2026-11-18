@@ -478,6 +478,7 @@ class PageEleves(QWidget):
     # ---------- البحث ----------
 
     def rafraichir(self) -> None:
+        self.compter_documents()
         self.barre_unites.actualiser()
         self.chercher(self.recherche.text())
         if self.eleve_id:
@@ -608,6 +609,7 @@ class PageEleves(QWidget):
     # ---------- الوثائق ----------
 
     def _resultat(self, doc) -> None:
+        self.compter_documents()
         message(self.message, f"وُلّدت الوثيقة وحُفظت في الأرشيف: \u2066{doc.chemin.name}\u2069")
         try:
             bureautique.ouvrir(doc.chemin)
