@@ -42,8 +42,12 @@ def test_quorum_et_seances(base, dossier):  # noqa: F811
     sid = ce.enregistrer_seance(base, s)
     with pytest.raises(ce.ErreurConseil, match="جدول الأعمال"):
         ce.enregistrer_seance(base, ce.Seance("gestion", "2026-10-03", [" "]))
+    # اجتماع مبرمج (تاريخ مقبل): يُحفظ للاستدعاء، ولا محضر ولا احتساب قبل انعقاده
+    futur = ce.enregistrer_seance(base, ce.Seance("gestion", "2099-01-01", ["x"], presents=ids[:1]))
     with pytest.raises(ce.ErreurConseil, match="المستقبل"):
-        ce.enregistrer_seance(base, ce.Seance("gestion", "2099-01-01", ["x"]))
+        ce.generer_pv(base, dossier, futur)
+    assert ce.suivi(base)[0]["nombre"] == 1
+    ce.supprimer_seance(base, futur)
     sid2 = ce.enregistrer_seance(base, ce.Seance("gestion", "2026-10-20", ["حصيلة"], presents=ids[:5],
                                                  deliberations="ناقش المجلس.\nصادق المجلس.",
                                                  decisions=["المصادقة على البرنامج"]))

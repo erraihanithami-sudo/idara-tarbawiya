@@ -235,8 +235,9 @@ def enregistrer_seance(conn, s: Seance, annee: str | None = None) -> int:
         d = date.fromisoformat(s.date_seance)
     except (TypeError, ValueError):
         raise ErreurConseil("تاريخ الاجتماع غير صحيح.") from None
-    if d > date.today():
-        raise ErreurConseil("تاريخ الاجتماع في المستقبل: يُسجل المحضر بعد انعقاد الاجتماع (والاستدعاء قبله).")
+    # اجتماع بتاريخ مقبل = اجتماع مبرمج (طلب المدير 2026-11-18: جدولة المجالس): يُحفظ للاستدعاء، والحضور والنصاب
+    # والمحضر بعد انعقاده.
+    mbrmj = d > date.today()
     odj = [_txt(x) for x in s.ordre_du_jour if _txt(x)]
     if not odj:
         raise ErreurConseil("جدول الأعمال إجباري.")
@@ -244,7 +245,7 @@ def enregistrer_seance(conn, s: Seance, annee: str | None = None) -> int:
     if not ms:
         raise ErreurConseil(f"سجل تركيبة {CONSEILS[s.conseil]} أولاً.")
     ids = {m["id"] for m in ms}
-    presents = ids if s.presents is None else set(s.presents) & ids
+    presents = ids if s.presents is None or mbrmj else set(s.presents) & ids
     ok, msg = quorum(s.conseil, len(ids), len(presents), s.convocation)
     if not ok:
         raise ErreurConseil(msg)
@@ -298,7 +299,7 @@ def suivi(conn, annee: str | None = None) -> list[dict]:
     a = _annee(conn, annee)
     res = []
     for c, lib in CONSEILS.items():
-        ss = seances(conn, c, a["libelle"])
+        ss = [x for x in seances(conn, c, a["libelle"]) if x["date_seance"] <= date.today().isoformat()]  # المنعقدة
         alertes = []
         if len(ss) < MINIMUM_ANNUEL[c]:
             alertes.append(f"{len(ss)} من {MINIMUM_ANNUEL[c]} اجتماعات على الأقل في السنة")
@@ -399,6 +400,8 @@ def _table_isa(conn, d, annee: str) -> None:
 
 def generer_pv(conn, dossier: DossierDonnees, sid: int) -> Path:
     s = seance(conn, sid)
+    if date.fromisoformat(s.date_seance) > date.today():
+        raise ErreurConseil("تاريخ الاجتماع في المستقبل: يُحرر المحضر بعد انعقاد الاجتماع (والاستدعاء قبله).")
     r = conn.execute("SELECT s.*, a.libelle FROM conseil_seance s JOIN annee_scolaire a ON a.id=s.annee_id WHERE s.id=?",
                      (sid,)).fetchone()
     annee = r["libelle"]
