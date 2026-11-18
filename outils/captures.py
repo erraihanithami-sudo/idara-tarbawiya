@@ -345,8 +345,26 @@ def main(sortie: Path) -> None:
                                                  enumerate(cex.proposition(f.conn, "gestion"))])
     cex.enregistrer_seance(f.conn, cex.Seance("gestion", "2026-10-03", [cex.SUGGESTIONS["gestion"][0],
                                                                         cex.SUGGESTIONS["gestion"][1]]))
+    cex.enregistrer_seance(f.conn, cex.Seance("gestion", (__import__("datetime").date.today() +
+                                                          __import__("datetime").timedelta(days=12)).isoformat(),
+                                              [cex.SUGGESTIONS["gestion"][2]], "15:00"))
     f.aller_a("مجالس المؤسسة")
+    f.page_conseils_etab.rafraichir()
     photo(f, "42_conseils_etab")
+    try:
+        _pc = f.page_conseils_etab
+        photo(_pc, "42b_conseils_page_complete")
+        _pc.ouvrir_programmation("gestion")
+        photo(_pc.fiche_seance, "42c_conseils_convocation")
+        _pc.fiche_seance.hide()
+        _pc.ouvrir_pv()
+        photo(_pc.fiche_seance, "42d_conseils_pv")
+        _pc.fiche_seance.hide()
+        _pc.ouvrir_composition("gestion")
+        photo(_pc.fiche_compo, "42e_conseils_composition")
+        _pc.fiche_compo.hide()
+    except Exception as _e:  # noqa: BLE001
+        print("conseils:", repr(_e))
     f.aller_a("تسليم المهام")
     photo(f, "29_section_a_venir")
     f.aller_a("الموارد البشرية")

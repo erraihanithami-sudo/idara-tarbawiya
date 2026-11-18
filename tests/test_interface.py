@@ -1255,6 +1255,30 @@ def test_page_conseils_etablissement(app, config_tmp, monkeypatch):
     assert p.sid and p.odj.toPlainText().startswith("دراسة برنامج العمل السنوي")
     assert p.pv() and p.convocation() and len(ouverts) == 2
     assert ce.suivi(f.conn)[0]["nombre"] == 1
+    # طلب المدير 2026-11-18: الصفحة للجدولة والأرشيف، والاستدعاء والمحضر والتركيبة في نوافذ منبثقة
+    assert p.cartes["gestion"].chiffre.text() == "1 / 2" and p.t_docs.rowCount() == 2
+    assert not p.vide_prog.isHidden() and p.t_prog.isHidden()
+    d = p.ouvrir_programmation("gestion")
+    assert d.isVisible() and p.c_deroulement.isHidden() and p.sid is None and p.r_conseils["gestion"].isChecked()
+    p.odj.setPlainText("التحضير لنهاية السنة")
+    n = len(ouverts)
+    assert p.programmer_et_convoquer() and len(ouverts) == n + 1, p.message.text()
+    assert p.t_prog.rowCount() == 1 and "بعد 7 يوماً" in p.t_prog.item(0, 4).text() and p.seances.rowCount() == 1
+    d.hide()
+    selectionner(p.seances, 0)
+    assert not p.barre_sel.isHidden() and p.sid
+    d = p.ouvrir_pv(p.sid)
+    assert not p.c_deroulement.isHidden() and p.presence.count() == 10
+    p.decisions.setPlainText("المصادقة على البرنامج")
+    assert p.enregistrer_et_pv() and len(ouverts) == n + 2
+    d.hide()
+    p.filtrer("pedagogique")
+    assert p.seances.rowCount() == 0 and p.cartes["pedagogique"].actif
+    p.filtrer("pedagogique")
+    assert p.seances.rowCount() == 1
+    c = p.ouvrir_composition("pedagogique")
+    assert c.isVisible() and p.conseil.currentData() == "pedagogique" and p.r_conseils_c["pedagogique"].isChecked()
+    c.hide()
     f.close()
 
 
