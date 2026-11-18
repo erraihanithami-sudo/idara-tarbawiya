@@ -118,7 +118,7 @@ def main(sortie: Path) -> None:
     f.aller_a("الموارد البشرية")
     r = f.page_rh
     photo(f, "20_personnel_liste")
-    r.nouveau()
+    r.ouvrir_nouveau()
     r.c["nom_ar"].setText("التجريبية")
     r.c["prenom_ar"].setText("فاطمة")
     r.r_f.setChecked(True)
@@ -140,7 +140,6 @@ def main(sortie: Path) -> None:
     r.note_insp.setText("16.5")
     r.d_tanzim["date_inspection"].setText("10/03/2025")
     r.inspecteur.setText("المفتش التجريبي")
-    r.ouvrir_nouveau()
     r.enregistrer()
     photo(r.fiche, "21_personnel_fiche")
     r.dates["date_naissance"].ouvrir_calendrier()
