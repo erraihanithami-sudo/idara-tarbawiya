@@ -98,6 +98,22 @@ def main(sortie: Path) -> None:
     d.close()
     e.vacances(date.today(), date.today() + timedelta(days=10))
     photo(f, "17_eleve_niveau_non_confirme")
+    # معرض وثائق التلاميذ ونوافذه (طلب المدير 2026-11-18)
+    try:
+        photo(e, "17b_eleves_galerie")
+        _d = e.ouvrir_document("vacances", ouvrir=False)
+        _d.show()
+        photo(_d, "17c_eleves_doc_vacances")
+        _d.close()
+        _d = e.ouvrir_document("portes", ouvrir=False)
+        _d.show()
+        photo(_d, "17d_eleves_convoc_portes")
+        _d.close()
+        e.ouvrir_fiche()
+        photo(e.fiche, "17e_eleve_fiche_popup")
+        e.fiche.hide()
+    except Exception as _e:  # noqa: BLE001
+        print("galerie eleves:", repr(_e))
     f.aller_a("التلاميذ القدامى")
     a2 = f.page_anciens
     photo(f, "18_anciens_vide")

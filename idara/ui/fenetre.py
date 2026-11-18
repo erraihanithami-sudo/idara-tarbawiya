@@ -1208,7 +1208,7 @@ class FenetrePrincipale(QMainWindow):
         self.recherche.clear()
         if typ == "eleve":
             self.aller_a("التلاميذ")
-            self.page_eleves.afficher(ident)
+            self.page_eleves.ouvrir_fiche(ident)
         else:
             self.aller_a("الموارد البشرية")
             self.page_rh.ouvrir_fiche(ident)

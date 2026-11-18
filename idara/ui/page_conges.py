@@ -7,7 +7,7 @@ from datetime import date
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QDialogButtonBox,
-                               QFormLayout, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                               QFormLayout, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from idara.services import bureautique
@@ -20,7 +20,10 @@ from idara.ui.formulaires import champ, etiquette
 from idara.ui import pictos
 from idara.ui.graphiques import Anneau, BarresGroupees
 from idara.ui.saisie import ChampDate, cellule, message, tableau
-from idara.ui.vitrine import CarteFiltre, FenetreFiche, grille_cartes
+from idara.ui.vitrine import CarteFiltre, FenetreFiche, bouton_couleur, grille_cartes
+
+DOCS_COULEURS = {"demande": "#2E7D32", "recu": "#1565C0", "remp": "#6A1B9A", "bord": "#00838F",
+                 "reprise": "#EF6C00"}
 
 # بطاقات الأرقام (طلب المدير 2026-11-18): الحالة معيار للجدول عند الضغط
 ETATS = [
@@ -241,6 +244,34 @@ class PageConges(QWidget):
         self.vide.setObjectName("etiquette")
         self.vide.setAlignment(Qt.AlignCenter)
         cv.addWidget(self.vide)
+        # وثائق الرخصة المحددة مباشرة من الصفحة (طلب المدير 2026-11-18)
+        self.barre_docs = QFrame()
+        self.barre_docs.setObjectName("barreSelection")
+        self.barre_docs.setStyleSheet("QFrame#barreSelection { background: #F3F7F6; border: 1px solid #CFE3DE; "
+                                      "border-radius: 12px; }")
+        bd = QGridLayout(self.barre_docs)
+        bd.setContentsMargins(12, 10, 12, 10)
+        bd.setSpacing(8)
+        self.l_doc_sel = QLabel()
+        self.l_doc_sel.setStyleSheet("font-weight: 700; background: transparent;")
+        bd.addWidget(self.l_doc_sel, 0, 0, 1, 3)
+        self.p_demande = bouton_couleur("طلب الرخصة", DOCS_COULEURS["demande"], "document")
+        self.p_demande.clicked.connect(lambda: self._generer(cg.generer_demande))
+        self.p_recu = bouton_couleur("إيصال الشهادة الطبية", DOCS_COULEURS["recu"], "valider")
+        self.p_recu.clicked.connect(lambda: self._generer(cg.generer_recu))
+        self.p_remp = bouton_couleur("طلب تعويض", DOCS_COULEURS["remp"], "personnes")
+        self.p_remp.clicked.connect(lambda: self._generer(cg.generer_remplacement))
+        self.p_bord = bouton_couleur("ورقة الإرسال", DOCS_COULEURS["bord"], "envoyer")
+        self.p_bord.clicked.connect(self.dialogue_bordereau)
+        self.p_reprise = bouton_couleur("محضر الاستئناف", DOCS_COULEURS["reprise"], "retour")
+        self.p_reprise.clicked.connect(lambda: self.dialogue_reprise(self.cid))
+        self.p_ouvrir = QPushButton("فتح الملف")
+        self.p_ouvrir.clicked.connect(lambda: self.ouvrir_fiche())
+        for i, b in enumerate((self.p_demande, self.p_recu, self.p_remp, self.p_bord, self.p_reprise,
+                               self.p_ouvrir)):
+            bd.addWidget(b, 1 + i // 3, i % 3)
+        cv.addWidget(self.barre_docs)
+        self.barre_docs.hide()
         racine.addWidget(c)
         self.c_graph, self.v_graph = carte("المبيانات")
         self._graphes: list[QWidget] = []
@@ -316,30 +347,43 @@ class PageConges(QWidget):
                               ("من أدلى بالشهادة", self.qui_depose),
                               ("المدلي بالشهادة", self.deposant), ("رقم بطاقته الوطنية", self.deposant_cin),
                               ("ملاحظات الإيصال", self.rem_cert)]))
+        hs = QHBoxLayout()
         b_save = QPushButton("حفظ ملف الرخصة")
         b_save.setObjectName("principal")
         b_save.clicked.connect(self.enregistrer)
-        fv.addWidget(b_save, 0, Qt.AlignRight)
+        hs.addWidget(b_save)
+        # طلب المدير 2026-11-18: طلب الرخصة يُولد مباشرة من ملفها
+        self.b_save_demande = bouton_couleur("حفظ وتوليد طلب الرخصة", "#2E7D32", "document",
+                                             "يحفظ الملف ثم يولد طلب الرخصة ويسجله في الصادر")
+        self.b_save_demande.clicked.connect(lambda: self.enregistrer_et_demande())
+        hs.addWidget(self.b_save_demande)
+        hs.addStretch()
+        fv.addLayout(hs)
         self.message_fiche = QLabel()   # نتيجة الحفظ والتوليد داخل النافذة المنبثقة
         self.message_fiche.setWordWrap(True)
         self.message_fiche.hide()
         fv.addWidget(self.message_fiche)
 
-        t = QLabel("الوثائق")
+        t = QLabel("وثائق الرخصة")
         t.setObjectName("titreCarte")
         fv.addWidget(t)
+        self.aide_docs = QLabel("احفظ ملف الرخصة أولاً، ثم ولّد وثائقه من هنا أو من الصفحة الرئيسية للرخص.")
+        self.aide_docs.setObjectName("etiquette")
+        self.aide_docs.setWordWrap(True)
+        fv.addWidget(self.aide_docs)
         self.zone_docs = QWidget()
         g = QGridLayout(self.zone_docs)
         g.setContentsMargins(0, 0, 0, 0)
-        self.b_demande = QPushButton("طلب الرخصة (يُسجل في الصادر)")
+        g.setSpacing(10)
+        self.b_demande = bouton_couleur("طلب الرخصة (يُسجل في الصادر)", DOCS_COULEURS["demande"], "document")
         self.b_demande.clicked.connect(lambda: self._generer(cg.generer_demande))
-        self.b_recu = QPushButton("إيصال الشهادة الطبية")
+        self.b_recu = bouton_couleur("إيصال الشهادة الطبية", DOCS_COULEURS["recu"], "valider")
         self.b_recu.clicked.connect(lambda: self._generer(cg.generer_recu))
-        self.b_remp = QPushButton("طلب تعويض")
+        self.b_remp = bouton_couleur("طلب تعويض", DOCS_COULEURS["remp"], "personnes")
         self.b_remp.clicked.connect(lambda: self._generer(cg.generer_remplacement))
-        self.b_bord = QPushButton("ورقة الإرسال")
+        self.b_bord = bouton_couleur("ورقة الإرسال", DOCS_COULEURS["bord"], "envoyer")
         self.b_bord.clicked.connect(self.dialogue_bordereau)
-        self.b_reprise = QPushButton("محضر استئناف العمل")
+        self.b_reprise = bouton_couleur("محضر استئناف العمل", DOCS_COULEURS["reprise"], "retour")
         self.b_reprise.clicked.connect(lambda: self.dialogue_reprise(self.cid))
         for i, b in enumerate((self.b_demande, self.b_recu, self.b_remp, self.b_bord, self.b_reprise)):
             g.addWidget(b, i // 2, i % 2)
@@ -504,8 +548,16 @@ class PageConges(QWidget):
     def _selection(self) -> None:
         lignes = {i.row() for i in self.liste.selectedIndexes()}
         self.b_ouvrir.setEnabled(len(lignes) == 1)
+        self.barre_docs.setVisible(len(lignes) == 1)
         if len(lignes) == 1:
             self.afficher(self.liste.item(lignes.pop(), 0).data(Qt.UserRole))
+            self.l_doc_sel.setText("وثائق الرخصة المحددة: " + self.titre.text())
+
+    def enregistrer_et_demande(self):
+        """يحفظ ملف الرخصة ثم يولد طلبها مباشرة (طلب المدير 2026-11-18)."""
+        if self.enregistrer() is None:
+            return None
+        return self._generer(cg.generer_demande)
 
     def _msg(self, texte: str, erreur: bool = False) -> None:
         message(self.message, texte, erreur)
@@ -616,6 +668,7 @@ class PageConges(QWidget):
         self._maj_prolongations()
         self._maj_type()
         self.zone_docs.setEnabled(False)
+        self.aide_docs.show()
         self.docs.setRowCount(0)
         self.message.hide()
         self.message_fiche.hide()
@@ -648,11 +701,14 @@ class PageConges(QWidget):
         p = rh.lire(self.f.conn, c.personnel_id)
         self.titre.setText(f"{p.prenom_ar} {p.nom_ar} · {self.type.currentText()}")
         self.zone_docs.setEnabled(True)
+        self.aide_docs.hide()
         radaa = cg.est_allaitement(self.f.conn, c.type_conge_id)   # ساعة يومية: لا تعويض ولا استئناف
         self.b_remp.setEnabled(p.categorie in ("enseignant", "educatrice") and not radaa)
         self.b_recu.setEnabled(bool(c.medecin))
         deja = self.f.conn.execute("SELECT 1 FROM reprise_travail WHERE conge_id=?", (cid,)).fetchone()
         self.b_reprise.setEnabled(not deja and not c.prolongation_de and not radaa)
+        for pb, b in ((self.p_remp, self.b_remp), (self.p_recu, self.b_recu), (self.p_reprise, self.b_reprise)):
+            pb.setEnabled(b.isEnabled())
         docs = cg.documents(self.f.conn, cid)
         self.docs.setRowCount(len(docs))
         for i, d in enumerate(docs):

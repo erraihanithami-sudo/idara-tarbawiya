@@ -17,6 +17,28 @@ from idara.services import textes as tx
 from idara.ui.composants import carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.saisie import ChampDate, cellule, message, tableau
+from idara.ui.vitrine import CarteDocument, FenetreFiche, bouton_couleur
+
+# معرض الوثائق (طلب المدير 2026-11-18): (المفتاح، العنوان، الوصف، اللون، الأيقونة)
+DOCUMENTS = [
+    ("vacances", "شهادة العطلة", "للسفر خلال العطل، بالفرنسية، والعطل تُقترح من المقرر الوزاري.", "#1565C0",
+     "calendrier"),
+    ("visite", "ورقة الزيارة الطبية", "لتوجيه التلميذ إلى الطبيب أو المركز الصحي.", "#00838F", "valider"),
+    ("convocation", "استدعاء ولي الأمر", "استدعاء فردي، أو لعدة تلاميذ في ملف واحد.", "#6A1B9A", "rappel"),
+    ("portes", "استدعاءات الأبواب المفتوحة", "الأبواب المفتوحة رقم 1 إلى 4، بعدد يختاره المدير في الصفحة.",
+     "#2E7D32", "ouvrir"),
+    ("rencontre", "استدعاءات اللقاء التواصلي", "اللقاء التواصلي رقم 01 إلى 05 مع أولياء الأمور.", "#EF6C00",
+     "personnes"),
+    ("ag_parents", "استدعاءات الجمع العام", "الجمع العام لجمعية أمهات وآباء وأولياء التلاميذ.", "#AD1457",
+     "personnes"),
+    ("fiche", "بطاقة التلميذ: تتبع المسار", "الرائزان والمراحل بمبيانات، لتلميذ أو لقسم كامل.", "#3949AB",
+     "statistiques"),
+    ("ancien", "الشهادة المدرسية (ما قبل مسار)", "للتلاميذ القدامى غير المسجلين في منظومة مسار.", "#5D4037",
+     "document"),
+    ("dossier", "طلب ملف التلميذ أو إرساله", "مراسلات الوافدين والمغادرين وتتبع ملفاتهم.", "#455A64",
+     "envoyer"),
+]
+PAGES_DOCS = {"fiche": "بطاقة التلميذ", "ancien": "التلاميذ القدامى", "dossier": "حركية التلاميذ"}
 
 
 def _qdate(d: date) -> QDate:
@@ -118,6 +140,187 @@ class DialogueStatut(QDialog):
         v.addWidget(b)
 
 
+class DialogueDocEleve(QDialog):
+    """نافذة توليد وثيقة تلميذ (طلب المدير 2026-11-18): اختيار التلميذ أو التلاميذ، ثم معطيات الوثيقة، ثم التوليد."""
+
+    def __init__(self, page, cle: str):
+        super().__init__(page)
+        self.page, self.f, self.cle = page, page.f, cle
+        _, titre, desc, coul, picto = next(d for d in DOCUMENTS if d[0] == cle)
+        self.setWindowTitle(titre)
+        self.setLayoutDirection(Qt.RightToLeft)
+        self.setModal(True)
+        v = QVBoxLayout(self)
+        v.setContentsMargins(18, 16, 18, 16)
+        v.setSpacing(10)
+        e = entete(titre, desc)
+        v.addWidget(e)
+        self.multiple = cle == "convocation"
+        c, cv = carte("التلاميذ المعنيون" if self.multiple else "التلميذ(ة)")
+        self.recherche = QLineEdit()
+        self.recherche.setPlaceholderText("بحث: الاسم أو رمز مسار")
+        self.recherche.setClearButtonEnabled(True)
+        self.recherche.textChanged.connect(lambda _: self.chercher())
+        cv.addWidget(self.recherche)
+        self.table = tableau(["الرمز", "الاسم", "القسم"])
+        self.table.setSelectionMode(self.table.SelectionMode.ExtendedSelection if self.multiple
+                                    else self.table.SelectionMode.SingleSelection)
+        self.table.setMinimumHeight(240)
+        self.table.itemSelectionChanged.connect(self._compte)
+        cv.addWidget(self.table)
+        self.l_choix = QLabel()
+        self.l_choix.setObjectName("etiquette")
+        cv.addWidget(self.l_choix)
+        v.addWidget(c)
+        self.zone_vac = None
+        if cle == "vacances":
+            c2, v2 = carte("فترة العطلة")
+            try:
+                vac = cal.vacances(self.f.conn)
+            except cal.ErreurCalendrier:
+                vac = []
+            self.choix = QComboBox()
+            self.choix.addItem("— إدخال يدوي —", None)
+            for st in vac:
+                self.choix.addItem(f"{st.titre} ({st.periode})", (st.debut.isoformat(), st.fin.isoformat()))
+            self.du, self.au, self.le = ChampDate(), ChampDate(), ChampDate()
+            self.le.definir(date.today().isoformat())
+            self.choix.currentIndexChanged.connect(lambda _: self._choisir())
+            g = QGridLayout()
+            g.setHorizontalSpacing(14)
+            for k, (lib, w) in enumerate((("عطلة من المقرر", self.choix), ("تاريخ التحرير", self.le),
+                                          ("بداية العطلة *", self.du), ("نهاية العطلة *", self.au))):
+                g.addWidget(etiquette(lib, w), (k // 2) * 2, k % 2)
+                g.addWidget(w, (k // 2) * 2 + 1, k % 2)
+            v2.addLayout(g)
+            prochaine = next((i for i, st in enumerate(vac, start=1) if st.fin >= date.today()), None)
+            if prochaine:
+                self.choix.setCurrentIndex(prochaine)
+            v.addWidget(c2)
+            self.zone_vac = c2
+        self.message = QLabel()
+        self.message.setWordWrap(True)
+        self.message.hide()
+        v.addWidget(self.message)
+        h = QHBoxLayout()
+        h.addStretch()
+        b = QPushButton("إغلاق")
+        b.clicked.connect(self.reject)
+        h.addWidget(b)
+        self.b_generer = bouton_couleur("توليد " + titre, coul, picto)
+        self.b_generer.clicked.connect(lambda: self.generer())
+        h.addWidget(self.b_generer)
+        v.addLayout(h)
+        self.lignes: list = []
+        self.chercher()
+        self.resize(820, 720)
+
+    def ouvrir(self) -> None:
+        self.show()
+        self.raise_()
+
+    def _choisir(self) -> None:
+        d = self.choix.currentData()
+        if d:
+            self.du.definir(d[0])
+            self.au.definir(d[1])
+
+    def chercher(self) -> None:
+        u = self.page.barre_unites.unite
+        t = self.recherche.text()
+        self.lignes = el.rechercher(self.f.conn, t, unite=u, limite=60 if t.strip() else 2000)
+        self.table.setRowCount(len(self.lignes))
+        for i, r in enumerate(self.lignes):
+            for j, x in enumerate((r["code_massar"], el.nom_complet(r), r["classe"] or "—")):
+                self.table.setItem(i, j, cellule(x, r["id"]))
+        self._compte()
+
+    def ids(self) -> list[int]:
+        rows = sorted({i.row() for i in self.table.selectedIndexes()})
+        return [self.table.item(r, 0).data(Qt.UserRole) for r in rows]
+
+    def _compte(self) -> None:
+        n = len(self.ids())
+        self.l_choix.setText(f"المحدَّدون: {n}" + (" (حدد عدة تلاميذ بالضغط على Ctrl أو Shift)" if self.multiple
+                                                  else "") if n else "حدد التلميذ من اللائحة.")
+
+    def generer(self):
+        ids = self.ids()
+        if not ids:
+            message(self.message, "حدد تلميذاً واحداً على الأقل.", True)
+            return None
+        try:
+            if self.cle == "vacances":
+                du, au, le = self.du.iso(), self.au.iso(), self.le.iso()
+                if not du or not au:
+                    raise el.ErreurEleve("بداية العطلة ونهايتها إجباريتان.")
+                if au < du:
+                    raise el.ErreurEleve("نهاية العطلة قبل بدايتها.")
+                doc = el.generer_attestation_vacances(self.f.conn, self.f.dossier, ids[0], date.fromisoformat(du),
+                                                      date.fromisoformat(au), date.fromisoformat(le) if le else None)
+            elif self.cle == "visite":
+                doc = el.generer_visite_medicale(self.f.conn, self.f.dossier, ids[0])
+            else:
+                doc = el.generer_convocations(self.f.conn, self.f.dossier, ids)[0]
+        except ValueError as e:   # ErreurEleve أو تاريخ غير صحيح
+            message(self.message, str(e) or "تاريخ غير صحيح.", True)
+            return None
+        except dc.ErreurDocument as e:
+            message(self.message, str(e), True)
+            return None
+        message(self.message, f"وُلّدت الوثيقة وحُفظت في الأرشيف: \u2066{doc.chemin.name}\u2069")
+        self.page.compter_documents()
+        if self.page.eleve_id in ids:
+            self.page.afficher(self.page.eleve_id)
+        try:
+            bureautique.ouvrir(doc.chemin)
+        except OSError as e:
+            message(self.message, f"وُلّدت الوثيقة لكن تعذر فتحها: {e}", True)
+        return doc
+
+
+class DialogueConvocationsOccasion(QDialog):
+    """استدعاءات المناسبات (الأبواب المفتوحة، اللقاء التواصلي، الجمع العام) في نافذة منبثقة، بنفس واجهة
+    «الإعلام والتواصل» والمناسبة مختارة مسبقاً."""
+
+    def __init__(self, page, occasion: str):
+        super().__init__(page)
+        from idara.services import convocations as cvs
+        from idara.ui.page_communication import VueConvocations
+        self.page, self.f = page, page.f
+        _, titre, desc, coul, picto = next(d for d in DOCUMENTS if d[0] == occasion)
+        self.setWindowTitle(titre)
+        self.setLayoutDirection(Qt.RightToLeft)
+        self.setModal(True)
+        v = QVBoxLayout(self)
+        v.setContentsMargins(18, 16, 18, 16)
+        v.setSpacing(10)
+        v.addWidget(entete(titre, desc + " اقتصاد الورق: 1 إلى 8 استدعاءات في الصفحة، بخطوط قص."))
+        self.message = QLabel()
+        self.message.setWordWrap(True)
+        self.message.hide()
+        v.addWidget(self.message)
+        self.vue = VueConvocations(self)
+        self.vue.occasion.setCurrentIndex(self.vue.occasion.findData(occasion))
+        self.vue.rafraichir()
+        from PySide6.QtWidgets import QScrollArea
+        zone = QScrollArea()
+        zone.setWidgetResizable(True)
+        zone.setFrameShape(QFrame.NoFrame)
+        zone.setWidget(self.vue)
+        v.addWidget(zone, 1)
+        self.occasion = occasion
+        assert occasion in cvs.OCCASIONS
+        self.resize(900, 820)
+
+    def ouvrir(self) -> None:
+        self.show()
+        self.raise_()
+
+    def generer(self):
+        return self.vue.generer()
+
+
 class PageEleves(QWidget):
     def __init__(self, fenetre):
         super().__init__()
@@ -126,32 +329,42 @@ class PageEleves(QWidget):
         racine = QVBoxLayout(self)
         racine.setContentsMargins(40, 32, 40, 32)
         racine.setSpacing(16)
-        racine.addWidget(entete("التلاميذ", "ابحث بالاسم أو برمز مسار، ثم ولّد الوثيقة من بطاقة التلميذ."))
+        racine.addWidget(entete("وثائق التلاميذ", "اختر الوثيقة فتنبثق نافذتها: اختيار التلميذ أو التلاميذ، ثم "
+                                                  "المعطيات، ثم التوليد. وتحتها لائحة التلاميذ وبطاقة كل واحد."))
         self.message = QLabel()
         self.message.setWordWrap(True)
         self.message.hide()
         racine.addWidget(self.message)
 
-        corps = QHBoxLayout()
-        corps.setSpacing(20)
-        racine.addLayout(corps, 1)
+        # ---- معرض الوثائق (طلب المدير 2026-11-18) ----
+        c, cv = carte("الوثائق التي يمكن توليدها")
+        self.cartes_docs: dict[str, CarteDocument] = {}
+        g = QGridLayout()
+        g.setSpacing(14)
+        for i, (k, titre, desc, coul, picto) in enumerate(DOCUMENTS):
+            cd = CarteDocument(k, titre, desc, coul, picto)
+            cd.clique.connect(self.ouvrir_document)
+            self.cartes_docs[k] = cd
+            g.addWidget(cd, i // 3, i % 3)
+        cv.addLayout(g)
+        racine.addWidget(c)
 
         # البحث والنتائج
-        c, cv = carte()
+        c, cv = carte("لائحة التلاميذ")
         self.recherche = QLineEdit()
-        self.recherche.setPlaceholderText("الاسم أو النسب (بالعربية أو الفرنسية) أو رمز مسار")
+        self.recherche.setPlaceholderText("بحث: الاسم أو النسب (بالعربية أو الفرنسية) أو رمز مسار")
         self.recherche.setClearButtonEnabled(True)
         self.recherche.textChanged.connect(self.chercher)
         # المجموعة المدرسية: تلاميذ كل وحدة على حدة، و«المؤسسة كاملة» للجميع (طلب المدير 2026-11-07)
         from idara.ui.unites import BarreUnites
         self.barre_unites = BarreUnites(lambda: self.f.conn, lambda _u: self.chercher(self.recherche.text()))
         cv.addWidget(self.barre_unites)
-        cv.addWidget(etiquette("بحث", self.recherche))
         cv.addWidget(self.recherche)
         self.resultats = tableau(["الرمز", "الاسم", "القسم", "الوضعية"])
         self.resultats.setSelectionMode(self.resultats.SelectionMode.ExtendedSelection)
         self.resultats.itemSelectionChanged.connect(self._selection)
-        self.resultats.setMinimumHeight(420)
+        self.resultats.itemDoubleClicked.connect(lambda _: self.ouvrir_fiche())
+        self.resultats.setMinimumHeight(380)
         # نسخ الرمز من اللائحة أيضاً: النقر بالزر الأيمن أو Ctrl+C
         from PySide6.QtGui import QAction, QKeySequence
         a = QAction("نسخ رمز مسار", self.resultats)
@@ -161,14 +374,20 @@ class PageEleves(QWidget):
         self.resultats.addAction(a)
         self.resultats.setContextMenuPolicy(Qt.ActionsContextMenu)
         cv.addWidget(self.resultats, 1)
+        h = QHBoxLayout()
         self.nb = QLabel()
         self.nb.setObjectName("etiquette")
-        cv.addWidget(self.nb)
+        h.addWidget(self.nb, 1)
+        self.b_ouvrir = QPushButton("فتح بطاقة التلميذ المحدد")
+        self.b_ouvrir.setEnabled(False)
+        self.b_ouvrir.clicked.connect(lambda: self.ouvrir_fiche())
+        h.addWidget(self.b_ouvrir)
         self.b_convocations = QPushButton("استدعاء أولياء أمور المحددين")
         self.b_convocations.setToolTip("حدد عدة تلاميذ بالضغط على Ctrl، ثم ولّد استدعاءاتهم في ملف واحد")
         self.b_convocations.clicked.connect(self.convocations)
-        cv.addWidget(self.b_convocations)
-        corps.addWidget(c, 6)
+        h.addWidget(self.b_convocations)
+        cv.addLayout(h)
+        racine.addWidget(c, 1)
 
         # البطاقة
         self.c_fiche, fv = carte()
@@ -190,14 +409,13 @@ class PageEleves(QWidget):
 
         actions = QGridLayout()
         actions.setSpacing(8)
-        self.b_vacances = QPushButton("شهادة العطلة")
-        self.b_vacances.setObjectName("principal")
+        self.b_vacances = bouton_couleur("شهادة العطلة", "#1565C0", "calendrier")
         self.b_vacances.clicked.connect(self.dialogue_vacances)
-        self.b_visite = QPushButton("ورقة الزيارة الطبية")
+        self.b_visite = bouton_couleur("ورقة الزيارة الطبية", "#00838F", "valider")
         self.b_visite.clicked.connect(self.visite)
-        self.b_convoc = QPushButton("استدعاء ولي الأمر")
+        self.b_convoc = bouton_couleur("استدعاء ولي الأمر", "#6A1B9A", "rappel")
         self.b_convoc.clicked.connect(lambda: self.convocations([self.eleve_id]))
-        self.b_statut = QPushButton("الوضعية (مغادرة، انقطاع...)")
+        self.b_statut = bouton_couleur("الوضعية (مغادرة، انقطاع...)", "#455A64", "modifier")
         self.b_statut.clicked.connect(self.dialogue_statut)
         for i, b in enumerate((self.b_vacances, self.b_visite, self.b_convoc, self.b_statut)):
             actions.addWidget(b, i // 2, i % 2)
@@ -252,13 +470,10 @@ class PageEleves(QWidget):
         self.docs.cellDoubleClicked.connect(self._ouvrir_doc)
         fv.addWidget(self.docs)
         fv.addStretch()
-        corps.addWidget(self.c_fiche, 5)
         self.c_fiche.hide()
-        self.vide = QLabel("اختر تلميذاً من اللائحة لعرض بطاقته.")
-        self.vide.setObjectName("etiquette")
-        self.vide.setAlignment(Qt.AlignCenter)
-        corps.addWidget(self.vide, 5)
+        self.fiche = FenetreFiche(self, "بطاقة التلميذ", "الهوية والمسار الدراسي والوثائق المولدة.", self.c_fiche, 820)
         self.chercher("")
+        self.compter_documents()
 
     # ---------- البحث ----------
 
@@ -282,8 +497,41 @@ class PageEleves(QWidget):
 
     def _selection(self) -> None:
         ids = self.ids_selectionnes()
+        self.b_ouvrir.setEnabled(len(ids) == 1)
         if len(ids) == 1:
             self.afficher(ids[0])
+
+    def ouvrir_fiche(self, eleve_id: int | None = None) -> FenetreFiche | None:
+        if eleve_id is not None:
+            self.afficher(eleve_id)
+        if not self.eleve_id:
+            return None
+        self.fiche.definir_titre("بطاقة التلميذ: " + self.titre.text())
+        self.fiche.ouvrir()
+        return self.fiche
+
+    # ---------- معرض الوثائق ----------
+
+    def compter_documents(self) -> None:
+        for k, code in (("vacances", "attestation_vacances"), ("visite", "visite_medicale"),
+                        ("convocation", "convocation_parent")):
+            r = self.f.conn.execute("SELECT COUNT(*) FROM document_genere d JOIN modele_document m ON "
+                                    "m.id=d.modele_id WHERE m.code=?", (code,)).fetchone()
+            self.cartes_docs[k].definir_compte(r[0] if r else 0)
+
+    def ouvrir_document(self, cle: str, ouvrir: bool = True):
+        """الضغط على وثيقة في المعرض: نافذتها المنبثقة، أو صفحتها إن كانت لها صفحة خاصة."""
+        if cle in PAGES_DOCS:
+            self.f.aller_a(PAGES_DOCS[cle])
+            return None
+        if cle in ("portes", "rencontre", "ag_parents"):
+            d = DialogueConvocationsOccasion(self, cle)
+        else:
+            d = DialogueDocEleve(self, cle)
+        self.dialogue = d
+        if ouvrir:
+            d.ouvrir()
+        return d
 
     def ids_selectionnes(self) -> list[int]:
         lignes = sorted({i.row() for i in self.resultats.selectedIndexes()})
@@ -341,7 +589,6 @@ class PageEleves(QWidget):
             self.docs.setItem(i, 0, cellule(d["titre"], d["fichier_archive"]))
             self.docs.setItem(i, 1, cellule(d["date_generation"][:16]))
             self.docs.setItem(i, 2, cellule("فتح ↵"))
-        self.vide.hide()
         self.c_fiche.show()
 
     def enregistrer(self) -> list[str] | None:

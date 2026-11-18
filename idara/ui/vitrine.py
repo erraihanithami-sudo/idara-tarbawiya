@@ -118,3 +118,84 @@ class FenetreFiche(QDialog):
         self.show()
         self.raise_()
         self.activateWindow()
+
+
+def bouton_couleur(texte: str, couleur: str, picto: str | None = None, aide: str = ""):
+    """زر وثيقة بلون مميز وأيقونة بيضاء (أزرار توليد الوثائق)."""
+    from PySide6.QtCore import QSize
+    from PySide6.QtWidgets import QPushButton
+    b = QPushButton(texte)
+    b.setObjectName("boutonCouleur")
+    b.setCursor(Qt.PointingHandCursor)
+    b.setMinimumHeight(46)
+    c = QColor(couleur)
+    fonce = c.darker(125).name()
+    b.setStyleSheet(
+        f"QPushButton#boutonCouleur {{ background: qlineargradient(x1:1, y1:0, x2:0, y2:1, stop:0 {couleur}, "
+        f"stop:1 {fonce}); color: white; border: none; border-radius: 12px; padding: 8px 16px; font-weight: 700; }}"
+        f"QPushButton#boutonCouleur:hover {{ background: {fonce}; }}"
+        f"QPushButton#boutonCouleur:disabled {{ background: #CFCFCF; color: #F5F5F5; }}")
+    if picto:
+        b.setIcon(pictos.icone(picto, "#FFFFFF", 20))
+        b.setIconSize(QSize(20, 20))
+        b.setProperty("picto", picto)
+    if aide:
+        b.setToolTip(aide)
+    return b
+
+
+class CarteDocument(QFrame):
+    """بطاقة وثيقة في معرض الوثائق: شريط ملون، أيقونة كبيرة، العنوان، وصف قصير، وعدد ما وُلّد منها.
+    الضغط عليها يفتح نافذة توليدها."""
+
+    clique = Signal(str)
+
+    def __init__(self, cle: str, titre: str, description: str, couleur: str, picto: str):
+        super().__init__()
+        self.cle, self.couleur = cle, couleur
+        self.setObjectName("carteDocument")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setMinimumHeight(150)
+        c = QColor(couleur)
+        self.setStyleSheet(
+            f"QFrame#carteDocument {{ background: qlineargradient(x1:1, y1:0, x2:0, y2:1, stop:0 "
+            f"rgba({c.red()},{c.green()},{c.blue()},38), stop:0.55 {theme.BLANC}, stop:1 {theme.BLANC}); "
+            f"border: 1px solid {theme.LIGNE}; border-top: 5px solid {couleur}; border-radius: 18px; }}"
+            f"QFrame#carteDocument:hover {{ border: 2px solid {couleur}; border-top: 5px solid {couleur}; }}")
+        v = QVBoxLayout(self)
+        v.setContentsMargins(18, 14, 18, 14)
+        v.setSpacing(6)
+        h = QHBoxLayout()
+        ic = QLabel()
+        ic.setPixmap(pictos.pastille(picto, couleur, 54))
+        ic.setFixedSize(54, 54)
+        ic.setStyleSheet("background: transparent;")
+        h.addWidget(ic)
+        h.addStretch()
+        self.compteur = QLabel()
+        self.compteur.setStyleSheet(f"background: {couleur}; color: white; border-radius: 10px; padding: 2px 10px; "
+                                    "font-weight: 700;")
+        self.compteur.hide()
+        h.addWidget(self.compteur, 0, Qt.AlignTop)
+        v.addLayout(h)
+        t = QLabel(titre)
+        t.setWordWrap(True)
+        t.setStyleSheet(f"font-size: 13pt; font-weight: 700; color: {c.darker(130).name()}; background: transparent;")
+        v.addWidget(t)
+        d = QLabel(description)
+        d.setObjectName("etiquette")
+        d.setWordWrap(True)
+        d.setStyleSheet("background: transparent;")
+        v.addWidget(d)
+        v.addStretch()
+        self.titre = titre
+
+    def definir_compte(self, n: int | None) -> None:
+        self.compteur.setVisible(bool(n))
+        if n:
+            self.compteur.setText(f"وُلّدت {n}")
+
+    def mouseReleaseEvent(self, ev):   # noqa: N802
+        if ev.button() == Qt.LeftButton:
+            self.clique.emit(self.cle)
+        super().mouseReleaseEvent(ev)

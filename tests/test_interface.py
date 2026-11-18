@@ -286,6 +286,36 @@ def test_page_eleves_recherche_et_documents(app, config_tmp, monkeypatch):
     p.resultats.selectAll()
     docs = p.convocations()
     assert docs is not None and len(docs) == 5
+    # طلب المدير 2026-11-18: معرض الوثائق ونوافذها المنبثقة
+    assert len(p.cartes_docs) == 9 and p.cartes_docs["convocation"].compteur.text() == "وُلّدت 5"
+    selectionner = __import__("idara.ui.saisie", fromlist=["x"]).selectionner
+    d = p.ouvrir_document("visite", ouvrir=False)
+    assert d.generer() is None and "حدد تلميذاً" in d.message.text()
+    d.recherche.setText("يوسف")   # مستواه مؤكد أعلاه
+    selectionner(d.table, 0)
+    assert d.generer() is not None and d.message.objectName() == "info", d.message.text()
+    d = p.ouvrir_document("vacances", ouvrir=False)
+    d.recherche.setText("يوسف")
+    selectionner(d.table, 0)
+    d.du.setText("20/12/2026")
+    d.au.setText("10/12/2026")
+    assert d.generer() is None and "قبل بدايتها" in d.message.text()
+    d.au.setText("04/01/2027")
+    assert d.generer() is not None, d.message.text()
+    d = p.ouvrir_document("convocation", ouvrir=False)
+    d.table.selectAll()
+    assert d.generer() is not None and p.cartes_docs["convocation"].compteur.text() == "وُلّدت 10"
+    d = p.ouvrir_document("rencontre", ouvrir=False)
+    assert d.vue.occasion.currentData() == "rencontre" and d.vue.table.rowCount() > 0
+    d.vue.numero.setCurrentText("02")
+    d.vue.date.setText("12/12/2026")
+    d.vue.heure.setText("10:00")
+    assert d.generer() is not None, d.message.text()
+    assert p.ouvrir_document("ancien") is None and f.page_courante() == "التلاميذ القدامى"
+    f.aller_a("التلاميذ")
+    selectionner(p.resultats, 0)
+    assert p.b_ouvrir.isEnabled() and p.ouvrir_fiche() is p.fiche and p.fiche.isVisible()
+    p.fiche.hide()
     f.close()
 
 
@@ -562,6 +592,21 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     assert s.table.rowCount() == 2 and "3" in s.prochain.text()
     s.objet.setText("مراسلة يدوية")
     assert s.ajouter() == "3/26-27" and s.table.rowCount() == 3
+    f.aller_a("الرخص")
+    # طلب المدير 2026-11-18: وثائق الرخصة المحددة من الصفحة، و«حفظ وتوليد طلب الرخصة» من ملفها
+    from idara.ui.saisie import selectionner
+    selectionner(p.liste, 0)
+    assert not p.barre_docs.isHidden() and p.p_remp.isEnabled()
+    assert p.ouvrir_nouveau().isVisible() and not p.zone_docs.isEnabled() and not p.aide_docs.isHidden()
+    p.personnel.setCurrentIndex(p.personnel.findData(pid))
+    p.debut.setText("01/12/2026")
+    p.duree.setValue(3)
+    n = len(ouverts)
+    assert p.enregistrer_et_demande() is not None and len(ouverts) == n + 1, p.message.text()
+    assert p.zone_docs.isEnabled() and p.aide_docs.isHidden()
+    p.fiche.hide()
+    selectionner(p.liste, next(i for i in range(p.liste.rowCount()) if p.liste.item(i, 0).data(Qt.UserRole) == cid))
+    assert p.cid == cid
     f.close()
 
 
