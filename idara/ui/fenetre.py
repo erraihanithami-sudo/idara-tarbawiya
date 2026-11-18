@@ -1084,6 +1084,12 @@ class FenetrePrincipale(QMainWindow):
         except Exception:  # noqa: BLE001 — وثيقة لا يفهمها المحرر: لا نمنع المدير من فتحها
             bureautique.ouvrir_externe(chemin)
             return None
+        # بلاغ المدير 2026-11-18: الوثيقة المولدة من نافذة منبثقة لا تظهر كاملة. النوافذ المنبثقة للبرنامج
+        # (cederDocument) تُخفى مؤقتاً فتُعرض الوثيقة في الصفحة كاملة، و«رجوع» يعيد النافذة كما تُركت.
+        if modal is not None and modal.property("cederDocument"):
+            modal.hide()
+            self._modale_suspendue = modal
+            modal = None
         if modal is not None:
             from PySide6.QtWidgets import QDialog
             dlg = QDialog(modal)
@@ -1091,8 +1097,9 @@ class FenetrePrincipale(QMainWindow):
             dlg.setLayoutDirection(Qt.RightToLeft)
             QVBoxLayout(dlg).addWidget(e)
             e.retour = lambda _e: dlg.close()
-            dlg.resize(1100, 860)
-            dlg.show()
+            ecran = dlg.screen().availableGeometry() if dlg.screen() else None
+            dlg.resize(min(1100, ecran.width() - 40) if ecran else 1100, min(860, ecran.height() - 40) if ecran else 860)
+            dlg.showMaximized() if ecran and ecran.height() < 900 else dlg.show()
             self.editeurs = [x for x in self.editeurs if x.isVisible()] + [e]
             return e
         if self.pile.currentIndex() != self.indice_doc:
@@ -1116,6 +1123,14 @@ class FenetrePrincipale(QMainWindow):
         self.editeurs = [x for x in self.editeurs if x.parent() is not self.page_doc and x.isVisible()]
         if self.pile.currentIndex() == self.indice_doc:
             self.pile.setCurrentIndex(self.avant_doc if self.avant_doc is not None else 0)
+        m = getattr(self, "_modale_suspendue", None)
+        self._modale_suspendue = None
+        if m is not None:
+            try:
+                m.show()   # العودة إلى النافذة المنبثقة التي وُلّدت منها الوثيقة
+                m.raise_()
+            except RuntimeError:   # حُذفت النافذة في الأثناء
+                pass
 
     def cliquer_section(self, i: int) -> None:
         """النقر على قسم: يفتح فروعه ويعرض رحبته؛ النقرة الثانية تطوي الفروع والصفحة تبقى."""

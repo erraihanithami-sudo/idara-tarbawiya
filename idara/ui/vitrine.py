@@ -91,6 +91,7 @@ class FenetreFiche(QDialog):
         self.setWindowTitle(titre)
         self.setLayoutDirection(Qt.RightToLeft)
         self.setModal(True)
+        self.setProperty("cederDocument", True)
         v = QVBoxLayout(self)
         v.setContentsMargins(18, 16, 18, 16)
         v.setSpacing(10)

@@ -244,7 +244,7 @@ class EditeurDocument(QWidget):
         rect = pr.pageLayout().paintRect(QPageLayout.Millimeter)
         doc.setPageSize(QSizeF(self.largeur_contenu, self.largeur_contenu * rect.height() / rect.width()))
         doc.print_(pr)
-        doc.deleteLater()
+        self._doc_rendu = doc   # يبقى حياً حتى الرسم التالي (لا حذف أثناء رسم المعاينة)
 
     def imprimer(self) -> bool:
         pr = self.imprimante()
@@ -255,10 +255,19 @@ class EditeurDocument(QWidget):
         return True
 
     def apercu(self) -> None:
-        d = QPrintPreviewDialog(self.imprimante(), self)
+        # بلاغ المدير 2026-11-18: «معاينة الطبع» كانت تُغلق البرنامج. السبب: الطابعة تُنشأ مؤقتة فيحذفها بايثون
+        # والمعاينة ما تزال تستعملها. الحل: الاحتفاظ بها (وبالنافذة) طوال المعاينة.
+        self._imprimante_apercu = self.imprimante()
+        d = QPrintPreviewDialog(self._imprimante_apercu, self)
+        self._apercu = d
         d.setLayoutDirection(Qt.RightToLeft)
+        d.setWindowTitle("معاينة الطبع · " + self.chemin.stem)
         d.paintRequested.connect(self.rendre)
+        ecran = self.screen().availableGeometry() if self.screen() else None
+        if ecran is not None:
+            d.resize(int(ecran.width() * 0.9), int(ecran.height() * 0.9))
         d.exec()
+        self._apercu = None
 
     def pages_images(self, echelle: float = 2.0) -> list[QImage]:
         """كل صفحة صورةً بحجم الورقة (هوامشها بيضاء)، بنفس تقطيع الطبع."""

@@ -58,6 +58,7 @@ class DialogueMouvement(QDialog):
         super().__init__(page)
         self.page, self.f, self.mid = page, page.f, mid
         self.setWindowTitle("تعديل حركية" if mid else "إضافة حركية جديدة")
+        self.setProperty("cederDocument", True)
         self.setLayoutDirection(Qt.RightToLeft)
         self.setMinimumWidth(760)
         v = QVBoxLayout(self)

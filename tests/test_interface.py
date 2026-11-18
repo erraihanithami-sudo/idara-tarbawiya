@@ -2376,3 +2376,45 @@ def test_affiches_et_convocations(app, config_tmp, monkeypatch, tmp_path):
     p.pilules["annonces"].click()   # سجل الإعلانات النصية ما زال في مكانه
     assert p.vue().r.cle == "annonces"
     f.close()
+
+
+def test_editeur_apercu_et_nafidha(app, config_tmp, monkeypatch):
+    """بلاغ المدير 2026-11-18: «معاينة الطبع» كانت تُغلق البرنامج، والوثيقة المولدة من نافذة منبثقة لا تظهر كاملة."""
+    from PySide6.QtPrintSupport import QPrintPreviewDialog
+    from PySide6.QtWidgets import QApplication, QWidget
+
+    from idara.services import bureautique
+    from idara.services import registres as rg
+    from idara.ui.vitrine import FenetreFiche
+    f = _fenetre_avec_eleves(config_tmp)
+    monkeypatch.setattr(bureautique, "ouvrir_externe", lambda p: None)
+    monkeypatch.setattr(bureautique, "ouvreur", f.ouvrir_document)
+    rg.enregistrer(f.conn, "agents", {"nom": "عون تجريبي", "fonction": "الحراسة", "horaire": "8:00 - 16:00"})
+    f.aller_a("الأعوان")
+    p = f.page_agents.vue().generer("service")
+    e = f.editeurs[0]
+    rendus = []
+
+    def exec_simule(d):   # المعاينة ترسم الصفحات ثم تُغلق
+        d.paintRequested.emit(e._imprimante_apercu)
+        rendus.append(d)
+        return 0
+    monkeypatch.setattr(QPrintPreviewDialog, "exec", exec_simule)
+    import gc
+    e.apercu()
+    gc.collect()
+    e.apercu()
+    assert len(rendus) == 2 and e._imprimante_apercu is not None
+    e.b_retour.click()
+    # وثيقة تُفتح من نافذة منبثقة: تُخفى النافذة وتُعرض الوثيقة كاملة، و«رجوع» يعيدها
+    w = QWidget()
+    fen = FenetreFiche(f, "نافذة تجريبية", "", w)
+    fen.ouvrir()
+    assert fen.isModal() and fen.isVisible()
+    monkeypatch.setattr(QApplication, "activeModalWidget", staticmethod(lambda: fen))
+    e2 = f.ouvrir_document(p)
+    assert fen.isHidden() and f.pile.currentIndex() == f.indice_doc and e2.parent() is f.page_doc
+    e2.b_retour.click()
+    assert fen.isVisible() and f.pile.currentIndex() != f.indice_doc
+    fen.close()
+    f.close()
