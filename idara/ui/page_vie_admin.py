@@ -5,7 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel,
                                QLineEdit, QPlainTextEdit, QPushButton, QSpinBox, QStyledItemDelegate,
-                               QTableWidgetItem, QWidget)
+                               QTableWidgetItem, QVBoxLayout, QWidget)
 
 from idara.services import bureautique
 from idara.services import garde as gd
@@ -563,15 +563,151 @@ class PageTransport(QWidget):
 
 # ====================== استعمالات الزمن ======================
 
+COUL_MATIERES = {"اللغة العربية": "#00897B", "اللغة الفرنسية": "#3949AB", "اللغة الأمازيغية": "#8D6E63",
+                 "الرياضيات": "#E65100", "النشاط العلمي": "#2E7D32", "التربية الإسلامية": "#00695C",
+                 "الاجتماعيات": "#6D4C41", "التربية الفنية": "#AD1457", "التربية البدنية": "#C62828",
+                 "اللغة الإنجليزية": "#1565C0", "الدعم ومعالجة التعثرات": "#6A1B9A", "أنشطة الحياة المدرسية": "#F9A825"}
+
+
+def couleur_matiere(m: str) -> str:
+    if m in COUL_MATIERES:
+        return COUL_MATIERES[m]
+    palette = ("#5E35B1", "#00838F", "#7CB342", "#D81B60", "#FB8C00", "#546E7A")
+    return palette[sum(map(ord, m)) % len(palette)]
+
+
+class GrilleSemaine(QWidget):
+    """استعمال زمن أستاذ مرسوماً: الأيام صفوفاً، والوقت من 08:00 إلى 18:00، وكل حصة كتلة بلون مادتها."""
+
+    def __init__(self):
+        super().__init__()
+        self.seances: list[list[str]] = []
+        self.setMinimumSize(760, 420)
+
+    def definir(self, seances) -> None:
+        self.seances = seances
+        self.update()
+
+    def paintEvent(self, ev):   # noqa: N802
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        W, H = self.width(), self.height()
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor("#FFFFFF"))
+        p.drawRoundedRect(QRectF(0, 0, W, H), 16, 16)
+        gauche, droite_j, haut = 14, 92, 34
+        debut, fin = 8 * 60, 18 * 60
+        larg = W - gauche - droite_j - 10
+        hl = (H - haut - 12) / len(va.JOURS)
+        f = QFont()
+        f.setPointSizeF(8.5)
+        p.setFont(f)
+        for h in range(8, 19):
+            x = gauche + larg - (h * 60 - debut) / (fin - debut) * larg   # RTL: الصباح يمين
+            p.setPen(QPen(QColor("#E3E8EE"), 1, Qt.DashLine if h % 2 else Qt.SolidLine))
+            p.drawLine(int(x), haut, int(x), H - 10)
+            p.setPen(QColor("#78909C"))
+            p.drawText(QRectF(x - 24, 6, 48, 20), Qt.AlignCenter, f"{h:02d}:00")
+        for k, j in enumerate(va.JOURS):
+            y = haut + k * hl
+            if k % 2 == 0:
+                p.fillRect(QRectF(gauche, y, larg, hl), QColor("#F6F8FB"))
+            fb = QFont(f)
+            fb.setBold(True)
+            fb.setPointSizeF(10)
+            p.setFont(fb)
+            p.setPen(QColor("#1F3B57"))
+            p.drawText(QRectF(W - droite_j, y, droite_j - 8, hl), Qt.AlignRight | Qt.AlignVCenter, j)
+        for s in self.seances:
+            try:
+                k = va.JOURS.index(s[0])
+                a, b = va._minutes(s[1]), va._minutes(s[2])
+            except (ValueError, va.ErreurVieAdmin):
+                continue
+            x1 = gauche + larg - (min(b, fin) - debut) / (fin - debut) * larg
+            x2 = gauche + larg - (max(a, debut) - debut) / (fin - debut) * larg
+            r = QRectF(x1 + 2, haut + k * hl + 5, max(8.0, x2 - x1 - 4), hl - 10)
+            c = QColor(couleur_matiere(s[3]))
+            g = QLinearGradient(r.topRight(), r.bottomLeft())
+            g.setColorAt(0, c.lighter(115))
+            g.setColorAt(1, c.darker(115))
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(0, 0, 0, 35))
+            p.drawRoundedRect(r.translated(1.5, 2.5), 9, 9)
+            p.setBrush(g)
+            p.drawRoundedRect(r, 9, 9)
+            p.setPen(QColor("#FFFFFF"))
+            fs = QFont(f)
+            fs.setBold(True)
+            p.setFont(fs)
+            p.drawText(r.adjusted(5, 3, -5, -3), Qt.AlignCenter | Qt.TextWordWrap,
+                       f"{s[3]}\n{s[1]}–{s[2]}" + (f" · {s[4]}" if s[4] else ""))
+        p.end()
+
+
 class PageEmplois(QWidget):
+    """استعمالات الزمن (طلب المدير 2026-11-19): الصفحة تعرض استعمال الزمن الجماعي أو لائحة الأساتذة (قائمة منسدلة
+    لنمط العرض)، وأمام كل أستاذ زر لعرض استعماله وزر لمسكه؛ المسك والحصيص في نوافذ منبثقة."""
+
     def __init__(self, fenetre):
         super().__init__()
+        from idara.ui.vitrine import CarteFiltre, FenetreFiche, bouton_couleur, grille_cartes
         self.f = fenetre
         self.pid: int | None = None
-        racine, self.message = _page(
-            "استعمالات الزمن", "حصص كل أستاذ(ة): اليوم، من، إلى، المادة، المستوى. يراقب البرنامج التداخل والحصيص "
-                               "الأسبوعي لكل مادة، ويغذي لوحة «استعمال الزمن الجماعي» في السبورة المرجعية.")
+        racine, self.message = _page("استعمالات الزمن", "")
         self.setLayout(racine)
+        # ---- البطاقات ----
+        self.cartes = {
+            "profs": CarteFiltre("profs", "الأساتذة", "#1565C0", "personnes", " "),
+            "saisis": CarteFiltre("saisis", "استعمالات ممسوكة", "#2E7D32", "valider", " "),
+            "sans": CarteFiltre("sans", "دون استعمال زمن", "#EF8A00", "rappel", " "),
+            "seances": CarteFiltre("seances", "الحصص الأسبوعية", "#6A1B9A", "calendrier", " "),
+        }
+        for k, c_ in self.cartes.items():
+            c_.clique.connect(self.filtrer)
+        racine.addLayout(grille_cartes(list(self.cartes.values()), 4))
+        h = QHBoxLayout()
+        h.setSpacing(12)
+        h.addWidget(QLabel("نمط العرض:"))
+        self.mode = QComboBox()
+        self.mode.addItem("لائحة الأساتذة", "liste")
+        self.mode.addItem("استعمال الزمن الجماعي", "collectif")
+        self.mode.setMinimumWidth(220)
+        self.mode.currentIndexChanged.connect(lambda _: self._afficher())
+        h.addWidget(self.mode)
+        h.addStretch()
+        self.b_quotas = bouton_couleur("الحصيص الأسبوعي للمواد", "#6A1B9A", "statistiques",
+                                       "عدد الدقائق الأسبوعي لكل مادة، لمراقبة استعمالات الزمن")
+        self.b_quotas.clicked.connect(lambda: self.ouvrir_quotas())
+        h.addWidget(self.b_quotas)
+        racine.addLayout(h)
+        self.filtre: str | None = None
+        # ---- لائحة الأساتذة ----
+        self.c_liste, v = carte()
+        self.titre_liste = QLabel()
+        self.titre_liste.setObjectName("titreCarte")
+        v.addWidget(self.titre_liste)
+        self.liste = tableau(["الأستاذ(ة)", "التدريس", "الحصص", "المجموع الأسبوعي", "المراقبة", "الإجراءات"], etirer=4)
+        self.liste.setMinimumHeight(320)
+        self.liste.verticalHeader().setDefaultSectionSize(46)
+        self.liste.itemDoubleClicked.connect(lambda it: self.voir(self.liste.item(it.row(), 0).data(Qt.UserRole)))
+        v.addWidget(self.liste)
+        racine.addWidget(self.c_liste)
+        # ---- الجماعي ----
+        self.c_coll, v = carte("استعمال الزمن الجماعي: فترتا الصباح والمساء لكل أستاذ")
+        cols = ["الأستاذ(ة)"] + [f"{j} {x}" for j in va.JOURS for x in ("ص", "م")]
+        self.collectif = tableau(cols, etirer=0)
+        self.collectif.setMinimumHeight(340)
+        v.addWidget(self.collectif)
+        racine.addWidget(self.c_coll)
+        racine.addStretch()
+
+        # ---- نافذة المسك ----
+        w = QWidget()
+        wv = QVBoxLayout(w)
+        wv.setSpacing(12)
         c, v = carte("حصص الأستاذ(ة)")
         self.prof = QComboBox()
         self.prof.currentIndexChanged.connect(lambda _: self.charger())
@@ -583,8 +719,7 @@ class PageEmplois(QWidget):
         aide.setWordWrap(True)
         v.addWidget(aide)
         h = QHBoxLayout()
-        b = QPushButton("حفظ")
-        b.setObjectName("principal")
+        b = bouton_couleur("حفظ", "#1565C0", "enregistrer")
         b.clicked.connect(lambda: self.enregistrer(True))
         h.addWidget(b)
         self.jour = QComboBox()
@@ -601,37 +736,162 @@ class PageEmplois(QWidget):
         b.clicked.connect(lambda: _supprimer(self.table))
         h.addWidget(b)
         h.addStretch()
-        b = QPushButton("توليد استعمال الزمن")
+        b = bouton_couleur("توليد استعمال الزمن", "#2E7D32", "document")
         b.clicked.connect(lambda: self.generer())
         h.addWidget(b)
         v.addLayout(h)
-        racine.addWidget(c)
+        wv.addWidget(c)
         c, v = carte("مراقبة الحصيص الأسبوعي")
         self.total = QLabel()
         self.total.setObjectName("titreCarte")
         v.addWidget(self.total)
         self.t_ctrl = tableau(["المادة", "المنجز (دقيقة)", "الحصيص (دقيقة)", "الملاحظة"], etirer=3)
-        self.t_ctrl.setMinimumHeight(200)
+        self.t_ctrl.setMinimumHeight(180)
         v.addWidget(self.t_ctrl)
-        racine.addWidget(c)
-        c, v = carte("الحصيص الأسبوعي للمواد")
+        wv.addWidget(c)
+        self.message_fiche = QLabel()
+        self.message_fiche.setWordWrap(True)
+        self.message_fiche.hide()
+        wv.addWidget(self.message_fiche)
+        self.fiche = FenetreFiche(self, "مسك استعمال الزمن", "", w, largeur=1000)
+        # ---- نافذة العرض ----
+        w = QWidget()
+        wv = QVBoxLayout(w)
+        self.l_vue = QLabel()
+        self.l_vue.setObjectName("titreCarte")
+        wv.addWidget(self.l_vue)
+        self.grille_vue = GrilleSemaine()
+        wv.addWidget(self.grille_vue, 1)
+        h = QHBoxLayout()
+        b = bouton_couleur("تعديل الحصص", "#1565C0", "modifier")
+        b.clicked.connect(lambda: self.saisir(self.pid))
+        h.addWidget(b)
+        b = bouton_couleur("توليد الوثيقة", "#2E7D32", "document")
+        b.clicked.connect(lambda: self.generer())
+        h.addWidget(b)
+        h.addStretch()
+        wv.addLayout(h)
+        self.fiche_vue = FenetreFiche(self, "استعمال الزمن", "", w, largeur=1040)
+        # ---- نافذة الحصيص ----
+        w = QWidget()
+        wv = QVBoxLayout(w)
         aide = QLabel("أدخلوا مرة واحدة عدد الدقائق الأسبوعي لكل مادة حسب المنهاج المعتمد عندكم. البرنامج لا يفترض "
                       "أي حصيص: المادة دون حصيص لا تُراقب.")
         aide.setObjectName("etiquette")
         aide.setWordWrap(True)
-        v.addWidget(aide)
+        wv.addWidget(aide)
         self.t_quotas = _grille(("المادة", "الدقائق في الأسبوع"), 260)
-        v.addWidget(self.t_quotas)
+        wv.addWidget(self.t_quotas)
         h = QHBoxLayout()
-        b = QPushButton("حفظ الحصيص")
+        b = bouton_couleur("حفظ الحصيص", "#6A1B9A", "enregistrer")
         b.clicked.connect(lambda: self.enregistrer_quotas())
         h.addWidget(b)
         _boutons_lignes(h, self.t_quotas)
         h.addStretch()
-        v.addLayout(h)
-        racine.addWidget(c)
-        racine.addStretch()
+        wv.addLayout(h)
+        self.fiche_quotas = FenetreFiche(self, "الحصيص الأسبوعي للمواد", "", w, largeur=640)
         self.rafraichir()
+
+    def _profs(self):
+        return [p for p in rh.lister(self.f.conn) if p.categorie in ("enseignant", "educatrice")]
+
+    def filtrer(self, k: str) -> None:
+        self.filtre = None if k == self.filtre or k in ("profs", "seances") else k
+        self.mode.setCurrentIndex(0)
+        self._afficher()
+
+    def _afficher(self) -> None:
+        from idara.ui import pictos
+        from idara.ui.vitrine import icone_triangle, info_bulle
+        profs = self._profs()
+        donnees = []
+        for p in profs:
+            ss = va.lire_emploi(self.f.conn, p.id)
+            try:
+                c_ = va.controle_emploi(self.f.conn, p.id)
+            except va.ErreurVieAdmin:
+                c_ = {"heures": "—", "matieres": [], "seances": len(ss)}
+            donnees.append((p, ss, c_))
+        n_saisis = sum(1 for _, ss, _ in donnees if ss)
+        self.cartes["profs"].definir(len(profs))
+        self.cartes["saisis"].definir(n_saisis)
+        self.cartes["sans"].definir(len(profs) - n_saisis)
+        sans = [f"{p.prenom_ar} {p.nom_ar}" for p, ss, _ in donnees if not ss]
+        self.cartes["sans"].definir_alerte("\n".join(["دون استعمال زمن:"] + sans) if sans else "")
+        self.cartes["seances"].definir(sum(len(ss) for _, ss, _ in donnees))
+        for k, c_ in self.cartes.items():
+            c_.definir_actif(k == self.filtre)
+        coll = self.mode.currentData() == "collectif"
+        self.c_liste.setVisible(not coll)
+        self.c_coll.setVisible(coll)
+        lignes = [d for d in donnees if self.filtre is None or (self.filtre == "saisis") == bool(d[1])]
+        self.titre_liste.setText(f"أساتذة المؤسسة ({len(lignes)})")
+        self.liste.setRowCount(len(lignes))
+        for i, (p, ss, c_) in enumerate(lignes):
+            it = _item(f"{p.prenom_ar} {p.nom_ar}", False, p.id)
+            if not ss:
+                it.setIcon(icone_triangle(18))
+                it.setToolTip(info_bulle("لم يُمسك استعمال زمن هذا الأستاذ بعد"))
+            self.liste.setItem(i, 0, it)
+            ens = " · ".join(x for x in (p.matiere, p.niveau_enseigne) if x) or "—"
+            depasse = [m for m in c_["matieres"] if m["etat"] and m["etat"] != "الحصيص مكتمل"]
+            etat = "—" if not ss else ("؛ ".join(f"{m['matiere']}: {m['etat']}" for m in depasse) or "مطابق للحصيص")
+            for j, x in enumerate((ens, str(len(ss)), c_["heures"] if ss else "—", etat), start=1):
+                self.liste.setItem(i, j, _item(x, False))
+            if depasse:
+                self.liste.item(i, 4).setIcon(icone_triangle(16))
+            w = QWidget()
+            hb = QHBoxLayout(w)
+            hb.setContentsMargins(4, 2, 4, 2)
+            hb.setSpacing(6)
+            for t, coul, pic, fn in (("عرض", "#3949AB", "apercu", lambda _=False, x=p.id: self.voir(x)),
+                                     ("مسك", "#2E7D32", "modifier", lambda _=False, x=p.id: self.saisir(x))):
+                b = QPushButton(t)
+                b.setObjectName("boutonCouleur")
+                b.setIcon(pictos.icone(pic, "#FFFFFF", 15))
+                b.setStyleSheet(f"QPushButton {{ background: {coul}; color: white; border: none; border-radius: 9px; "
+                                f"padding: 4px 12px; font-weight: 700; }}")
+                b.clicked.connect(fn)
+                hb.addWidget(b)
+            self.liste.setCellWidget(i, 5, w)
+        self.liste.resizeColumnToContents(5)
+        self.collectif.setRowCount(len(donnees))
+        for i, (p, ss, _) in enumerate(donnees):
+            self.collectif.setItem(i, 0, _item(f"{p.prenom_ar} {p.nom_ar}", False, p.id))
+            dj = va.demi_journees(self.f.conn, p.id) if ss else {j: ["", ""] for j in va.JOURS}
+            for k, x in enumerate(x for j in va.JOURS for x in dj[j]):
+                it = _item(x, False)
+                if x:
+                    from PySide6.QtGui import QColor
+                    it.setBackground(QColor("#E8F5E9" if k % 2 == 0 else "#E3F2FD"))
+                self.collectif.setItem(i, k + 1, it)
+        self.collectif.resizeColumnsToContents()
+
+    def voir(self, pid: int):
+        self.pid = pid
+        p = next((x for x in self._profs() if x.id == pid), None)
+        ss = va.lire_emploi(self.f.conn, pid)
+        nom = f"{p.prenom_ar} {p.nom_ar}" if p else ""
+        self.l_vue.setText(f"{nom} · {len(ss)} حصة" + (f" · {va.controle_emploi(self.f.conn, pid)['heures']}" if ss
+                                                       else " · لم يُمسك بعد"))
+        self.grille_vue.definir(ss)
+        self.fiche_vue.definir_titre(f"استعمال الزمن: {nom}")
+        self.fiche_vue.ouvrir()
+        return self.fiche_vue
+
+    def saisir(self, pid: int | None = None):
+        self.fiche_vue.hide()
+        if pid is not None:
+            self.prof.setCurrentIndex(max(0, self.prof.findData(pid)))
+        self.charger()
+        self.message_fiche.hide()
+        self.fiche.definir_titre(f"مسك استعمال الزمن: {self.prof.currentText()}")
+        self.fiche.ouvrir()
+        return self.fiche
+
+    def ouvrir_quotas(self):
+        self.fiche_quotas.ouvrir()
+        return self.fiche_quotas
 
     def rafraichir(self) -> None:
         actuel = self.pid
@@ -646,6 +906,7 @@ class PageEmplois(QWidget):
         q = va.lire_quotas(self.f.conn)
         _remplir(self.t_quotas, [[m, str(q.get(m, ""))] for m in list(dict.fromkeys(list(va.MATIERES) + list(q)))])
         self.charger()
+        self._afficher()
 
     def charger(self) -> None:
         self.pid = self.prof.currentData()
@@ -679,11 +940,14 @@ class PageEmplois(QWidget):
             va.enregistrer_emploi(self.f.conn, self.pid, _lire(self.table))
         except va.ErreurVieAdmin as e:
             message(self.message, str(e), True)
+            message(self.message_fiche, str(e), True)
             return False
         _remplir(self.table, va.lire_emploi(self.f.conn, self.pid))
         self._controle()
+        self._afficher()
         if afficher:
             message(self.message, "حُفظ استعمال الزمن.")
+            message(self.message_fiche, "حُفظ استعمال الزمن.")
         return True
 
     def enregistrer_quotas(self) -> bool:
@@ -693,6 +957,7 @@ class PageEmplois(QWidget):
             message(self.message, str(e), True)
             return False
         self._controle()
+        self._afficher()
         message(self.message, "حُفظ الحصيص الأسبوعي.")
         return True
 

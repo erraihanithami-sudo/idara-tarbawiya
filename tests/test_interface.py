@@ -2301,6 +2301,20 @@ def test_pages_vie_admin(app, config_tmp, monkeypatch):
     assert not e.enregistrer() and "قبل بدايتها" in e.message.text()
     e.table.item(0, 2).setText("10:00")
     assert e.generer() is not None
+    # طلب المدير 2026-11-19: الصفحة للعرض (لائحة الأساتذة أو الجماعي)، والمسك والحصيص في نوافذ منبثقة
+    assert e.cartes["saisis"].chiffre.text() == "1" and e.liste.cellWidget(0, 5) is not None
+    r = next(k for k in range(e.liste.rowCount()) if e.liste.item(k, 0).data(Qt.UserRole) == pid)
+    assert e.liste.item(r, 2).text() == "1" and "1 س 30 د" in e.liste.item(r, 3).text()
+    d = e.voir(pid)
+    assert d.isVisible() and len(e.grille_vue.seances) == 1 and not e.grille_vue.grab().isNull()
+    d2 = e.saisir(pid)
+    assert d2.isVisible() and not d.isVisible() and e.prof.currentData() == pid
+    d2.hide()
+    e.mode.setCurrentIndex(e.mode.findData("collectif"))
+    assert e.c_liste.isHidden() and not e.c_coll.isHidden()
+    k = next(k for k in range(e.collectif.rowCount()) if e.collectif.item(k, 0).data(Qt.UserRole) == pid)
+    assert any(e.collectif.item(k, j).text() == "08:30–10:00" for j in range(1, e.collectif.columnCount()))
+    assert e.ouvrir_quotas().isVisible()
     f.close()
 
 
