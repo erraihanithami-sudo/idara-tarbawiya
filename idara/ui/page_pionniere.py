@@ -309,6 +309,8 @@ class PageCommunicationPionniere(QWidget):
         self.lignes = [r for r in tout if self.filtre is None or r.type == self.filtre]
         titre = pn.TYPES_RENCONTRE[self.filtre] if self.filtre else "كل اللقاءات"
         self.titre_liste.setText(f"{titre} ({len(self.lignes)})")
+        from idara.ui.vitrine import vider_colonne_widgets
+        vider_colonne_widgets(self.liste, 6)
         self.liste.setRowCount(len(self.lignes))
         for i, r in enumerate(self.lignes):
             coul = self.cartes[r.type].couleur

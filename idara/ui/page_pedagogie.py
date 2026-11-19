@@ -485,6 +485,8 @@ class PageVieScolaire(QWidget):
         except vs.ErreurVie as e:
             message(self.message, str(e), True)
             return
+        from idara.ui.vitrine import vider_colonne_widgets
+        vider_colonne_widgets(self.clubs, 5)
         self.clubs.setRowCount(len(cs))
         self.club_act.clear()
         self.club_act.addItem("—", None)

@@ -826,6 +826,8 @@ class PageEmplois(QWidget):
         self.c_coll.setVisible(coll)
         lignes = [d for d in donnees if self.filtre is None or (self.filtre == "saisis") == bool(d[1])]
         self.titre_liste.setText(f"أساتذة المؤسسة ({len(lignes)})")
+        from idara.ui.vitrine import vider_colonne_widgets
+        vider_colonne_widgets(self.liste, 5)
         self.liste.setRowCount(len(lignes))
         for i, (p, ss, c_) in enumerate(lignes):
             it = _item(f"{p.prenom_ar} {p.nom_ar}", False, p.id)

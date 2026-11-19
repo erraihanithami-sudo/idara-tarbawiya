@@ -347,3 +347,12 @@ def ajuster_colonne_actions(table, col: int) -> None:
         table.horizontalHeader().setSectionResizeMode(col, QHeaderView.Fixed)
         table.setColumnWidth(col, larg + 8)
     table.verticalHeader().setDefaultSectionSize(max(table.verticalHeader().defaultSectionSize(), 44))
+
+
+def vider_colonne_widgets(table, col: int) -> None:
+    """يخفي أزرار الأسطر السابقة ويزيلها فوراً قبل إعادة الملء (حذفها المؤجل قد يتركها ظاهرة لحظة)."""
+    for i in range(table.rowCount()):
+        w = table.cellWidget(i, col)
+        if w is not None:
+            w.hide()
+            table.removeCellWidget(i, col)

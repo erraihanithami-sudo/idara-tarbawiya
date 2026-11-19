@@ -430,6 +430,8 @@ class PageConseilsEtab(QWidget):
         self.titre_liste.setText(f"لائحة المجالس: {titre} · مبرمجة {len(prevus)} · منجزة {len(faits)}")
         self.liste.blockSignals(True)
         self.liste.clearSelection()
+        from idara.ui.vitrine import vider_colonne_widgets
+        vider_colonne_widgets(self.liste, 6)
         self.liste.setRowCount(len(self.lignes))
         for i, r in enumerate(self.lignes):
             self.liste.setItem(i, 0, self._cellule_conseil(r["conseil"], r["id"]))
@@ -477,6 +479,8 @@ class PageConseilsEtab(QWidget):
 
     def _maj_actions(self) -> None:
         """يعيد بناء أزرار الأسطر (تفعيل «الاطلاع على المحضر» بعد توليده) دون فقد التحديد."""
+        from idara.ui.vitrine import vider_colonne_widgets
+        vider_colonne_widgets(self.liste, 6)
         for i, r in enumerate(getattr(self, "lignes", [])):
             self.liste.setCellWidget(i, 6, self._actions(r["id"], self._prevu(r)))
         from idara.ui.vitrine import ajuster_colonne_actions

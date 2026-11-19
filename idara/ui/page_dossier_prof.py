@@ -165,6 +165,8 @@ class PageDossierProf(QWidget):
                   "demande": "طلبات مرسلة", "partis": "الأساتذة المغادرون"}
         self.titre_suivi.setText(f"{titres[f]} ({len(lignes)})")
         self.lignes = lignes
+        from idara.ui.vitrine import vider_colonne_widgets
+        vider_colonne_widgets(self.suivi, 4)
         self.suivi.setRowCount(len(lignes))
         for i, x in enumerate(lignes):
             it = cellule(x["nom"], x["pid"])
