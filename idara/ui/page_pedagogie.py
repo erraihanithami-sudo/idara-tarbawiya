@@ -283,28 +283,65 @@ class PageTarl(QWidget):
 
 # ======================================================================
 class PageVieScolaire(QWidget):
-    """الأندية التربوية والأنشطة الموازية: البرنامج السنوي، الإنجاز والحصيلة."""
+    """الأندية التربوية والأنشطة الموازية: البرنامج السنوي، الإنجاز والحصيلة.
+    طلب المدير 2026-11-19: الصفحة للعرض والإحصاء، وإضافة الأندية والأنشطة وتعديلها في نوافذ منبثقة."""
 
     def __init__(self, fenetre):
         super().__init__()
+        from idara.ui.vitrine import CarteFiltre, FenetreFiche, bouton_couleur, grille_cartes
         self.f = fenetre
         self.club_id: int | None = None
         self.act_id: int | None = None
-        racine, self.message = _page("الأندية التربوية والأنشطة الموازية",
-                                     "البرنامج السنوي بأعمدة نموذجكم (نوع النشاط، الأنشطة، المتدخلون، المستهدفون، "
-                                     "فترة الإنجاز، آليات التنفيذ)، ثم تسجيل الإنجاز وعدد المشاركين والحصيلة.")
+        racine, self.message = _page("الأندية التربوية والأنشطة الموازية", "")
         self.setLayout(racine)
+        self.cartes = {
+            "clubs": CarteFiltre("clubs", "الأندية", "#8E24AA", "personnes", " "),
+            "membres": CarteFiltre("membres", "التلاميذ المنخرطون", "#00897B", "personnes", " "),
+            "programmees": CarteFiltre("programmees", "أنشطة مبرمجة", "#1565C0", "calendrier", " "),
+            "realisees": CarteFiltre("realisees", "أنشطة منجزة", "#2E7D32", "valider", " "),
+        }
+        racine.addLayout(grille_cartes(list(self.cartes.values()), 4))
         self.indic = QLabel()
-        self.indic.setObjectName("titreCarte")
+        self.indic.setObjectName("etiquette")
         self.indic.setWordWrap(True)
         racine.addWidget(self.indic)
+        h = QHBoxLayout()
+        h.setSpacing(12)
+        for lib, coul, pic, fn in (("نادٍ جديد", "#8E24AA", "ajouter", lambda: self.ouvrir_club()),
+                                   ("نشاط جديد", "#1565C0", "ajouter", lambda: self.ouvrir_activite()),
+                                   ("البرنامج السنوي", "#00897B", "document", lambda: self.document("programme")),
+                                   ("حصيلة الأنشطة", "#2E7D32", "document", lambda: self.document("bilan"))):
+            b = bouton_couleur(lib, coul, pic)
+            b.clicked.connect(fn)
+            h.addWidget(b)
+        h.addStretch()
+        racine.addLayout(h)
 
-        # ---- الأندية ----
+        # ---- الأندية (الصفحة) ----
         c, v = carte("الأندية التربوية")
-        self.clubs = tableau(["النادي", "المنشط(ة)", "التوقيت", "الأعضاء", "أنشطة منجزة"], etirer=0)
-        self.clubs.setMinimumHeight(180)
+        self.clubs = tableau(["النادي", "المنشط(ة)", "التوقيت", "الأعضاء", "أنشطة منجزة", "الإجراءات"], etirer=0)
+        self.clubs.setMinimumHeight(200)
+        self.clubs.verticalHeader().setDefaultSectionSize(46)
         self.clubs.itemSelectionChanged.connect(self._sel_club)
+        self.clubs.itemDoubleClicked.connect(lambda it: self.ouvrir_club(self.clubs.item(it.row(), 0)
+                                                                          .data(Qt.UserRole)))
         v.addWidget(self.clubs)
+        racine.addWidget(c)
+        # ---- الأنشطة (الصفحة) ----
+        c, v = carte("البرنامج السنوي للأنشطة وإنجازها")
+        self.acts = tableau(["فترة الإنجاز", "نوع النشاط", "النشاط", "الحالة", "المشاركون"], etirer=2)
+        self.acts.setMinimumHeight(240)
+        self.acts.itemSelectionChanged.connect(self._sel_act)
+        self.acts.itemDoubleClicked.connect(lambda it: self.ouvrir_activite(self.acts.item(it.row(), 0)
+                                                                             .data(Qt.UserRole)))
+        v.addWidget(self.acts)
+        racine.addWidget(c)
+        racine.addStretch()
+
+        # ---- نافذة النادي: معطياته وأعضاؤه ----
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setSpacing(10)
         self.nom_club, self.horaire = champ("مثلا: النادي البيئي"), champ("مثلا: الأربعاء 15:00-16:00")
         self.animateur = QComboBox()
         self.objectifs = champ("الأهداف (اختياري)")
@@ -312,23 +349,29 @@ class PageVieScolaire(QWidget):
                             etirer=0))
         v.addWidget(self.objectifs)
         h = QHBoxLayout()
-        for lib, fn in (("تسجيل نادٍ جديد", lambda: self.enregistrer_club(True)),
-                        ("حفظ التعديل", lambda: self.enregistrer_club(False)),
-                        ("حذف النادي", lambda: self.supprimer_club()),
-                        ("لائحة الأعضاء", lambda: self.liste_club())):
+        self.b_club_nouveau = bouton_couleur("تسجيل النادي", "#8E24AA", "enregistrer")
+        self.b_club_nouveau.clicked.connect(lambda: self.enregistrer_club(True))
+        self.b_club_maj = bouton_couleur("حفظ التعديل", "#1565C0", "enregistrer")
+        self.b_club_maj.clicked.connect(lambda: self.enregistrer_club(False))
+        h.addWidget(self.b_club_nouveau)
+        h.addWidget(self.b_club_maj)
+        for lib, fn in (("حذف النادي", lambda: self.supprimer_club()), ("لائحة الأعضاء", lambda: self.liste_club())):
             b = bouton(lib)
             b.clicked.connect(fn)
             h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
-        t = QLabel("أعضاء النادي المحدد")
+        self.c_membres = QWidget()
+        vm = QVBoxLayout(self.c_membres)
+        vm.setContentsMargins(0, 0, 0, 0)
+        t = QLabel("أعضاء النادي")
         t.setObjectName("titreCarte")
-        v.addWidget(t)
+        vm.addWidget(t)
         self.recherche = champ("ابحث عن تلميذ بالاسم أو رمز مسار لإضافته")
         self.recherche.textChanged.connect(lambda _: self._chercher())
         self.candidats = QComboBox()
         self.role = champ("المهمة (اختياري): رئيس النادي، كاتب...")
-        v.addLayout(_grille([("البحث", self.recherche), ("التلميذ", self.candidats), ("المهمة", self.role)], etirer=0))
+        vm.addLayout(_grille([("البحث", self.recherche), ("التلميذ", self.candidats), ("المهمة", self.role)], etirer=0))
         h = QHBoxLayout()
         b = QPushButton("إضافة إلى النادي")
         b.clicked.connect(lambda: self.ajouter_membre())
@@ -337,27 +380,21 @@ class PageVieScolaire(QWidget):
         b.clicked.connect(lambda: self.retirer_membre())
         h.addWidget(b)
         h.addStretch()
-        v.addLayout(h)
+        vm.addLayout(h)
         self.membres = tableau(["الاسم", "القسم", "المهمة"], etirer=0)
-        self.membres.setMinimumHeight(180)
-        v.addWidget(self.membres)
-        racine.addWidget(c)
+        self.membres.setMinimumHeight(200)
+        vm.addWidget(self.membres)
+        v.addWidget(self.c_membres)
+        self.message_club = QLabel()
+        self.message_club.setWordWrap(True)
+        self.message_club.hide()
+        v.addWidget(self.message_club)
+        self.fiche_club = FenetreFiche(self, "نادٍ تربوي", "", w, largeur=900)
 
-        # ---- الأنشطة ----
-        c, v = carte("البرنامج السنوي للأنشطة وإنجازها")
-        h = QHBoxLayout()
-        for lib, fn in (("البرنامج السنوي", lambda: self.document("programme")),
-                        ("حصيلة الأنشطة", lambda: self.document("bilan"))):
-            b = bouton(lib)
-            b.setObjectName("principal")
-            b.clicked.connect(fn)
-            h.addWidget(b)
-        h.addStretch()
-        v.addLayout(h)
-        self.acts = tableau(["فترة الإنجاز", "نوع النشاط", "النشاط", "الحالة", "المشاركون"], etirer=2)
-        self.acts.setMinimumHeight(240)
-        self.acts.itemSelectionChanged.connect(self._sel_act)
-        v.addWidget(self.acts)
+        # ---- نافذة النشاط ----
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setSpacing(10)
         self.type_act, self.club_act, self.statut = QComboBox(), QComboBox(), QComboBox()
         self.type_act.addItems(vs.TYPES)
         for k, lib in vs.STATUTS.items():
@@ -367,8 +404,8 @@ class PageVieScolaire(QWidget):
         self.periode, self.mecanismes = champ("مثلا: شهر أكتوبر"), champ("آليات التنفيذ")
         self.debut, self.fin = ChampDate(), ChampDate()
         self.nb_g, self.nb_f = champ("0", ltr=True), champ("0", ltr=True)
-        for w in (self.nb_g, self.nb_f):
-            w.setMaximumWidth(80)
+        for x in (self.nb_g, self.nb_f):
+            x.setMaximumWidth(80)
         self.bilan = QPlainTextEdit()
         self.bilan.setPlaceholderText("الحصيلة والملاحظات (للنشاط المنجز)")
         self.bilan.setFixedHeight(70)
@@ -381,17 +418,59 @@ class PageVieScolaire(QWidget):
         v.addLayout(_grille([("آليات التنفيذ", self.mecanismes), ("ذكور", self.nb_g), ("إناث", self.nb_f)], etirer=0))
         v.addWidget(self.bilan)
         h = QHBoxLayout()
-        for lib, fn in (("تسجيل نشاط جديد", lambda: self.enregistrer_activite(True)),
-                        ("حفظ التعديل", lambda: self.enregistrer_activite(False)),
-                        ("حذف النشاط", lambda: self.supprimer_activite())):
-            b = bouton(lib)
-            b.clicked.connect(fn)
-            h.addWidget(b)
+        self.b_act_nouveau = bouton_couleur("تسجيل النشاط", "#1565C0", "enregistrer")
+        self.b_act_nouveau.clicked.connect(lambda: self.enregistrer_activite(True))
+        self.b_act_maj = bouton_couleur("حفظ التعديل", "#1565C0", "enregistrer")
+        self.b_act_maj.clicked.connect(lambda: self.enregistrer_activite(False))
+        h.addWidget(self.b_act_nouveau)
+        h.addWidget(self.b_act_maj)
+        b = bouton("حذف النشاط")
+        b.clicked.connect(lambda: self.supprimer_activite())
+        h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
-        racine.addWidget(c)
-        racine.addStretch()
+        self.message_act = QLabel()
+        self.message_act.setWordWrap(True)
+        self.message_act.hide()
+        v.addWidget(self.message_act)
+        self.fiche_act = FenetreFiche(self, "نشاط موازٍ", "", w, largeur=900)
         self.rafraichir()
+
+    def ouvrir_club(self, cid: int | None = None):
+        self.club_id = cid
+        if cid:
+            self._charger_club()
+        else:
+            for x in (self.nom_club, self.horaire, self.objectifs):
+                x.clear()
+            self.animateur.setCurrentIndex(0)
+            self._membres()
+        self.b_club_nouveau.setVisible(cid is None)
+        self.b_club_maj.setVisible(cid is not None)
+        self.c_membres.setVisible(cid is not None)
+        self.message_club.hide()
+        self.fiche_club.definir_titre(f"النادي: {self.nom_club.text()}" if cid else "نادٍ جديد")
+        self.fiche_club.ouvrir()
+        return self.fiche_club
+
+    def ouvrir_activite(self, aid: int | None = None):
+        self.act_id = aid
+        if aid:
+            self._charger_act()
+        else:
+            for x in (self.titre_act, self.intervenants, self.cibles, self.periode, self.mecanismes, self.nb_g,
+                      self.nb_f):
+                x.clear()
+            self.debut.definir(None)
+            self.fin.definir(None)
+            self.bilan.clear()
+            self.statut.setCurrentIndex(0)
+        self.b_act_nouveau.setVisible(aid is None)
+        self.b_act_maj.setVisible(aid is not None)
+        self.message_act.hide()
+        self.fiche_act.definir_titre("تعديل نشاط" if aid else "نشاط جديد")
+        self.fiche_act.ouvrir()
+        return self.fiche_act
 
     # ---------- التحميل ----------
 
@@ -414,6 +493,29 @@ class PageVieScolaire(QWidget):
                                    str(cl["activites"]))):
                 self.clubs.setItem(i, j, cellule(v, cl["id"] if j == 0 else None))
             self.club_act.addItem(cl["nom"], cl["id"])
+        self.cartes["clubs"].definir(b["clubs"])
+        self.cartes["membres"].definir(b["membres"])
+        self.cartes["programmees"].definir(b["programmees"])
+        self.cartes["realisees"].definir(b["realisees"])
+        self.cartes["realisees"].note.setText(f"{b['taux']:.0f}% من المبرمج" if b["taux"] is not None else " ")
+        from idara.ui import pictos
+        for i, cl in enumerate(cs):
+            w = QWidget()
+            hb = QHBoxLayout(w)
+            hb.setContentsMargins(4, 2, 4, 2)
+            hb.setSpacing(6)
+            for t, coul, pic, fn in (("فتح", "#8E24AA", "ouvrir", lambda _=False, x=cl["id"]: self.ouvrir_club(x)),
+                                     ("نشاط للنادي", "#1565C0", "ajouter",
+                                      lambda _=False, x=cl["id"]: self._activite_club(x))):
+                q = QPushButton(t)
+                q.setObjectName("boutonCouleur")
+                q.setIcon(pictos.icone(pic, "#FFFFFF", 15))
+                q.setStyleSheet(f"QPushButton {{ background: {coul}; color: white; border: none; border-radius: 9px; "
+                                f"padding: 4px 10px; font-weight: 700; }}")
+                q.clicked.connect(fn)
+                hb.addWidget(q)
+            self.clubs.setCellWidget(i, 5, w)
+        self.clubs.resizeColumnToContents(5)
         self.indic.setText(
             f"الأنشطة: مبرمجة {b['programmees']}، منجزة {b['realisees']}"
             + (f" ({b['taux']:.2f}%)" if b["taux"] is not None else "")
@@ -439,8 +541,16 @@ class PageVieScolaire(QWidget):
         rows = {i.row() for i in t.selectedIndexes()}
         return t.item(rows.pop(), 0).data(Qt.UserRole) if len(rows) == 1 else None
 
+    def _activite_club(self, cid: int):
+        d = self.ouvrir_activite()
+        self.club_act.setCurrentIndex(max(0, self.club_act.findData(cid)))
+        return d
+
     def _sel_club(self) -> None:
         self.club_id = self._sel(self.clubs)
+        self._charger_club()
+
+    def _charger_club(self) -> None:
         if self.club_id:
             c = vs.club(self.f.conn, self.club_id)
             self.nom_club.setText(c["nom"])
@@ -467,6 +577,9 @@ class PageVieScolaire(QWidget):
 
     def _sel_act(self) -> None:
         self.act_id = self._sel(self.acts)
+        self._charger_act()
+
+    def _charger_act(self) -> None:
         if not self.act_id:
             return
         a = vs.activite(self.f.conn, self.act_id)
@@ -488,19 +601,28 @@ class PageVieScolaire(QWidget):
         try:
             r = fn()
         except (vs.ErreurVie, ValueError) as e:
-            message(self.message, str(e) or "قيمة غير صحيحة.", True)
+            for m in (self.message, self.message_club, self.message_act):
+                message(m, str(e) or "قيمة غير صحيحة.", True)
             return None
+        cid = self.club_id
         self.rafraichir()
-        message(self.message, succes)
+        self.club_id = cid
+        self._membres()
+        for m in (self.message, self.message_club, self.message_act):
+            message(m, succes)
         return True if r is None else r
 
     def enregistrer_club(self, nouveau: bool):
         if not nouveau and not self.club_id:
             message(self.message, "حدد نادياً في الجدول.", True)
             return None
-        return self._faire(lambda: vs.enregistrer_club(self.f.conn, self.nom_club.text(), self.animateur.currentData(),
-                                                       self.objectifs.text(), self.horaire.text(),
-                                                       None if nouveau else self.club_id), "حُفظ النادي.")
+        r = self._faire(lambda: vs.enregistrer_club(self.f.conn, self.nom_club.text(), self.animateur.currentData(),
+                                                    self.objectifs.text(), self.horaire.text(),
+                                                    None if nouveau else self.club_id), "حُفظ النادي.")
+        if r and nouveau and isinstance(r, int) and self.fiche_club.isVisible():
+            self.ouvrir_club(r)   # بعد التسجيل: إضافة الأعضاء في النافذة نفسها
+            message(self.message_club, "حُفظ النادي. أضف أعضاءه الآن.")
+        return r
 
     def supprimer_club(self):
         if not self.club_id:

@@ -22,8 +22,9 @@ _PORTEES = {"ligne": "للسطر المحدد في الجدول", "tout": "لك�
 
 
 class VueRegistre(QWidget):
-    def __init__(self, page, cle: str, couleur: str):
+    def __init__(self, page, cle: str, couleur: str, fenetre: bool = False):
         super().__init__()
+        self.en_fenetre = fenetre   # طلب المدير 2026-11-19: الإضافة والتعديل في نافذة منبثقة
         self.page, self.f, self.r = page, page.f, rg.registre(cle)
         self.lid: int | None = None
         self.classes: dict[str, str] = {}
@@ -77,7 +78,22 @@ class VueRegistre(QWidget):
         self.etat.setObjectName("pastille")
         h.addWidget(self.etat)
         v.addLayout(h)
-        v0.addWidget(c)
+        if fenetre:
+            from idara.ui.vitrine import FenetreFiche, bouton_couleur
+            self.fiche = FenetreFiche(self, self.r.titre, "", c, largeur=900)
+            self.message_fiche = QLabel()
+            self.message_fiche.setWordWrap(True)
+            self.message_fiche.hide()
+            v.addWidget(self.message_fiche)
+            hb = QHBoxLayout()
+            self.b_ajouter = bouton_couleur(f"إضافة: {self.r.titre}", couleur, "ajouter")
+            self.b_ajouter.clicked.connect(lambda: self.ouvrir_nouveau())
+            hb.addWidget(self.b_ajouter)
+            hb.addStretch()
+            v0.addLayout(hb)
+        else:
+            self.fiche = None
+            v0.addWidget(c)
 
         # ---- الجدول
         c, v = carte("الأسطر المسجلة")
@@ -101,6 +117,8 @@ class VueRegistre(QWidget):
                              etirer=min(1, len(self.colonnes) - 1))
         self.table.setMinimumHeight(240)
         self.table.itemSelectionChanged.connect(self._selection)
+        if fenetre:
+            self.table.itemDoubleClicked.connect(lambda it: self.ouvrir(self.table.item(it.row(), 0).data(Qt.UserRole)))
         v.addWidget(self.table)
         self.nb = QLabel()
         self.nb.setObjectName("etiquette")
@@ -238,6 +256,22 @@ class VueRegistre(QWidget):
         self.etat.setText("تعديل سطر مسجل")
         self.b_suppr.setEnabled(True)
 
+    def ouvrir_nouveau(self):
+        self.nouveau()
+        if self.fiche is not None:
+            self.message_fiche.hide()
+            self.fiche.definir_titre(f"إضافة: {self.r.titre}")
+            self.fiche.ouvrir()
+        return self.fiche
+
+    def ouvrir(self, lid: int):
+        self.charger(lid)
+        if self.fiche is not None:
+            self.message_fiche.hide()
+            self.fiche.definir_titre(f"تعديل: {self.r.titre}")
+            self.fiche.ouvrir()
+        return self.fiche
+
     def nouveau(self) -> None:
         self.lid = None
         for ch in self.r.champs:
@@ -252,10 +286,14 @@ class VueRegistre(QWidget):
             lid = rg.enregistrer(self.f.conn, self.r.cle, self.valeurs(), self.lid)
         except rg.ErreurRegistre as e:
             message(self.page.message, str(e), True)
+            if self.fiche is not None:
+                message(self.message_fiche, str(e), True)
             return None
         self.afficher()
         self.charger(lid)
         message(self.page.message, "حُفظ السطر.")
+        if self.fiche is not None:
+            message(self.message_fiche, "حُفظ السطر.")
         return lid
 
     def supprimer(self) -> bool:
@@ -283,7 +321,8 @@ class VueRegistre(QWidget):
 
 
 class PageRegistres(QWidget):
-    def __init__(self, fenetre, titre: str, sous: str, cles: list[str], couleur: str | None = None):
+    def __init__(self, fenetre, titre: str, sous: str, cles: list[str], couleur: str | None = None,
+                 fenetres: bool = False):
         super().__init__()
         self.f = fenetre
         self.cles_registres = list(cles)
@@ -306,7 +345,7 @@ class PageRegistres(QWidget):
             h.addStretch()
             racine.addLayout(h)
         for k in cles:
-            self.vues[k] = VueRegistre(self, k, couleur)
+            self.vues[k] = VueRegistre(self, k, couleur, fenetres)
             racine.addWidget(self.vues[k])
         racine.addStretch()
         self.cle = cles[0]

@@ -806,7 +806,7 @@ class FenetrePrincipale(QMainWindow):
             ["agents", "suivi_agents"], cs["الموارد البشرية"])
         self.page_cellules = PageRegistres(
             self, "خليتا اليقظة والإنصات", "تركيبة الخليتين، اجتماعاتهما، والحالات المرصودة وما اتُّخذ فيها.",
-            ["cellule_membres", "cellule_reunions", "cellule_cas"], cs["الحياة المدرسية"])
+            ["cellule_membres", "cellule_reunions", "cellule_cas"], cs["الحياة المدرسية"], fenetres=True)
         self.page_tahfiz = PageRegistres(
             self, "التحفيز والتهاني", "سجّل كل تحفيز ثم اطبع شهادته المزخرفة.", ["tahfiz"], cs["الحياة المدرسية"])
         self.page_partenariats = PageRegistres(

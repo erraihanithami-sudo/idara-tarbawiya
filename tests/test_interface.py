@@ -1101,6 +1101,18 @@ def test_section_pedagogie(app, config_tmp, monkeypatch):
     assert v.enregistrer_activite(True), v.message.text()
     assert v.acts.rowCount() == 1 and "45" in v.indic.text()
     assert v.document("programme") and v.document("bilan") and len(ouverts) == 3
+    # طلب المدير 2026-11-19: إضافة الأندية والأنشطة في نوافذ منبثقة
+    assert v.cartes["clubs"].chiffre.text() == "1" and v.cartes["realisees"].chiffre.text() == "1"
+    d = v.ouvrir_club()
+    assert d.isVisible() and v.c_membres.isHidden() and v.nom_club.text() == ""
+    v.nom_club.setText("نادي القراءة")
+    assert v.enregistrer_club(True) and v.clubs.rowCount() == 2 and not v.c_membres.isHidden() and v.club_id
+    d.hide()
+    assert v.clubs.cellWidget(0, 5) is not None
+    cid = v.clubs.item(0, 0).data(Qt.UserRole)
+    da = v._activite_club(cid)
+    assert da.isVisible() and v.club_act.currentData() == cid and v.titre_act.text() == ""
+    da.hide()
     f.close()
 
 
