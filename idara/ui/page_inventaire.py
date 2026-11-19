@@ -132,6 +132,7 @@ class PageInventaire(QWidget):
         # أحجام الأعمدة على قدر محتواها (طلب المدير 2026-11-19)؛ الوصف يأخذ ما بقي
         from PySide6.QtWidgets import QHeaderView
         hh = self.table.horizontalHeader()
+        hh.setMinimumSectionSize(48)
         for j, w in enumerate((60, 105, 0, 170, 60, 100, 110, 160, 110, 150)):
             if j == 2:
                 hh.setSectionResizeMode(j, QHeaderView.Stretch)

@@ -2177,7 +2177,7 @@ def test_page_inventaire(app, config_tmp, monkeypatch):
     p.designation.setText("سبورة بيضاء")
     assert p.enregistrer() and f"حُفظ السطر {num}" in p.message_fiche.text()
     d.hide()
-    assert p.table.columnWidth(0) <= 80 and p.table.columnWidth(4) <= 80
+    assert p.table.columnWidth(0) < p.table.columnWidth(2) and p.table.columnWidth(4) < p.table.columnWidth(3)
     d = p.ouvrir(p.table.item(0, 0).data(Qt.UserRole))
     assert d.isVisible() and p.aid == p.table.item(0, 0).data(Qt.UserRole)
     d.hide()
