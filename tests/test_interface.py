@@ -1770,12 +1770,15 @@ def test_inscriptions_frais(app, config_tmp):
     f = _fenetre_avec_eleves(config_tmp)
     f.aller_a("التسجيلات")
     p = f.page_inscriptions
-    assert "حدّد وسط المؤسسة" in p.l_milieu.text() and p.table.rowCount() > 0
+    assert "حدّد مبالغ التسجيل" in p.l_milieu.text() and p.table.rowCount() > 0
+    # طلب المدير 2026-11-19: لا تلاميذ التعليم الأولي، والأقسام في قائمة منسدلة
+    assert all(not p.table.item(i, 2).text().startswith("PS") for i in range(p.table.rowCount()))
+    assert p.classe.count() >= 2 and not any(p.classe.itemText(i).startswith("PS") for i in range(p.classe.count()))
     e = et.lire_etablissement(f.conn)
     e.milieu = "urbain"
     et.enregistrer_etablissement(f.conn, e)
     p.rafraichir()
-    assert "حضري" in p.l_milieu.text()
+    assert "12 درهم" in p.l_milieu.text() and "قيم افتراضية" in p.l_milieu.text()
     n = p.table.rowCount()
     p.table.item(0, 3).setCheckState(Qt.Checked)
     assert p.totaux["elements"]["assurance"] == {"libelle": "التأمين المدرسي", "payes": 1, "montant_unitaire": 12,
@@ -1784,6 +1787,16 @@ def test_inscriptions_frais(app, config_tmp):
     assert p.totaux["total"] == 12 + 10 * n
     p.table.item(0, 4).setCheckState(Qt.Unchecked)
     assert p.totaux["elements"]["sport"]["payes"] == n - 1
+    d = p.ouvrir_montants()
+    assert d.isVisible() and p.c_montants["assurance"].text() == "12"
+    p.c_montants["sport"].setText("abc")
+    assert not p.enregistrer_montants() and "رقم" in p.message_montants.text()
+    p.c_montants["sport"].setText("20")
+    assert p.enregistrer_montants() and not d.isVisible() and "قيم افتراضية" not in p.l_milieu.text()
+    assert p.totaux["elements"]["sport"]["montant"] == 20 * (n - 1)
+    cl = p.classe.itemData(1)
+    p.classe.setCurrentIndex(1)
+    assert all(p.table.item(i, 2).text() == cl for i in range(p.table.rowCount()))
     f.aller_a("إعداد المؤسسة")
     assert f.page_etab.f_etab.milieu.currentData() == "urbain"
     f.close()

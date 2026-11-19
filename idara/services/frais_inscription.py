@@ -3,6 +3,9 @@
 
 المبالغ (كما حددها المدير): التأمين 8 دراهم في الوسط القروي و12 درهماً في الوسط الحضري (وسط المؤسسة يُحدَّد في
 الإعدادات)، الجمعية الرياضية 10 دراهم، جمعية تنمية التعاون المدرسي 10 دراهم.
+
+طلب المدير 2026-11-19: المدير يكتب المبالغ بنفسه في «تهيئة المبالغ» (نافذة منبثقة)، وتُعتمد بدل ما سبق. ولا يظهر
+تلاميذ التعليم الأولي في اللائحة لأنهم يُؤمَّنون من خلال جمعيتهم. واللائحة تُعرض حسب القسم.
 """
 
 from __future__ import annotations
@@ -22,10 +25,55 @@ class ErreurFrais(ValueError):
     """رسالة موجهة للمدير بالعربية."""
 
 
-def montants(conn: sqlite3.Connection) -> dict[str, int | None]:
-    """مبلغ كل عنصر؛ التأمين None إن لم يُحدَّد وسط المؤسسة بعد."""
+def montants_saisis(conn: sqlite3.Connection) -> dict[str, float]:
+    """المبالغ التي كتبها المدير في «تهيئة المبالغ»."""
+    from idara.services import fiches
+    return {k: v for k, v in (fiches.lire(conn, "frais_montants") or {}).items() if k in ELEMENTS and v is not None}
+
+
+def _nombre(v):
+    return int(v) if float(v).is_integer() else round(float(v), 2)
+
+
+def montants(conn: sqlite3.Connection) -> dict[str, int | float | None]:
+    """مبلغ كل عنصر: ما كتبه المدير، وإلا القيم السابقة (التأمين حسب الوسط، None إن لم يُحدَّد)."""
     e = etab_srv.lire_etablissement(conn)
-    return {"assurance": ASSURANCE.get(e.milieu if e else ""), **MONTANTS_FIXES}
+    res = {"assurance": ASSURANCE.get(e.milieu if e else ""), **MONTANTS_FIXES}
+    res.update({k: _nombre(v) for k, v in montants_saisis(conn).items()})
+    return res
+
+
+def definir_montants(conn: sqlite3.Connection, valeurs: dict[str, object]) -> dict:
+    from idara.services import fiches
+    propres = {}
+    for k, v in valeurs.items():
+        if k not in ELEMENTS:
+            raise ErreurFrais("عنصر تسجيل غير معروف.")
+        t = str(v if v is not None else "").replace(",", ".").strip()
+        if not t:
+            raise ErreurFrais(f"اكتب مبلغ «{ELEMENTS[k]}».")
+        try:
+            x = float(t)
+        except ValueError:
+            raise ErreurFrais(f"مبلغ «{ELEMENTS[k]}» رقم بالدرهم.") from None
+        if x < 0:
+            raise ErreurFrais(f"مبلغ «{ELEMENTS[k]}» لا يكون سالباً.")
+        propres[k] = x
+    fiches.ecrire(conn, "frais_montants", {**montants_saisis(conn), **propres})
+    return montants(conn)
+
+
+def _prescolaire(x) -> bool:
+    from idara.services.massar import niveaux_du_code_classe
+    if x["niveau"]:
+        return x["niveau"].startswith("PS")
+    ns = niveaux_du_code_classe(x["classe"] or "")
+    return bool(ns) and all(n.startswith("PS") for n in ns) or (x["classe"] or "").upper().startswith(("PS", "MS", "GS"))
+
+
+def classes(conn: sqlite3.Connection, unite: str | None = None) -> list[str]:
+    """أقسام اللائحة (دون أقسام التعليم الأولي)."""
+    return list(dict.fromkeys(x["classe"] for x in lister(conn, unite=unite)))
 
 
 def _annee(conn) -> int:
@@ -35,8 +83,9 @@ def _annee(conn) -> int:
     return a["id"]
 
 
-def lister(conn: sqlite3.Connection, niveau: str | None = None, unite: str | None = None) -> list[dict]:
-    """التلاميذ الذين يتابعون دراستهم، مرتبين حسب المستوى ثم القسم ثم الاسم، مع ما أدّوه."""
+def lister(conn: sqlite3.Connection, niveau: str | None = None, unite: str | None = None,
+           classe: str | None = None) -> list[dict]:
+    """التلاميذ الذين يتابعون دراستهم (دون التعليم الأولي)، مرتبين حسب المستوى ثم القسم ثم الاسم، مع ما أدّوه."""
     aid = _annee(conn)
     sql = ("SELECT e.id, e.code_massar, e.nom_ar, e.prenom_ar, c.code AS classe, n.code AS niveau, "
            "COALESCE(f.assurance,0) AS assurance, COALESCE(f.sport,0) AS sport, "
@@ -51,8 +100,11 @@ def lister(conn: sqlite3.Connection, niveau: str | None = None, unite: str | Non
     if unite:
         sql += " AND c.unite_id=(SELECT id FROM unite_scolaire WHERE nom_ar=?)"
         args.append(unite)
-    sql += " ORDER BY n.ordre, c.code, e.nom_ar, e.prenom_ar"
-    return [dict(r) for r in conn.execute(sql, args)]
+    if classe:
+        sql += " AND c.code=?"
+        args.append(classe)
+    sql += " ORDER BY c.code, n.ordre, e.nom_ar, e.prenom_ar"
+    return [x for x in (dict(r) for r in conn.execute(sql, args)) if not _prescolaire(x)]
 
 
 def marquer(conn: sqlite3.Connection, eleve_id: int, element: str, paye: bool) -> None:
@@ -72,9 +124,10 @@ def marquer_tous(conn: sqlite3.Connection, eleves: list[int], element: str, paye
     return len(eleves)
 
 
-def totaux(conn: sqlite3.Connection, niveau: str | None = None, unite: str | None = None) -> dict:
+def totaux(conn: sqlite3.Connection, niveau: str | None = None, unite: str | None = None,
+           classe: str | None = None) -> dict:
     """العدد والمبلغ لكل عنصر، والمجموع التراكمي."""
-    liste = lister(conn, niveau, unite)
+    liste = lister(conn, niveau, unite, classe)
     m = montants(conn)
     res = {"eleves": len(liste), "elements": {}, "total": 0}
     for k, lib in ELEMENTS.items():
@@ -82,4 +135,5 @@ def totaux(conn: sqlite3.Connection, niveau: str | None = None, unite: str | Non
         mt = n * m[k] if m[k] is not None else None
         res["elements"][k] = {"libelle": lib, "payes": n, "montant_unitaire": m[k], "montant": mt}
         res["total"] += mt or 0
+    res["total"] = _nombre(res["total"])
     return res

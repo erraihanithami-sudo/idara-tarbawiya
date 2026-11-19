@@ -44,3 +44,20 @@ def test_marquer_et_totaux(base):  # noqa: F811
     assert fr.totaux(base, niveau=niv)["eleves"] == sum(1 for x in liste if x["niveau"] == niv)
     with pytest.raises(fr.ErreurFrais):
         fr.marquer(base, ids[0], "autre", True)
+
+
+def test_montants_manuels_et_sans_prescolaire(base):  # noqa: F811
+    """طلب المدير 2026-11-19: المبالغ يكتبها المدير، والتعليم الأولي خارج اللائحة، والعرض حسب القسم."""
+    with pytest.raises(fr.ErreurFrais, match="رقم"):
+        fr.definir_montants(base, {"assurance": "اثنا عشر"})
+    with pytest.raises(fr.ErreurFrais, match="سالباً"):
+        fr.definir_montants(base, {"sport": "-1"})
+    m = fr.definir_montants(base, {"assurance": "12,5", "sport": "15", "cooperative": "5"})
+    assert m == {"assurance": 12.5, "sport": 15, "cooperative": 5}
+    liste = fr.lister(base)
+    assert liste and not any((x["niveau"] or "").startswith("PS") or x["classe"].startswith("PS") for x in liste)
+    cls = fr.classes(base)
+    assert cls and all(not c.startswith("PS") for c in cls)
+    assert {x["classe"] for x in fr.lister(base, classe=cls[0])} == {cls[0]}
+    fr.marquer(base, liste[0]["id"], "assurance", True)
+    assert fr.totaux(base)["elements"]["assurance"]["montant"] == 12.5

@@ -25,11 +25,19 @@ class PageInscriptions(QWidget):
         self.f = fenetre
         self._chargement = False
         racine, self.message = _page("تدبير التسجيلات",
-                                     "أشّر أمام كل تلميذ على ما أدّاه من واجبات التسجيل؛ العدّاد يُحدَّث فوراً.")
+                                     "أشّر أمام كل تلميذ على ما أدّاه من واجبات التسجيل؛ العدّاد يُحدَّث فوراً. "
+                                     "تلاميذ التعليم الأولي يُؤمَّنون من خلال جمعيتهم فلا يظهرون هنا.")
         self.setLayout(racine)
+        from idara.ui.vitrine import bouton_couleur
+        h0 = QHBoxLayout()
         self.l_milieu = QLabel()
         self.l_milieu.setWordWrap(True)
-        racine.addWidget(self.l_milieu)
+        h0.addWidget(self.l_milieu, 1)
+        self.b_montants = bouton_couleur("تهيئة مبالغ التسجيل", "#EF6C00", "statistiques",
+                                         "قيمة التأمين والانخراط في الجمعية الرياضية وجمعية تنمية التعاون المدرسي")
+        self.b_montants.clicked.connect(lambda: self.ouvrir_montants())
+        h0.addWidget(self.b_montants)
+        racine.addLayout(h0)
 
         c, v = carte("المجموع التراكمي")
         self.grille = QGridLayout()
@@ -37,11 +45,12 @@ class PageInscriptions(QWidget):
         v.addLayout(self.grille)
         racine.addWidget(c)
 
-        c, v = carte("لائحة التلاميذ حسب المستوى")
-        self.niveau, self.unite = QComboBox(), QComboBox()
-        self.niveau.currentIndexChanged.connect(lambda _: self.afficher())
-        self.unite.currentIndexChanged.connect(lambda _: self.afficher())
-        v.addLayout(_grille([("المستوى", self.niveau), ("الوحدة المدرسية", self.unite)]))
+        c, v = carte("مسك المساهمات: لائحة التلاميذ حسب القسم")
+        self.classe, self.unite = QComboBox(), QComboBox()
+        self.classe.setMinimumWidth(220)
+        self.classe.currentIndexChanged.connect(lambda _: self.afficher())
+        self.unite.currentIndexChanged.connect(lambda _: self._remplir_classes())
+        v.addLayout(_grille([("القسم", self.classe), ("الوحدة المدرسية", self.unite)]))
         h = QHBoxLayout()
         self.boutons_tous = {}
         for k, lib in fr.ELEMENTS.items():
@@ -52,6 +61,10 @@ class PageInscriptions(QWidget):
         h.addStretch()
         v.addLayout(h)
         self.table = tableau(["الرمز", "الاسم الكامل", "القسم"] + list(fr.ELEMENTS.values()), etirer=1)
+        hh = self.table.horizontalHeader()
+        hh.setSectionResizeMode(hh.ResizeMode.Interactive)
+        for j, w in enumerate((130, 260, 120, 150, 150, 210)):
+            self.table.setColumnWidth(j, w)
         self.table.setMinimumHeight(520)
         self.table.itemChanged.connect(self._coche)
         v.addWidget(self.table)
@@ -61,49 +74,100 @@ class PageInscriptions(QWidget):
 
     def rafraichir(self) -> None:
         conn = self.f.conn
-        e = etab_srv.lire_etablissement(conn)
         m = fr.montants(conn)
+        saisis = fr.montants_saisis(conn)
         if m["assurance"] is None:
-            self.l_milieu.setText("حدّد وسط المؤسسة (حضري أو قروي) في الإعدادات ← المؤسسة لحساب مبلغ التأمين: "
-                                  "8 دراهم في الوسط القروي و12 درهماً في الوسط الحضري.")
+            self.l_milieu.setText("حدّد مبالغ التسجيل في «تهيئة مبالغ التسجيل»: قيمة التأمين والانخراط في "
+                                  "الجمعيتين.")
             self.l_milieu.setObjectName("alerte")
         else:
-            self.l_milieu.setText(f"الوسط: {etab_srv.MILIEUX[e.milieu]} · التأمين {m['assurance']} دراهم، "
-                                  f"الجمعية الرياضية {m['sport']} دراهم، التعاون المدرسي {m['cooperative']} دراهم "
-                                  "لكل تلميذ.")
+            self.l_milieu.setText(" · ".join(f"{lib}: {m[k]:g} درهم" for k, lib in fr.ELEMENTS.items())
+                                  + " لكل تلميذ" + ("" if len(saisis) == len(fr.ELEMENTS)
+                                                     else " (قيم افتراضية: صحّحها في «تهيئة مبالغ التسجيل»)"))
             self.l_milieu.setObjectName("etiquette")
         self.l_milieu.style().unpolish(self.l_milieu)
         self.l_milieu.style().polish(self.l_milieu)
-        for combo, valeurs, tous in ((self.niveau, self._niveaux(), "كل المستويات"),
-                                     (self.unite, [(u, u) for u in etab_srv.unites(conn)], "المؤسسة كاملة")):
-            actuel = combo.currentData()
-            combo.blockSignals(True)
-            combo.clear()
-            combo.addItem(tous, None)
-            for lib, d in valeurs:
-                combo.addItem(lib, d)
-            combo.setCurrentIndex(max(0, combo.findData(actuel)))
-            combo.blockSignals(False)
+        actuel = self.unite.currentData()
+        self.unite.blockSignals(True)
+        self.unite.clear()
+        self.unite.addItem("المؤسسة كاملة", None)
+        for u in etab_srv.unites(conn):
+            self.unite.addItem(u, u)
+        self.unite.setCurrentIndex(max(0, self.unite.findData(actuel)))
+        self.unite.blockSignals(False)
         visible = self.unite.count() > 1
         self.unite.setVisible(visible)
         for l in self.findChildren(QLabel):
             if l.text() == "الوحدة المدرسية":
                 l.setVisible(visible)
+        self._remplir_classes()
+
+    def _remplir_classes(self) -> None:
+        actuel = self.classe.currentData()
+        try:
+            cls = fr.classes(self.f.conn, self.unite.currentData())
+        except fr.ErreurFrais:
+            cls = []
+        self.classe.blockSignals(True)
+        self.classe.clear()
+        self.classe.addItem("كل الأقسام", None)
+        for c in cls:
+            self.classe.addItem(c, c)
+        self.classe.setCurrentIndex(max(0, self.classe.findData(actuel)))
+        self.classe.blockSignals(False)
         self.afficher()
 
-    def _niveaux(self) -> list[tuple[str, str]]:
+    # ---- تهيئة المبالغ في نافذة منبثقة (طلب المدير 2026-11-19) ----
+    def ouvrir_montants(self):
+        from PySide6.QtWidgets import QFormLayout, QVBoxLayout
+
+        from idara.ui.formulaires import champ
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        if not hasattr(self, "fiche_montants"):
+            w = QWidget()
+            v = QVBoxLayout(w)
+            aide = QLabel("اكتب المبالغ بالدرهم لكل تلميذ، كما حددتها المؤسسة لهذه السنة.")
+            aide.setObjectName("etiquette")
+            aide.setWordWrap(True)
+            v.addWidget(aide)
+            fl = QFormLayout()
+            self.c_montants = {}
+            for k, lib in (("assurance", "قيمة التأمين المدرسي"), ("sport", "الانخراط في الجمعية الرياضية"),
+                           ("cooperative", "الانخراط في جمعية تنمية التعاون المدرسي")):
+                c = champ("بالدرهم", ltr=True)
+                c.setMaximumWidth(160)
+                self.c_montants[k] = c
+                fl.addRow(lib, c)
+            v.addLayout(fl)
+            b = bouton_couleur("حفظ المبالغ", "#EF6C00", "enregistrer")
+            b.clicked.connect(lambda: self.enregistrer_montants())
+            v.addWidget(b, 0, Qt.AlignLeft)
+            self.message_montants = QLabel()
+            self.message_montants.setWordWrap(True)
+            self.message_montants.hide()
+            v.addWidget(self.message_montants)
+            self.fiche_montants = FenetreFiche(self, "تهيئة مبالغ التسجيل", "", w, largeur=560)
+        m = fr.montants(self.f.conn)
+        for k, c in self.c_montants.items():
+            c.setText("" if m[k] is None else f"{m[k]:g}")
+        self.message_montants.hide()
+        self.fiche_montants.ouvrir()
+        return self.fiche_montants
+
+    def enregistrer_montants(self) -> bool:
         try:
-            codes = []
-            for x in fr.lister(self.f.conn):
-                if x["niveau"] and x["niveau"] not in codes:
-                    codes.append(x["niveau"])
-        except fr.ErreurFrais:
-            return []
-        return [(tx.niveau_ar(n) if n in tx.NIVEAUX else n, n) for n in codes]
+            fr.definir_montants(self.f.conn, {k: c.text() for k, c in self.c_montants.items()})
+        except fr.ErreurFrais as e:
+            message(self.message_montants, str(e), True)
+            return False
+        self.fiche_montants.hide()
+        self.rafraichir()
+        message(self.message, "حُفظت مبالغ التسجيل، وتحيّن العدّاد.")
+        return True
 
     def afficher(self) -> None:
         try:
-            self.liste = fr.lister(self.f.conn, self.niveau.currentData(), self.unite.currentData())
+            self.liste = fr.lister(self.f.conn, unite=self.unite.currentData(), classe=self.classe.currentData())
         except fr.ErreurFrais as e:
             message(self.message, str(e), True)
             self.liste = []
@@ -135,7 +199,7 @@ class PageInscriptions(QWidget):
         return n
 
     def compteurs(self) -> None:
-        t = fr.totaux(self.f.conn, self.niveau.currentData(), self.unite.currentData())
+        t = fr.totaux(self.f.conn, unite=self.unite.currentData(), classe=self.classe.currentData())
         self.totaux = t
         while self.grille.count():
             w = self.grille.takeAt(0).widget()
@@ -144,8 +208,8 @@ class PageInscriptions(QWidget):
                 w.setParent(None)
                 w.deleteLater()
         for i, (k, e) in enumerate(t["elements"].items()):
-            mt = "—" if e["montant"] is None else f"{e['montant']} درهم"
+            mt = "—" if e["montant"] is None else f"{e['montant']:g} درهم"
             self.grille.addWidget(Tuile(e["libelle"], mt, COULEURS[k], "التدبير المالي والمادي",
                                         f"{e['payes']} / {t['eleves']} تلميذاً"), 0, i)
-        self.grille.addWidget(Tuile("المجموع التراكمي لكل العناصر", f"{t['total']} درهم", theme.ORANGE,
+        self.grille.addWidget(Tuile("المجموع التراكمي لكل العناصر", f"{t['total']:g} درهم", theme.ORANGE,
                                     "التدبير المالي والمادي", f"{t['eleves']} تلميذاً في اللائحة"), 1, 0, 1, 3)
