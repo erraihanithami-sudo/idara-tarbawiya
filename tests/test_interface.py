@@ -1533,7 +1533,7 @@ def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
     monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
     f = _fenetre_avec_eleves(config_tmp)
     noms = [n for n, _ in dict(SECTIONS)["التقييم"]]
-    assert noms == ["المراقبة المستمرة", "الامتحان", "استثمار النتائج", "مجالس الأقسام", "محاضر نهاية الأسدوس"]
+    assert noms == ["المراقبة المستمرة", "الامتحان", "استثمار النتائج", "مجالس الأقسام"]   # 2026-11-19
     for i in range(1, 4):
         rh.enregistrer(f.conn, rh.Personnel(nom_ar="التجريبي", prenom_ar=f"أستاذ{i}", sexe="M", categorie="enseignant",
                                             ppr=f"400000{i}"))
@@ -1569,20 +1569,6 @@ def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
     assert p.b_local.isHidden() and not p.b_prov.isHidden()
     assert p.importer_provincial(_liste_direction(tmp_path / "d.xlsx")), p.message.text()
     assert p.cands.item(0, 0).text() == "7903" and "7903–7905" in p.l_cands.text()
-    # محاضر نهاية الأسدوس
-    fic = classeur_resultats(tmp_path / "r.xlsx", {"6APG-1": [("X000000005", "الاختبار آدم", [7.0] * 8)]},
-                             niveau="السادس ابتدائي عام", semestres={"X000000005": (8.41, 7.95)},
-                             examens={"X000000005": (8.72, 6.05)})
-    ev.importer(f.conn, [fic])
-    f.aller_a("محاضر نهاية الأسدوس")
-    d = f.page_deliberations
-    d.periode.setCurrentIndex(d.periode.findData("S2"))
-    d.classe.setCurrentIndex(d.classe.findText("6APG-1"))
-    assert d.table.rowCount() == 1 and d.table.item(0, 2).text() == "7.78" and d.table.item(0, 5).text() == "ينتقل"
-    d.table.setItem(0, 7, QTableWidgetItem("التعليم الإعدادي"))
-    assert d.generer_classe(), d.message.text()
-    d.niveau.setCurrentIndex(d.niveau.findData("6AP"))
-    assert d.generer_niveau(), d.message.text()
     f.close()
 
 
@@ -1713,7 +1699,7 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     # البحث
     assert f.filtrer_nav("رخص") == ["الرخص"] and not f.boutons[i].isHidden()
     assert all(b.isHidden() for k, b in enumerate(f.boutons) if k != i)
-    assert {"محاضر نهاية الأسدوس", "مجالس الأقسام"} <= set(f.filtrer_nav("محضر"))
+    assert "مجالس الأقسام" in set(f.filtrer_nav("محضر")) and "محاضر نهاية الأسدوس" not in f.pages
     assert f.filtrer_nav("كلمة غير موجودة") == [] and not f.aucun_resultat.isHidden()
     f.recherche.setText("الامتحان")
     f.ouvrir_premier_resultat()

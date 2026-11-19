@@ -59,7 +59,7 @@ from idara.ui.page_communication import PageCommunication
 from idara.ui.page_registre import PageRegistres
 from idara.ui.rihab import BandeauPage, PageRahba
 from idara.ui.page_pv_rh import PagePvRh
-from idara.ui.page_examen import PageDeliberations, PageExamen
+from idara.ui.page_examen import PageExamen
 from idara.ui.page_conges import PageConges, PageSortants
 from idara.ui.zellige import BandeZellige, FondZellige, LogoMarque
 
@@ -548,8 +548,8 @@ SECTIONS = [
                                 ("البنية المادية", "البنية المادية"),
                                 ("الوثائق القانونية للجمعيات", "الوثائق القانونية للجمعيات")]),
     ("التقييم", [("المراقبة المستمرة", "المراقبة المستمرة"), ("الامتحان", "الامتحان"),
-                 ("استثمار النتائج", "استثمار النتائج"), ("مجالس الأقسام", "المحاضر: مجالس الأقسام"),
-                 ("محاضر نهاية الأسدوس", "المحاضر: نهاية الأسدوس")]),
+                 ("استثمار النتائج", "استثمار النتائج"), ("مجالس الأقسام", "المحاضر: مجالس الأقسام")]),
+    # طلب المدير 2026-11-19: حُذفت «محاضر نهاية الأسدوس» لأنها متضمنة في محاضر مجالس الأقسام
     ("مشروع المؤسسة", [("مشروع المؤسسة", "تتبع مشروع المؤسسة المندمج"),
                        ("فريق القيادة", "فريق القيادة ومحاضر المشروع")]),
     ("تسليم المهام", [("تسليم المهام", "تسليم المهام")]),
@@ -681,10 +681,10 @@ def normaliser_recherche(t: str) -> str:
 MOTS_CLES = {"ملفات الأساتذة": "طلب إرسال ملف إداري تربوي أستاذ التحاق مغادرة",
              "بطاقة التلميذ": "مسار تطور مستوى رائز قبلي بعدي مراحل مبيان tarl isa",
              "الرخص": "إجازة رخصة مرض ولادة رضاعة", "الموارد البشرية": "أساتذة أستاذ موظفين أطر xml",
-             "محاضر نهاية الأسدوس": "محضر مداولات نتائج نقط", "الامتحان": "امتحان موحد إشهادي سادس",
+             "الامتحان": "امتحان موحد إشهادي سادس",
              "التلاميذ": "تلميذ بحث شهادة مدرسية وثائق", "الاستيراد من مسار": "مسار لوائح استيراد",
              "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "تتبع الغياب": "غياب متغيبون نسبة", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
-             "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون", "مجالس الأقسام": "مجلس قسم محضر",
+             "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون", "مجالس الأقسام": "مجلس قسم محضر مداولات نتائج نقط نهاية الأسدوس",
              "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص",
              "الدعم التربوي": "دعم متعثرين تعثر معالجة سجل",
              "مشروع المؤسسة": "مشروع مؤشرات عمليات خطة العمل مسار حصيلة",
@@ -772,7 +772,6 @@ class FenetrePrincipale(QMainWindow):
         from idara.ui.page_dossier_prof import PageDossierProf
         self.page_dossier_prof = PageDossierProf(self)
         self.page_tanzim = PageTanzim(self)
-        self.page_deliberations = PageDeliberations(self)
         self.page_examen = PageExamen(self)
         self.page_rh = PagePersonnel(self)
         self.page_conges = PageConges(self)
@@ -822,7 +821,7 @@ class FenetrePrincipale(QMainWindow):
                       "لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves, "بطاقة التلميذ": self.page_fiche_eleve, "ملفات الأساتذة": self.page_dossier_prof,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
-                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "نتائج الريادة": self.page_resultats_pionniere, "تواصل الريادة": self.page_comm_pionniere, "مؤشرات الريادة": self.page_ind_pionniere, "مفكرة المدير": self.page_memo, "التواصل": self.page_contact, "التنظيم التربوي": self.page_tanzim, "محاضر نهاية الأسدوس": self.page_deliberations,
+                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "نتائج الريادة": self.page_resultats_pionniere, "تواصل الريادة": self.page_comm_pionniere, "مؤشرات الريادة": self.page_ind_pionniere, "مفكرة المدير": self.page_memo, "التواصل": self.page_contact, "التنظيم التربوي": self.page_tanzim,
                       "الامتحان": self.page_examen, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,

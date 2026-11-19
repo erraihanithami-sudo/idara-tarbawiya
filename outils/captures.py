@@ -377,8 +377,6 @@ def main(sortie: Path) -> None:
     photo(f, "45_tanzim_tarbawi")
     f.aller_a("الامتحان")
     photo(f, "46_examen")
-    f.aller_a("محاضر نهاية الأسدوس")
-    photo(f, "47_deliberations")
     # المظاهر والصفحات الجديدة (اقتراح المدير 2026-11-06)
     for nom in ("marine", "violet", "classique", "maghribi"):
         f.appliquer_theme(nom)
