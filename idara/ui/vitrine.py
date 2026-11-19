@@ -325,6 +325,7 @@ def boutons_ligne(specs) -> QWidget:
                             f"QPushButton#boutonCouleur:disabled {{ background: #B0BEC5; }}")
         b.setIconSize(QSize(14, 14))
         b.setFixedHeight(30)
+        b.setMinimumWidth(b.fontMetrics().horizontalAdvance(texte) * 115 // 100 + 46)   # لا يُقص النص
         b.setCursor(Qt.PointingHandCursor)
         b.clicked.connect(lambda _=False, f=fn: f())
         h.addWidget(b)
@@ -335,12 +336,13 @@ def boutons_ligne(specs) -> QWidget:
 def ajuster_colonne_actions(table, col: int) -> None:
     """عرض عمود الأزرار على قدر أوسع مجموعة، وارتفاع الأسطر يكفيها."""
     from PySide6.QtWidgets import QHeaderView
+    from PySide6.QtWidgets import QPushButton
     larg = 0
     for i in range(table.rowCount()):
         w = table.cellWidget(i, col)
         if w is not None:
-            w.adjustSize()
-            larg = max(larg, w.sizeHint().width())
+            bs = w.findChildren(QPushButton)
+            larg = max(larg, sum(b.minimumWidth() for b in bs) + 6 * max(0, len(bs) - 1) + 8)
     if larg:
         table.horizontalHeader().setSectionResizeMode(col, QHeaderView.Fixed)
         table.setColumnWidth(col, larg + 8)
