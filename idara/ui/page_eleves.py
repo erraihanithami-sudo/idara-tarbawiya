@@ -362,7 +362,23 @@ class PageEleves(QWidget):
         self.barre_unites = BarreUnites(lambda: self.f.conn, lambda _u: self.chercher(self.recherche.text()))
         cv.addWidget(self.barre_unites)
         cv.addWidget(self.recherche)
-        self.resultats = tableau(["الرمز", "الاسم", "القسم", "الوضعية"])
+        # التصفية حسب المستويات ثم الأقسام (طلب المدير 2026-11-19)
+        self.f_niveau: str | None = None
+        self.f_classe: str | None = None
+        self.barre_niveaux = QHBoxLayout()
+        self.barre_niveaux.setSpacing(6)
+        cv.addLayout(self.barre_niveaux)
+        self.barre_classes = QHBoxLayout()
+        self.barre_classes.setSpacing(6)
+        cv.addLayout(self.barre_classes)
+        self.pilules_niveaux: dict = {}
+        self.pilules_classes: dict = {}
+        self.resultats = tableau(["الرمز", "الاسم", "المستوى", "القسم", "الوضعية"], etirer=4)
+        hh = self.resultats.horizontalHeader()
+        hh.setSectionResizeMode(hh.ResizeMode.Interactive)
+        hh.setStretchLastSection(True)
+        for j, w in enumerate((130, 270, 150, 110)):
+            self.resultats.setColumnWidth(j, w)
         self.resultats.setSelectionMode(self.resultats.SelectionMode.ExtendedSelection)
         self.resultats.itemSelectionChanged.connect(self._selection)
         self.resultats.itemDoubleClicked.connect(lambda _: self.ouvrir_fiche())
@@ -486,15 +502,75 @@ class PageEleves(QWidget):
         if self.eleve_id:
             self.afficher(self.eleve_id)
 
+    def _niveaux(self) -> dict[str, str]:
+        if not hasattr(self, "_lib_niveaux"):
+            self._lib_niveaux = {r["code"]: r["libelle_ar"] for r in
+                                 self.f.conn.execute("SELECT code, libelle_ar FROM niveau ORDER BY ordre")}
+        return self._lib_niveaux
+
+    def _pilule(self, texte: str, actif: bool, fn) -> QPushButton:
+        b = QPushButton(texte)
+        b.setObjectName("pilule")
+        b.setCheckable(True)
+        b.setChecked(actif)
+        b.setCursor(Qt.PointingHandCursor)
+        b.clicked.connect(fn)
+        return b
+
+    def _vider(self, lay) -> None:
+        while lay.count():
+            it = lay.takeAt(0)
+            if it.widget() is not None:
+                it.widget().deleteLater()
+
+    def _barres_filtre(self, tous) -> None:
+        """أزرار المستويات (ما له تلاميذ)، ثم أقسام المستوى المختار."""
+        libs = self._niveaux()
+        niveaux = [k for k in libs if any(r["niveau"] == k for r in tous)]
+        self._vider(self.barre_niveaux)
+        self.pilules_niveaux = {}
+        self.barre_niveaux.addWidget(QLabel("المستوى:"))
+        for k in [None, *niveaux]:
+            b = self._pilule("كل المستويات" if k is None else libs[k], k == self.f_niveau,
+                             lambda _=False, x=k: self.filtrer_niveau(x))
+            self.pilules_niveaux[k] = b
+            self.barre_niveaux.addWidget(b)
+        self.barre_niveaux.addStretch()
+        classes = sorted({r["classe"] for r in tous if r["classe"]
+                          and (self.f_niveau is None or r["niveau"] == self.f_niveau)})
+        self._vider(self.barre_classes)
+        self.pilules_classes = {}
+        self.barre_classes.addWidget(QLabel("القسم:"))
+        for k in [None, *classes]:
+            b = self._pilule("كل الأقسام" if k is None else k, k == self.f_classe,
+                             lambda _=False, x=k: self.filtrer_classe(x))
+            self.pilules_classes[k] = b
+            self.barre_classes.addWidget(b)
+        self.barre_classes.addStretch()
+
+    def filtrer_niveau(self, k: str | None) -> None:
+        self.f_niveau, self.f_classe = k, None
+        self.chercher(self.recherche.text())
+
+    def filtrer_classe(self, k: str | None) -> None:
+        self.f_classe = k
+        self.chercher(self.recherche.text())
+
     def chercher(self, texte: str) -> None:
         u = self.barre_unites.unite if hasattr(self, "barre_unites") else None
-        lignes = el.rechercher(self.f.conn, texte, unite=u, limite=60 if texte.strip() else 2000)
+        tous = el.rechercher(self.f.conn, texte, unite=u, limite=60 if texte.strip() else 2000)
+        if hasattr(self, "barre_niveaux"):
+            self._barres_filtre(tous)
+        fn, fc = getattr(self, "f_niveau", None), getattr(self, "f_classe", None)
+        lignes = [r for r in tous if (fn is None or r["niveau"] == fn) and (fc is None or r["classe"] == fc)]
+        libs = self._niveaux()
         self.resultats.setRowCount(len(lignes))
         for i, r in enumerate(lignes):
-            for j, v in enumerate([r["code_massar"], el.nom_complet(r), r["classe"] or "—",
-                                   el.STATUTS.get(r["statut"], "غير مسجل")]):
+            for j, v in enumerate([r["code_massar"], el.nom_complet(r), libs.get(r["niveau"], "—"),
+                                   r["classe"] or "—", el.STATUTS.get(r["statut"], "غير مسجل")]):
                 self.resultats.setItem(i, j, cellule(v, r["id"]))
         portee = f" · {u}" if u else ""
+        portee += f" · {fc}" if fc else (f" · {libs.get(fn, fn)}" if fn else "")
         self.nb.setText(f"{len(lignes)} نتيجة{portee}" if texte.strip() else
                         f"تلاميذ السنة الجارية{portee}: {len(lignes)}")
 

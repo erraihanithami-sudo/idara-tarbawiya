@@ -257,6 +257,17 @@ def test_page_eleves_recherche_et_documents(app, config_tmp, monkeypatch):
     f.aller_a("التلاميذ")
     p = f.page_eleves
     assert p.resultats.rowCount() == 5 and p.c_fiche.isHidden()
+    # طلب المدير 2026-11-19: تصفية حسب المستويات والأقسام، وعمود الاسم بعرض معقول
+    assert p.resultats.columnCount() == 5 and p.resultats.columnWidth(1) <= 300 and len(p.pilules_niveaux) >= 2
+    niv = next(k for k in p.pilules_niveaux if k)
+    p.filtrer_niveau(niv)
+    n_niv = p.resultats.rowCount()
+    assert 0 < n_niv <= 5 and p.pilules_niveaux[niv].isChecked() and len(p.pilules_classes) >= 2
+    cl = next(k for k in p.pilules_classes if k)
+    p.filtrer_classe(cl)
+    assert all(p.resultats.item(i, 3).text() == cl for i in range(p.resultats.rowCount()))
+    p.filtrer_niveau(None)
+    assert p.resultats.rowCount() == 5
     p.recherche.setText("يوسف")
     assert p.resultats.rowCount() == 1
     __import__("idara.ui.saisie", fromlist=["x"]).selectionner(p.resultats, 0)
