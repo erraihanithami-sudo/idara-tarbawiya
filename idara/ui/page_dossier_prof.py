@@ -65,8 +65,8 @@ class PageDossierProf(QWidget):
         self.pids: list[int] = []
 
         # ---- نافذة المراسلة ----
-        w = QWidget()
-        racine_f = QVBoxLayout(w)
+        self.w_fiche = QWidget()
+        racine_f = QVBoxLayout(self.w_fiche)
         racine_f.setSpacing(12)
         c, v = carte("المراسلة")
         self.sens = QComboBox()
@@ -126,7 +126,7 @@ class PageDossierProf(QWidget):
         self.message_fiche.setWordWrap(True)
         self.message_fiche.hide()
         racine_f.addWidget(self.message_fiche)
-        self.fiche = FenetreFiche(self, "مراسلة ملف أستاذ", "", w, largeur=920)
+        self.fiche = FenetreFiche(self, "مراسلة ملف أستاذ", "", self.w_fiche, largeur=920)
         self.rafraichir()
         self._sens()
 
