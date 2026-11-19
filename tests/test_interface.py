@@ -2648,6 +2648,39 @@ def test_editeur_de_documents(app, config_tmp, monkeypatch, tmp_path):
     img = tmp_path / "صورة.png"
     __import__("PySide6.QtGui", fromlist=["x"]).QImage(40, 30, __import__("PySide6.QtGui", fromlist=["x"]).QImage.Format_RGB32).save(str(img))
     assert e2.inserer_image(img)
+    # طلب المدير 2026-11-19 «أريد مثل هذا المحرر»: شريط بتبويبات ومجموعات، مسطرة، شريط حالة، أدوات Word
+    assert list(e2.onglets) == ["الصفحة الرئيسية", "إدراج", "تخطيط الصفحة", "عرض"] and not e2.regle.isHidden()
+    e2.choisir_onglet(2)
+    assert e2.pile_ruban.currentIndex() == 2 and e2.onglets["تخطيط الصفحة"].isChecked()
+    e2.b_simple.setChecked(True)
+    assert e2.pile_ruban.isHidden()
+    e2.choisir_onglet(0)
+    assert not e2.pile_ruban.isHidden() and not e2.b_simple.isChecked()
+    e2.edit.selectAll()
+    e2.position_texte(True)
+    assert e2.edit.textCursor().charFormat().verticalAlignment() == e2.edit.textCursor().charFormat().VerticalAlignment.AlignSuperScript
+    e2.position_texte(True)
+    c = e2.edit.textCursor()
+    c.movePosition(c.MoveOperation.Start)
+    e2.edit.setTextCursor(c)
+    e2.appliquer_style("عنوان 1")
+    assert e2.edit.textCursor().blockFormat().headingLevel() == 1
+    e2.direction(False)
+    assert e2.edit.textCursor().blockFormat().layoutDirection() == Qt.LeftToRight
+    e2.inserer_symbole("☑")
+    assert "☑" in e2.edit.toPlainText()
+    larg = e2.largeur_contenu
+    e2.orientation(True)
+    assert e2.page.paysage and e2.largeur_contenu > larg and e2.b_paysage.isChecked()
+    assert e2.imprimante(tmp_path / "p.pdf").pageLayout().orientation().name == "Landscape"
+    e2.orientation(False)
+    e2.marges(12.7)
+    assert e2.largeur_contenu >= larg and e2.page.marges_mm == (12.7,) * 4
+    e2._maj_barre_etat()
+    assert "كلمة" in e2.barre_etat.l_mots.text() and e2.barre_etat.l_page.text().startswith("الصفحات")
+    e2.b_regle.click()
+    assert e2.regle.isHidden()
+    assert not e2.regle.grab().isNull() and not e2.outils.grab().isNull()
     e2.b_modifier.click()
     assert e2.vue.n >= 2   # فاصل الصفحات
     # وثيقة لا يفهمها المحرر: تُفتح خارجياً بدل رسالة خطأ

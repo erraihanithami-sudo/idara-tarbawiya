@@ -598,6 +598,13 @@ def main(sortie: Path) -> None:
         f.page_logements.ouvrir_points(_c)
         photo(f.page_logements.fiche_points, "91b_logements_points")
         f.page_logements.fiche_points.hide()
+        _e = f.ouvrir_document(_lg.generer(f.conn, f.dossier, "demande", _c))
+        if _e is not None:
+            _e.basculer_edition(True)
+            photo(f, "92_editeur_ruban")
+            _e.choisir_onglet(2)
+            photo(f, "92b_editeur_mise_en_page")
+            f.fermer_document()
     except Exception as _e:  # noqa: BLE001
         import traceback
         traceback.print_exc()

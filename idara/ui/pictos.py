@@ -249,7 +249,7 @@ MOTS = [
 ]
 
 # أزرار لها مظهرها الخاص (حبوب التنقل، الشريط الجانبي، أدوات التنسيق...) لا تُمس.
-EXCLUS = {"boutonCouleur", "puceRahba", "pilule", "navSection", "navPage", "danger", "puce", "carteAction", "lien", "navSous", "nav",
+EXCLUS = {"boutonCouleur", "onglet", "puceRahba", "pilule", "navSection", "navPage", "danger", "puce", "carteAction", "lien", "navSous", "nav",
           "navQuitter", "boutonAnnee", "sousnav", "navigation", "rechercheNav"}
 ZONES_EXCLUES = {"barreLaterale", "bandeauPage", "bandeauArchive"}
 FORMATAGE = {"غامق", "تسطير", "يمين", "وسط", "يسار", "تكبير الخط", "تصغير الخط", "تراجع", "إعادة"}
