@@ -44,6 +44,18 @@ def ouvrir_externe(chemin: Path) -> None:
     """يفتح الملف بالبرنامج المرتبط به على الحاسوب (لتعديل القوالب، ولما لا يفهمه المحرر)."""
     chemin = Path(chemin)
     finir(chemin)
+    # بلاغ المدير 2026-11-19: os.startfile من داخل نافذة Qt كان يُسقط البرنامج عند بعض المستعملين؛ Qt يفتح الملف
+    # بالبرنامج المرتبط به بطريقة آمنة. os.startfile يبقى احتياطاً فقط.
+    try:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtWidgets import QApplication
+        if QApplication.instance() is not None:
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(chemin))):
+                raise OSError("لا يوجد برنامج مرتبط بهذا النوع من الملفات على الحاسوب.")
+            return
+    except ImportError:
+        pass
     if sys.platform == "win32":
         os.startfile(str(chemin))  # noqa: S606
     else:

@@ -2320,6 +2320,53 @@ def test_editeur_de_documents(app, config_tmp, monkeypatch, tmp_path):
     assert e2.imprimante(tmp_path / "x.pdf").pageLayout().orientation().name == "Portrait"
     e2.ouvrir_externe()
     assert externes == [p]
+    # بلاغ المدير 2026-11-19: الفتح ببرنامج الحاسوب لا يُسقط البرنامج مهما كان الخطأ
+    def panne(_p):
+        raise RuntimeError("عطب في برنامج الحاسوب")
+    monkeypatch.setattr(bureautique, "ouvrir_externe", panne)
+    e2.ouvrir_externe()
+    assert "تعذر فتح الملف" in e2.message.text()
+    monkeypatch.setattr(bureautique, "ouvrir_externe", lambda p: externes.append(p))
+    # المعاينة: صفحات بعرض الشاشة، والتكبير والتصغير
+    assert not e2.zone.isHidden() and e2.vue.n >= 1 and e2.l_pages.text()
+    z = e2.vue.zoom
+    e2.zoomer(1.15)
+    assert abs(e2.vue.zoom - z * 1.15) < 0.01 and e2.mode_zoom == "fixe"
+    e2.c_zoom.setCurrentText("الصفحة كاملة")
+    assert e2.mode_zoom == "page"
+    e2.c_zoom.setCurrentText("150%")
+    assert abs(e2.vue.zoom - 1.5) < 0.01
+    # المحرر المطوَّر: جدول، قائمة، تباعد، بحث واستبدال، إبراز، فاصل صفحات، تاريخ
+    e2.b_modifier.click()
+    assert e2.zone.isHidden() and not e2.fond.isHidden()
+    c = e2.edit.textCursor()
+    c.movePosition(c.MoveOperation.End)
+    e2.edit.setTextCursor(c)
+    t = e2.inserer_tableau(2, 3)
+    assert t.rows() == 2 and t.columns() == 3
+    c = e2.edit.textCursor()
+    c.movePosition(c.MoveOperation.End)
+    e2.edit.setTextCursor(c)
+    e2.edit.insertPlainText("سطر للتجربة")
+    e2.liste(__import__("PySide6.QtGui", fromlist=["x"]).QTextListFormat.ListDecimal)
+    assert e2.edit.textCursor().currentList() is not None
+    e2.interligne(1.5)
+    assert e2.edit.textCursor().blockFormat().lineHeight() == 150
+    r = e2.rechercher()
+    r.cherche.setText("سطر للتجربة")
+    r.remplace.setText("سطر مستبدل")
+    assert r.tout_remplacer() == 1 and "سطر مستبدل" in e2.edit.toPlainText()
+    r.close()
+    e2.edit.selectAll()
+    e2.surligner(__import__("PySide6.QtGui", fromlist=["x"]).QColor("#FFEB3B"))
+    e2.couleur_texte(__import__("PySide6.QtGui", fromlist=["x"]).QColor("#1565C0"))
+    e2.saut_page()
+    e2.inserer_date()
+    img = tmp_path / "صورة.png"
+    __import__("PySide6.QtGui", fromlist=["x"]).QImage(40, 30, __import__("PySide6.QtGui", fromlist=["x"]).QImage.Format_RGB32).save(str(img))
+    assert e2.inserer_image(img)
+    e2.b_modifier.click()
+    assert e2.vue.n >= 2   # فاصل الصفحات
     # وثيقة لا يفهمها المحرر: تُفتح خارجياً بدل رسالة خطأ
     faux = tmp_path / "تالف.docx"
     faux.write_bytes(b"ceci n'est pas un docx")
