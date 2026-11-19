@@ -210,7 +210,15 @@ def _sortie(p):   # مغادر: سهم يخرج من الباب
     p.drawPolyline(QPolygonF([QPointF(16.5, 8), QPointF(20.5, 12), QPointF(16.5, 16)]))
 
 
+def _maison(p):   # السكن: بيت بسقف وباب ونافذة
+    p.drawPolyline(QPolygonF([QPointF(3, 11.5), QPointF(12, 4), QPointF(21, 11.5)]))
+    p.drawPolyline(QPolygonF([QPointF(5.5, 9.8), QPointF(5.5, 20), QPointF(18.5, 20), QPointF(18.5, 9.8)]))
+    p.drawPolyline(QPolygonF([QPointF(10, 20), QPointF(10, 14.5), QPointF(14, 14.5), QPointF(14, 20)]))
+    p.drawLine(QPointF(16.5, 4.8), QPointF(16.5, 7.6))
+
+
 DESSINS = {
+    "maison": _maison,
     "pause": _pause, "interdit": _interdit, "absent": _absent, "entree": _entree, "sortie": _sortie,
     "ajouter": _plus, "enregistrer": _disque, "imprimer": _imprimante, "document": _document, "pdf": _pdf,
     "image": _image, "importer": _importer, "exporter": _exporter, "chercher": _loupe, "modifier": _crayon,

@@ -590,6 +590,14 @@ def main(sortie: Path) -> None:
         photo(f.page_conseils_etab, "89_conseils_liste")
         f.aller_a("الموارد البشرية")
         photo(f, "90_personnel_triangles")
+        from idara.services import logements as _lg
+        _l = _lg.enregistrer_logement(f.conn, _lg.Logement("سكن الوحدة المركزية", "77/1", nature="صلب"))
+        _c = _lg.enregistrer_concours(f.conn, _lg.Concours(_l, _d.today().isoformat(), "", "", rural=True))
+        f.aller_a("السكنيات")
+        photo(f, "91_logements")
+        f.page_logements.ouvrir_points(_c)
+        photo(f.page_logements.fiche_points, "91b_logements_points")
+        f.page_logements.fiche_points.hide()
     except Exception as _e:  # noqa: BLE001
         import traceback
         traceback.print_exc()

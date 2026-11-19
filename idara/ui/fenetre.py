@@ -545,7 +545,7 @@ SECTIONS = [
                                 ("جمعية دعم مدرسة النجاح", "جمعية دعم مدرسة النجاح"),
                                 ("الصرف", "الصرف: سند الطلب والاتفاقية"), ("الجمعية الرياضية", "الجمعية الرياضية"),
                                 ("جمعية تنمية التعاون المدرسي", "جمعية تنمية التعاون المدرسي"),
-                                ("البنية المادية", "البنية المادية"),
+                                ("البنية المادية", "البنية المادية"), ("السكنيات", "تدبير السكنيات"),
                                 ("الوثائق القانونية للجمعيات", "الوثائق القانونية للجمعيات")]),
     ("التقييم", [("المراقبة المستمرة", "المراقبة المستمرة"), ("الامتحان", "الامتحان"),
                  ("استثمار النتائج", "استثمار النتائج"), ("مجالس الأقسام", "المحاضر: مجالس الأقسام")]),
@@ -691,6 +691,7 @@ MOTS_CLES = {"ملفات الأساتذة": "طلب إرسال ملف إداري
              "محاضر الموارد البشرية": "محضر التحاق دخول خروج توقيع",
              "تسليم المهام": "محضر تسليم المهام المدير الجديد السابق مفاتيح أختام بنايات",
              "الجرد": "جرد ممتلكات تجهيزات سجل الجرد فاتورة محو",
+             "السكنيات": "سكن سكنية مسكن إداري وظيفي تباري إسناد نقط مذكرة 40 معاينة إفراغ",
              "البنية المادية": "حجرات مباني ملاعب مراحيض مرافق صحية بنايات إعاقة",
              "أولياء الأمور": "ولي الأب الأم هاتف وصاية آباء",
              "السبورة المرجعية": "سبورة لوحات بطاقة معلومات المؤسسة خلايا يقظة إنصات استعمال الزمن الجماعي",
@@ -763,6 +764,8 @@ class FenetrePrincipale(QMainWindow):
         self.page_resultats_pionniere = PageResultatsPionniere(self)
         self.page_comm_pionniere = PageCommunicationPionniere(self)
         self.page_ind_pionniere = PageIndicateursPionniere(self)
+        from idara.ui.page_logements import PageLogements
+        self.page_logements = PageLogements(self)
         from idara.ui.page_contact import PageContact
         from idara.ui.page_memo import PageMemo
         self.page_memo = PageMemo(self)
@@ -821,7 +824,7 @@ class FenetrePrincipale(QMainWindow):
                       "لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves, "بطاقة التلميذ": self.page_fiche_eleve, "ملفات الأساتذة": self.page_dossier_prof,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
-                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "نتائج الريادة": self.page_resultats_pionniere, "تواصل الريادة": self.page_comm_pionniere, "مؤشرات الريادة": self.page_ind_pionniere, "مفكرة المدير": self.page_memo, "التواصل": self.page_contact, "التنظيم التربوي": self.page_tanzim,
+                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "نتائج الريادة": self.page_resultats_pionniere, "تواصل الريادة": self.page_comm_pionniere, "مؤشرات الريادة": self.page_ind_pionniere, "مفكرة المدير": self.page_memo, "السكنيات": self.page_logements, "التواصل": self.page_contact, "التنظيم التربوي": self.page_tanzim,
                       "الامتحان": self.page_examen, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,
@@ -1004,6 +1007,10 @@ class FenetrePrincipale(QMainWindow):
                 for page, lib in fils:
                     sb = BoutonSous(lib if page in self.pages else f"{lib}  ·  قريباً")
                     sb.setCursor(Qt.PointingHandCursor)
+                    from idara.ui.rihab import ICONES_PAGES
+                    if page in ICONES_PAGES:
+                        from idara.ui import pictos as _pc
+                        sb.setIcon(_pc.icone(ICONES_PAGES[page], "#C9A04A", 18))
                     sb.clicked.connect(lambda _=False, page=page: self.aller_a(page))
                     self.groupe.addButton(sb)
                     self.boutons_pages[page] = sb

@@ -67,6 +67,7 @@ DESCRIPTIONS = {
     "الجمعية الرياضية": "مالية الجمعية الرياضية وسجلاتها.",
     "جمعية تنمية التعاون المدرسي": "مالية التعاونية وسجلاتها.",
     "البنية المادية": "الحجرات والمرافق لكل وحدة مدرسية.",
+    "السكنيات": "السكنيات الإدارية والوظيفية: التباري ونقط المترشحين ومطبوعات المذكرة 40.",
     "الوثائق القانونية للجمعيات": "تجديد المكاتب ومحاضر الجموع العامة.",
     "المراقبة المستمرة": "تتبع فروض المراقبة المستمرة.",
     "الامتحان": "الامتحان الموحد: القاعات والحراسة والمحاضر.",
@@ -80,6 +81,9 @@ DESCRIPTIONS = {
     "الوثائق": "نماذج الوثائق وتخصيصها.",
     "دليل الاستخدام": "جولة مصورة وخطوات البداية.",
 }
+
+# أيقونة معبرة لبعض الصفحات (طلب المدير 2026-11-19: تدبير السكنيات «مع الأيقونة المناسبة»)
+ICONES_PAGES = {"السكنيات": "maison"}
 
 SOUS_SECTIONS = {
     "القيادة والتدبير": "نظرة شاملة على المؤسسة: المؤشرات، البرنامج السنوي، المجالس، والسبورة المرجعية.",
@@ -157,7 +161,15 @@ class CarteAction(QFrame):
         h = QHBoxLayout(self)
         h.setContentsMargins(16, 12, 14, 12)
         h.setSpacing(14)
-        h.addWidget(Glyphe(couleur, forme), 0, Qt.AlignTop)
+        if forme.startswith("picto:"):   # أيقونة معبرة لصفحة بعينها (السكنيات: بيت)
+            from idara.ui import pictos
+            ic = QLabel()
+            ic.setPixmap(pictos.pastille(forme[6:], couleur, 44))
+            ic.setFixedSize(44, 44)
+            ic.setAttribute(Qt.WA_TransparentForMouseEvents)
+            h.addWidget(ic, 0, Qt.AlignTop)
+        else:
+            h.addWidget(Glyphe(couleur, forme), 0, Qt.AlignTop)
         v = QVBoxLayout()
         v.setSpacing(2)
         self.l_titre = QLabel(titre)
@@ -321,7 +333,8 @@ class PageRahba(QWidget):
         c = couleur_section(section)
         self.cartes: dict[str, CarteAction] = {}
         for page, lib in fils:
-            k = CarteAction(lib, DESCRIPTIONS.get(page, ""), c)
+            k = CarteAction(lib, DESCRIPTIONS.get(page, ""), c,
+                            forme=f"picto:{ICONES_PAGES[page]}" if page in ICONES_PAGES else "etoile")
             k.clique.connect(lambda page=page: self.f.aller_a(page))
             self.cartes[page] = self.galerie.ajouter(k)
         racine.addWidget(self.galerie)

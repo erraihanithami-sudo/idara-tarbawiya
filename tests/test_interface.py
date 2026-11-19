@@ -1247,6 +1247,79 @@ def test_mofakkira_et_contact(app, config_tmp, monkeypatch):
     f.close()
 
 
+def test_page_logements(app, config_tmp, monkeypatch):
+    """طلب المدير 2026-11-19: تدبير السكنيات حسب المذكرة 40: سكن، تباري، نقط، مطبوعات (معاينة، تعديل، طبع)."""
+    from PySide6.QtWidgets import QPushButton
+    from idara.services import logements as lg
+    from idara.services import personnel as rh
+    f = _fenetre_avec_eleves(config_tmp)
+    ouverts = []
+
+    class Faux:
+        def __init__(self):
+            self.mode = "apercu"
+
+        def basculer_edition(self, _):
+            self.mode = "modifier"
+
+        def imprimer(self):
+            self.mode = "imprimer"
+    editeurs = []
+
+    def ouvrir(c):
+        ouverts.append(c)
+        e = Faux()
+        editeurs.append(e)
+        return e
+    monkeypatch.setattr(f, "ouvrir_document", ouvrir)
+    pid = rh.enregistrer(f.conn, rh.Personnel(nom_ar="الوهمي", prenom_ar="أستاذ", sexe="M", ppr="1234567",
+                                              grade="الدرجة الأولى", date_recrutement="2004-09-16"))
+    f.aller_a("السكنيات")
+    p = f.page_logements
+    assert f.page_courante() == "السكنيات" and p.t_docs.rowCount() == 9 and p.t_logements.isHidden()
+    # كل مطبوع: معاينة، تعديل، طبع؛ وغير المرفق بالمذكرة معطل
+    b = {x.text(): x for x in p.t_docs.cellWidget(0, 3).findChildren(QPushButton)}
+    assert set(b) == {"معاينة", "تعديل", "طبع"} and all(x.isEnabled() for x in b.values())
+    r6 = [p.t_docs.item(i, 0).data(Qt.UserRole) for i in range(9)].index("carte1")
+    assert not any(x.isEnabled() for x in p.t_docs.cellWidget(r6, 3).findChildren(QPushButton))
+    assert p.document("demande", "apercu") and len(ouverts) == 1
+    assert p.document("constat", "modifier") and editeurs[-1].mode == "modifier"
+    assert p.document("engagement_droit", "imprimer") and editeurs[-1].mode == "imprimer"
+    d = p.ouvrir_logement()
+    assert d.isVisible()
+    assert p.enregistrer_logement() is None and "عنوان السكن" in p.m_logement.text()
+    p.l_adresse.setText("سكن الوحدة المركزية")
+    p.l_numero.setText("77/1")
+    lid = p.enregistrer_logement()
+    assert lid and not d.isVisible() and p.t_logements.rowCount() == 1 and p.cartes["vacants"].chiffre.text() == "1"
+    d = p.ouvrir_concours(logement_id=lid)
+    assert d.isVisible() and p.c_logement.currentData() == lid
+    p.c_limite.definir("2026-12-30")
+    cid = p.enregistrer_concours()
+    assert cid and p.t_concours.rowCount() == 1 and p.cartes["ouverts"].chiffre.text() == "1"
+    d = p.ouvrir_points(cid)
+    assert d.isVisible() and p.p_concours.currentData() == cid
+    p.p_personne.setCurrentIndex(p.p_personne.findData(pid))
+    assert p.p_echelle.currentData() == "11" and p.p_ag.value() >= 21
+    p.p_situation.setCurrentIndex(p.p_situation.findData("marie"))
+    p.p_enfants.setValue(2)
+    p.p_conjoint.setChecked(True)
+    p.p_rend.setCurrentIndex(p.p_rend.findData("tres_bien"))
+    attendu = lg.points(p.donnees(), p._rural())["total"]
+    assert p.total == attendu and str(attendu) in p.l_total.text()
+    assert p.enregistrer_candidat() and p.t_classement.rowCount() == 1
+    assert p.attribuer(pid) and lg.concours(f.conn, cid).statut == "attribue"
+    assert p.cartes["occupes"].chiffre.text() == "1" and "أستاذ الوهمي" in p.t_logements.item(0, 4).text()
+    d.hide()
+    p.ctx_concours.setCurrentIndex(p.ctx_concours.findData(cid))
+    assert p.ctx_personne.currentData() == pid
+    n = len(ouverts)
+    assert p.document("pv") and len(ouverts) == n + 1
+    assert "1234567" in "".join(c.text for t in __import__("docx").Document(ouverts[-1]).tables
+                                for r in t.rows for c in r.cells)
+    f.close()
+
+
 def test_page_riyada_isa2_calcule(app, config_tmp, monkeypatch, tmp_path):
     """حساب ISA2 من نتائج الروائز (صيغة المدير 2026-11-12): التحميل، الإدخال اليدوي، التقرير."""
     from idara.services import bureautique
