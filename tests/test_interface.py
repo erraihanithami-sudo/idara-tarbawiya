@@ -1272,7 +1272,7 @@ def test_page_logements(app, config_tmp, monkeypatch):
         editeurs.append(e)
         return e
     monkeypatch.setattr(f, "ouvrir_document", ouvrir)
-    pid = rh.enregistrer(f.conn, rh.Personnel(nom_ar="الوهمي", prenom_ar="أستاذ", sexe="M", ppr="1234567",
+    pid = rh.enregistrer(f.conn, rh.Personnel(nom_ar="الوهمي", prenom_ar="أستاذ", sexe="M", ppr="7651234",
                                               grade="الدرجة الأولى", date_recrutement="2004-09-16"))
     f.aller_a("السكنيات")
     p = f.page_logements
@@ -1315,7 +1315,7 @@ def test_page_logements(app, config_tmp, monkeypatch):
     assert p.ctx_personne.currentData() == pid
     n = len(ouverts)
     assert p.document("pv") and len(ouverts) == n + 1
-    assert "1234567" in "".join(c.text for t in __import__("docx").Document(ouverts[-1]).tables
+    assert "7651234" in "".join(c.text for t in __import__("docx").Document(ouverts[-1]).tables
                                 for r in t.rows for c in r.cells)
     f.close()
 
