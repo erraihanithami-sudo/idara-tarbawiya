@@ -333,8 +333,7 @@ class PageCommunicationPionniere(QWidget):
         h.setContentsMargins(4, 2, 4, 2)
         h.setSpacing(6)
         for t, coul, pic, fn in (("التقرير", "#2E7D32", "document", lambda: self.rapport(rid)),
-                                 ("تعديل", "#1565C0", "modifier", lambda: self.ouvrir_rencontre(rid)),
-                                 ("حذف", "#C62828", "annuler", lambda: self.supprimer(rid))):
+                                 ("تعديل", "#1565C0", "modifier", lambda: self.ouvrir_rencontre(rid))):
             b = QPushButton(t)
             b.setObjectName("boutonCouleur")
             b.setIcon(pictos.icone(pic, "#FFFFFF", 15))
@@ -342,6 +341,10 @@ class PageCommunicationPionniere(QWidget):
                             f"padding: 4px 10px; font-weight: 700; }}")
             b.clicked.connect(fn)
             h.addWidget(b)
+        from idara.ui.composants import bouton
+        b = bouton("حذف")
+        b.clicked.connect(lambda: self.supprimer(rid))
+        h.addWidget(b)
         return w
 
     def filtrer(self, k: str) -> None:

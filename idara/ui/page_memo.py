@@ -483,8 +483,8 @@ class PageMemo(QWidget):
         self.b_coller.clicked.connect(lambda: self.enregistrer())
         self.b_fait = bouton_couleur("تم", "#2E7D32", "valider")
         self.b_fait.clicked.connect(lambda: self.marquer_fait())
-        self.b_suppr = QPushButton("حذف")
-        self.b_suppr.setObjectName("danger")
+        from idara.ui.composants import bouton
+        self.b_suppr = bouton("حذف")
         self.b_suppr.clicked.connect(lambda: self.supprimer())
         for b in (self.b_coller, self.b_fait, self.b_suppr):
             h.addWidget(b)
