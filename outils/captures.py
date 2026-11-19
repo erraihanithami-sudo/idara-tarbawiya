@@ -544,6 +544,58 @@ def main(sortie: Path) -> None:
         photo(f, "72_tableau_garde_jour")
     except Exception as e:  # noqa: BLE001
         print("garde:", repr(e))
+    # ---- طلب المدير 2026-11-19 ----
+    try:
+        from datetime import date as _d, timedelta as _td
+
+        from idara.services import memo as _mm
+        from idara.services import pionniere as _pn
+        f.aller_a("نتائج الريادة")
+        photo(f, "80_pionniere_resultats")
+        _pn.enregistrer_rencontre(f.conn, _pn.Rencontre("rencontre", _d.today().isoformat(), "نتائج المرحلة الأولى",
+                                                        "15:00", 60, 44, "عرض النتائج", "تتبع الواجبات"))
+        _pn.enregistrer_rencontre(f.conn, _pn.Rencontre("portes", (_d.today() + _td(days=9)).isoformat(),
+                                                        "الأبواب المفتوحة", invites=80))
+        f.aller_a("تواصل الريادة")
+        photo(f, "81_pionniere_communication")
+        f.page_comm_pionniere.ouvrir_rencontre(type_="rencontre")
+        photo(f.page_comm_pionniere.fiche, "81b_pionniere_rencontre_popup")
+        f.page_comm_pionniere.fiche.hide()
+        f.aller_a("مؤشرات الريادة")
+        photo(f, "82_pionniere_indicateurs")
+        for i, (suj, j, h, c) in enumerate((("زيارة المفتش التربوي", 0, "09:30", "jaune"),
+                                            ("تسليم الإحصاء السنوي للمديرية", 1, "11:00", "rose"),
+                                            ("اجتماع مجلس التدبير", 3, "15:00", "vert"),
+                                            ("تتبع ملفات الأساتذة الوافدين", 5, "", "bleu"),
+                                            ("الاتصال بجمعية الآباء", 8, "10:00", "orange"))):
+            _mm.enregistrer(f.conn, _mm.Memo(suj, (_d.today() + _td(days=j)).isoformat(), h, couleur=c))
+        f.aller_a("مفكرة المدير")
+        photo(f, "83_mofakkira")
+        f.page_memo.nouveau("rose")
+        photo(f.page_memo.fiche, "83b_mofakkira_popup")
+        f.page_memo.fiche.hide()
+        f.aller_a("التواصل")
+        photo(f, "84_contact")
+        f.aller_a("استعمالات الزمن")
+        photo(f, "85_emplois")
+        f.page_emplois.mode.setCurrentIndex(1)
+        photo(f, "85b_emplois_collectif")
+        f.aller_a("ملفات الأساتذة")
+        photo(f, "86_dossiers_profs_suivi")
+        f.aller_a("سجل الصادر")
+        f.page_sortants.ouvrir_structure()
+        photo(f.page_sortants.fiche_structure, "87_structure_direction")
+        f.page_sortants.fiche_structure.hide()
+        f.aller_a("التلاميذ")
+        photo(f, "88_eleves_filtres")
+        f.aller_a("مجالس المؤسسة")
+        photo(f.page_conseils_etab, "89_conseils_liste")
+        f.aller_a("الموارد البشرية")
+        photo(f, "90_personnel_triangles")
+    except Exception as _e:  # noqa: BLE001
+        import traceback
+        traceback.print_exc()
+        print("2026-11-19:", repr(_e))
     f.filtrer_nav("محضر")
     photo(f, "53_recherche_nav")
     f.filtrer_nav("")
