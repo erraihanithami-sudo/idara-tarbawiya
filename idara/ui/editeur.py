@@ -20,7 +20,7 @@ from pathlib import Path
 from PySide6.QtCore import QMarginsF, QPointF, QRectF, QSize, QSizeF, Qt, QUrl
 from PySide6.QtGui import (QColor, QFont, QImage, QPageLayout, QPageSize, QPainter, QPen, QPixmap, QPolygonF, QTextBlockFormat,
                            QTextCharFormat, QTextCursor, QTextDocument, QTextFormat, QTextImageFormat, QTextLength,
-                           QTextListFormat, QTextTableFormat)
+                           QTextFrameFormat, QTextListFormat, QTextTableFormat)
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
 from PySide6.QtWidgets import (QCheckBox, QColorDialog, QComboBox, QDialog, QFileDialog, QFontComboBox, QFrame,
                                QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy,
@@ -793,7 +793,7 @@ class EditeurDocument(QWidget):
             lignes, colonnes = sl.value(), sc.value()
         fmt = QTextTableFormat()
         fmt.setBorder(1)
-        fmt.setBorderStyle(QTextFormat.BorderStyle_Solid)
+        fmt.setBorderStyle(QTextFrameFormat.BorderStyle.BorderStyle_Solid)
         fmt.setCellPadding(5)
         fmt.setCellSpacing(0)
         fmt.setWidth(QTextLength(QTextLength.PercentageLength, 100))
