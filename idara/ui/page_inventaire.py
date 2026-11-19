@@ -31,8 +31,15 @@ class PageInventaire(QWidget):
                      "يُفرز السجل حسب نوع التجهيز، ويُولَّد كاملاً أو لنوع واحد، ويغذي محضر تسليم المهام.")
         self.setLayout(racine)
 
-        # ---- البطاقة ----
-        c, v = carte("تجهيز في السجل")
+        # ---- البطاقة: في نافذة منبثقة (طلب المدير 2026-11-19) ----
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        h0 = QHBoxLayout()
+        self.b_nouveau = bouton_couleur("تجهيز جديد", "#EF6C00", "ajouter", "تسجيل تجهيز في سجل الجرد")
+        self.b_nouveau.clicked.connect(lambda: self.ouvrir_nouveau())
+        h0.addWidget(self.b_nouveau)
+        h0.addStretch()
+        racine.addLayout(h0)
+        c, v = carte()
         self.titre = QLabel("تجهيز جديد")
         self.titre.setObjectName("titreCarte")
         v.addWidget(self.titre)
@@ -95,7 +102,11 @@ class PageInventaire(QWidget):
         h.addWidget(self.b_supprimer)
         h.addStretch()
         v.addLayout(h)
-        racine.addWidget(c)
+        self.message_fiche = QLabel()
+        self.message_fiche.setWordWrap(True)
+        self.message_fiche.hide()
+        v.addWidget(self.message_fiche)
+        self.fiche = FenetreFiche(self, "تجهيز في سجل الجرد", "", c, largeur=1000)
 
         # ---- السجل ----
         c, v = carte("سجل الجرد")
@@ -118,8 +129,19 @@ class PageInventaire(QWidget):
         v.addLayout(h)
         self.table = tableau(["الرقم", "تاريخ التسجيل", "وصف التجهيزات", "نوع التجهيز", "العدد", "ثمن الوحدة",
                               "المجموع", "التخصيص", "حالة الصيانة", "المحو"], etirer=2)
+        # أحجام الأعمدة على قدر محتواها (طلب المدير 2026-11-19)؛ الوصف يأخذ ما بقي
+        from PySide6.QtWidgets import QHeaderView
+        hh = self.table.horizontalHeader()
+        for j, w in enumerate((60, 105, 0, 170, 60, 100, 110, 160, 110, 150)):
+            if j == 2:
+                hh.setSectionResizeMode(j, QHeaderView.Stretch)
+            else:
+                hh.setSectionResizeMode(j, QHeaderView.Interactive)
+                self.table.setColumnWidth(j, w)
+        hh.setStretchLastSection(False)
         self.table.setMinimumHeight(380)
         self.table.itemSelectionChanged.connect(self._selection)
+        self.table.itemDoubleClicked.connect(lambda it: self.ouvrir(self.table.item(it.row(), 0).data(Qt.UserRole)))
         v.addWidget(self.table)
         h = QHBoxLayout()
         self.total = QLabel()
@@ -213,6 +235,20 @@ class PageInventaire(QWidget):
         self.decision.setText(a.radiation_decision)
         self.b_supprimer.setEnabled(True)
 
+    def ouvrir_nouveau(self):
+        self.nouveau()
+        self.message_fiche.hide()
+        self.fiche.definir_titre("تجهيز جديد في سجل الجرد")
+        self.fiche.ouvrir()
+        return self.fiche
+
+    def ouvrir(self, aid: int):
+        self.charger(aid)
+        self.message_fiche.hide()
+        self.fiche.definir_titre(self.titre.text())
+        self.fiche.ouvrir()
+        return self.fiche
+
     def nouveau(self) -> None:
         self.aid = None
         self.titre.setText("تجهيز جديد")
@@ -242,12 +278,15 @@ class PageInventaire(QWidget):
                 radiation_motif=self.motif.text(), radiation_decision=self.decision.text())
             aid = inv.enregistrer(self.f.conn, a)
         except ValueError as e:     # ErreurInventaire، أو تاريخ غير صحيح في خانة
-            message(self.message, str(e) if isinstance(e, inv.ErreurInventaire) else "أحد التواريخ غير صحيح.", True)
+            t = str(e) if isinstance(e, inv.ErreurInventaire) else "أحد التواريخ غير صحيح."
+            message(self.message, t, True)
+            message(self.message_fiche, t, True)
             return None
         self.aid = aid
         self.rafraichir()
         self.charger(aid)
         message(self.message, f"حُفظ السطر {a.numero} في سجل الجرد.")
+        message(self.message_fiche, f"حُفظ السطر {a.numero} في سجل الجرد.")
         return aid
 
     def supprimer(self, confirmer: bool | None = None) -> bool:
