@@ -1281,6 +1281,7 @@ def test_page_fiche_eleve(app, config_tmp, monkeypatch):
 
 def test_page_dossier_prof(app, config_tmp, monkeypatch):
     """طلب ملف أستاذ وإرساله من صفحة الموارد البشرية. أسماء وهمية."""
+    from PySide6.QtWidgets import QPushButton
     from idara.services import bureautique
     from idara.services import conges as cg
     ouverts = []
@@ -1300,6 +1301,32 @@ def test_page_dossier_prof(app, config_tmp, monkeypatch):
     p.table.setCurrentCell(0, 0)
     p.supprimer()
     assert p.table.rowCount() == 0
+    # طلب المدير 2026-11-19: الطلب في نافذة منبثقة، والصفحة لتتبع التوصل، مرتبطة بمحضر تسليم المهام
+    from idara.services import dossier_enseignant as de
+    from idara.services import personnel as rh
+    pid0 = rh.enregistrer(f.conn, rh.Personnel(nom_ar="الوهمي", prenom_ar="أستاذ", sexe="M", categorie="enseignant",
+                                               ppr="7654321"))
+    prof = rh.lire(f.conn, pid0)
+    p.rafraichir()
+    r = next(i for i in range(p.suivi.rowCount()) if p.suivi.item(i, 0).data(Qt.UserRole) == prof.id)
+    assert not p.suivi.item(r, 0).icon().isNull() and "لم يُطلب" in p.suivi.item(r, 2).text()
+    boutons = {b.text() for b in p.suivi.cellWidget(r, 4).findChildren(QPushButton)}
+    assert boutons == {"طلب الملف", "تم التوصل بالملف"}
+    d = p.ouvrir_correspondance("demande", [prof.id])
+    assert d.isVisible() and p.table.rowCount() == 1 and p.sens.currentData() == "demande"
+    assert p.generer() and de.historique(f.conn, prof.id)[-1]["sens"] == "demande"
+    d.hide()
+    r = next(i for i in range(p.suivi.rowCount()) if p.suivi.item(i, 0).data(Qt.UserRole) == prof.id)
+    boutons = {b.text() for b in p.suivi.cellWidget(r, 4).findChildren(QPushButton)}
+    assert "تذكير بإرسال الملف" in boutons and p.cartes["demande"].chiffre.text() == "1"
+    d = p.ouvrir_correspondance("demande", [prof.id], rappel=True)
+    assert p.rappel.isChecked() and p.cible.text() == "مدرسة وهمية"
+    d.hide()
+    n = int(p.cartes["recu"].chiffre.text())
+    p.marquer_recu(prof.id)
+    r = next(i for i in range(p.suivi.rowCount()) if p.suivi.item(i, 0).data(Qt.UserRole) == prof.id)
+    assert p.suivi.item(r, 2).text() == "ملف الأستاذ موجود بالمؤسسة" and p.suivi.item(r, 0).icon().isNull()
+    assert int(p.cartes["recu"].chiffre.text()) == n + 1 and "محضر تسليم المهام" in p.l_passation.text()
     f.close()
 
 

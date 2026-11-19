@@ -33,7 +33,7 @@ def _ltr(t: str) -> str:
 
 def generer(conn: sqlite3.Connection, dossier: DossierDonnees, sens: str, etab_cible: str,
             profs: list[tuple[str, str, str]], le: str | None = None, sous_couvert: str = "",
-            reference: str = "", rappel: bool = False) -> tuple[Path, str]:
+            reference: str = "", rappel: bool = False, pids: list[int] | None = None) -> tuple[Path, str]:
     """يرجع (مسار الوثيقة، رقم الصادر). profs: [(الاسم والنسب، رقم التأجير، ملاحظات)]."""
     from docx.shared import Cm
 
@@ -99,4 +99,58 @@ def generer(conn: sqlite3.Connection, dossier: DossierDonnees, sens: str, etab_c
         n += 1
         chemin = chemin.with_name(f"{chemin.stem}_{n}.docx")
     d.save(chemin)
+    if pids:
+        noter_envoi(conn, pids, sens, numero, le, rappel, etab_cible)
     return chemin, numero
+
+
+# ---------- تتبع الملفات (طلب المدير 2026-11-19) ----------
+# الصفحة الثابتة تتبع لكل أستاذ: هل ملفه موجود بالمؤسسة (خانة «الملف متوفر» في الموارد البشرية، وهي التي
+# يقرؤها محضر تسليم المهام)، وطلبات الملف وتذكيراتها وإرساله، برقم الصادر وتاريخه.
+
+ENSEIGNANTS = ("enseignant", "educatrice")
+
+
+def _cle(pid: int) -> str:
+    return f"dossier_prof:{int(pid)}"
+
+
+def historique(conn: sqlite3.Connection, pid: int) -> list[dict]:
+    from idara.services import fiches
+    return list((fiches.lire(conn, _cle(pid)) or {}).get("envois", []))
+
+
+def noter_envoi(conn: sqlite3.Connection, pids: list[int], sens: str, numero: str, le: str, rappel: bool,
+                etab: str) -> None:
+    from idara.services import fiches
+    for pid in pids:
+        h = historique(conn, pid)
+        h.append({"sens": sens, "rappel": bool(rappel), "numero": numero, "date": le, "etab": etab})
+        fiches.ecrire(conn, _cle(pid), {"envois": h})
+
+
+def marquer_recu(conn: sqlite3.Connection, pid: int, recu: bool = True) -> None:
+    """التوصل بملف الأستاذ: يحيّن خانة «الملف متوفر» فيتحيّن محضر تسليم المهام."""
+    with conn:
+        conn.execute("UPDATE personnel SET dossier_disponible=? WHERE id=?", (int(recu), pid))
+
+
+def suivi(conn: sqlite3.Connection) -> list[dict]:
+    """الأساتذة في العمل (الملف بالمؤسسة أو لا، والطلبات)، والمغادرون (إرسال ملفهم)."""
+    from idara.services import personnel as rh
+    res = []
+    for p in rh.lister(conn, actifs_seulement=False):
+        if p.categorie not in ENSEIGNANTS:
+            continue
+        h = historique(conn, p.id)
+        demandes = [x for x in h if x["sens"] == "demande"]
+        envois = [x for x in h if x["sens"] == "envoi"]
+        actif = p.statut == "actif"
+        if actif:
+            etat = "recu" if p.dossier_disponible else ("demande" if demandes else "a_demander")
+        else:
+            etat = "envoye" if envois else "a_envoyer"
+        res.append({"pid": p.id, "nom": f"{p.prenom_ar} {p.nom_ar}", "ppr": p.ppr or "", "actif": actif,
+                    "recu": bool(p.dossier_disponible), "demandes": demandes, "envois": envois, "etat": etat,
+                    "derniere": (demandes or envois or [None])[-1]})
+    return res
