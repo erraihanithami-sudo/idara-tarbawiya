@@ -46,8 +46,9 @@ class CarteFiltre(QFrame):
         self.libelle.setStyleSheet("font-weight: 700; background: transparent;")
         v.addWidget(self.chiffre)
         v.addWidget(self.libelle)
+        self.note = None
         if note:
-            n = QLabel(note)
+            n = self.note = QLabel(note)
             n.setObjectName("etiquette")
             n.setStyleSheet("background: transparent;")
             n.setWordWrap(True)

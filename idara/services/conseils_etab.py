@@ -300,9 +300,7 @@ def suivi(conn, annee: str | None = None) -> list[dict]:
     res = []
     for c, lib in CONSEILS.items():
         ss = [x for x in seances(conn, c, a["libelle"]) if x["date_seance"] <= date.today().isoformat()]  # المنعقدة
-        alertes = []
-        if len(ss) < MINIMUM_ANNUEL[c]:
-            alertes.append(f"{len(ss)} من {MINIMUM_ANNUEL[c]} اجتماعات على الأقل في السنة")
+        alertes = []   # عدد الاجتماعات متروك للمدير (طلبه 2026-11-19): لا تنبيه بحد أدنى
         if c == "gestion":
             debut = [s for s in ss if s["date_seance"][5:7] in ("09", "10")]
             fin = [s for s in ss if s["date_seance"][5:7] in ("06", "07")]
@@ -315,7 +313,8 @@ def suivi(conn, annee: str | None = None) -> list[dict]:
             alertes.append("التركيبة غير مسجلة")
         elif ec:
             alertes.append("مقاعد ينص عليها المرسوم غير مسجلة: " + "، ".join(ec))
-        res.append({"conseil": c, "libelle": lib, "nombre": len(ss), "minimum": MINIMUM_ANNUEL[c],
+        prevus = [x for x in seances(conn, c, a["libelle"]) if x["date_seance"] > date.today().isoformat()]
+        res.append({"conseil": c, "libelle": lib, "nombre": len(ss), "programmes": len(prevus),
                     "derniere": ss[-1]["date_seance"] if ss else None, "alertes": alertes})
     return res
 
@@ -496,6 +495,23 @@ def generer_convocation(conn, dossier: DossierDonnees, conseil: str, date_seance
         _cellule(t.cell(i, 0), m["nom"] + (f" ({m['groupe']})" if m["groupe"] else ""), taille=13)
         _cellule(t.cell(i, 1), m["qualite"], taille=13)
     return _sauver(d, dossier, a["libelle"], f"استدعاء {CONSEILS[conseil]}")
+
+
+def convocation_seance(conn, dossier: DossierDonnees, sid: int) -> Path:
+    """استدعاء اجتماع مسجل بتاريخه وساعته وجدول أعماله (زر «الاستدعاء» أمام كل مجلس في اللائحة)."""
+    s = seance(conn, sid)
+    return generer_convocation(conn, dossier, s.conseil, s.date_seance, s.heure or "", s.ordre_du_jour)
+
+
+def pv_existant(conn, dossier: DossierDonnees, sid: int) -> Path | None:
+    """آخر محضر مولد لهذا الاجتماع في الأرشيف، أو None."""
+    r = conn.execute("SELECT s.conseil, s.numero, a.libelle FROM conseil_seance s JOIN annee_scolaire a "
+                     "ON a.id=s.annee_id WHERE s.id=?", (sid,)).fetchone()
+    if r is None:
+        return None
+    rep = dossier.archives / r["libelle"].replace("/", "-") / "مجالس المؤسسة"
+    fichiers = sorted(rep.glob(f"*_محضر {CONSEILS[r['conseil']]} {r['numero']}.docx")) if rep.exists() else []
+    return fichiers[-1] if fichiers else None
 
 
 def _sauver(d, dossier: DossierDonnees, annee: str, nom: str) -> Path:

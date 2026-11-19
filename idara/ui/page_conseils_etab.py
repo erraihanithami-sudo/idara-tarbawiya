@@ -1,9 +1,10 @@
 """مجالس المؤسسة (المرسوم 2.02.376): الصفحة لجدولة المجالس وأرشيفها، والاستدعاء والمحضر والتركيبة في نوافذ منبثقة
 (طلب المدير 2026-11-18).
 
-- بطاقات المجالس الثلاثة: الاجتماعات المنعقدة مقابل الحد الأدنى في المرسوم، وآخر اجتماع، والتنبيهات.
-- «جدولة المجالس»: الاجتماعات المبرمجة (تاريخها اليوم أو بعده) بعدّ تنازلي.
-- «أرشيف الاجتماعات»: الاجتماعات المنعقدة، ومنها المحضر والاستدعاء والتعديل.
+- بطاقات المجالس الثلاثة: الاجتماعات المنجزة والمبرمجة وآخر اجتماع، ومثلث برتقالي للتنبيهات. عدد الاجتماعات
+  متروك للمدير، بلا حد أدنى (طلبه 2026-11-19).
+- «لائحة المجالس»: المبرمجة ثم المنجزة، وأمام كل مجلس أزراره (الاستدعاء، تعديل الموعد، توليد المحضر،
+  الاطلاع على المحضر).
 - «أرشيف الوثائق»: المحاضر والاستدعاءات المولدة، تُفتح بنقرة مزدوجة.
 """
 
@@ -77,7 +78,7 @@ class PageConseilsEtab(QWidget):
             self.cartes[k] = c_
         racine.addLayout(grille_cartes(list(self.cartes.values()), 3))
         # جدول التتبع (للمراجعة السريعة وللوثائق): المجلس، العدد، الحد الأدنى، آخر اجتماع، التنبيهات
-        self.suivi = tableau(["المجلس", "الاجتماعات", "الحد الأدنى", "آخر اجتماع", "تنبيهات"], etirer=4)
+        self.suivi = tableau(["المجلس", "المنجزة", "المبرمجة", "آخر اجتماع", "تنبيهات"], etirer=4)
         self.suivi.setWordWrap(True)
         self.suivi.hide()
 
@@ -100,35 +101,31 @@ class PageConseilsEtab(QWidget):
         self.alertes = AlerteTriangle("تنبيهات")
         racine.addWidget(self.alertes)
 
-        # ---- جدولة المجالس ----
-        c, v = carte("جدولة المجالس: الاجتماعات المبرمجة")
-        self.t_prog = tableau(["المجلس", "رقم", "التاريخ", "الساعة", "الموعد", "جدول الأعمال"], etirer=5)
-        self.t_prog.setMinimumHeight(150)
-        self.t_prog.itemDoubleClicked.connect(lambda it: self.ouvrir_programmation(
-            sid=self.t_prog.item(it.row(), 0).data(Qt.UserRole)))
-        v.addWidget(self.t_prog)
-        self.vide_prog = QLabel("لا اجتماع مبرمجاً. «برمجة اجتماع واستدعاء الأعضاء» يضيف موعداً جديداً ويولد "
-                                "استدعاءه.")
-        self.vide_prog.setObjectName("etiquette")
-        self.vide_prog.setAlignment(Qt.AlignCenter)
-        self.vide_prog.setWordWrap(True)
-        v.addWidget(self.vide_prog)
-        racine.addWidget(c)
-
-        # ---- أرشيف الاجتماعات ----
+        # ---- لائحة المجالس: المبرمجة والمنجزة، وأمام كل مجلس أزراره (طلب المدير 2026-11-19) ----
         c, v = carte()
-        self.titre_archive = QLabel()
-        self.titre_archive.setObjectName("titreCarte")
-        v.addWidget(self.titre_archive)
-        self.seances = tableau(["المجلس", "رقم", "التاريخ", "النوع", "الحضور", "جدول الأعمال"], etirer=5)
-        self.seances.setMinimumHeight(220)
-        self.seances.itemSelectionChanged.connect(self._sel)
-        self.seances.itemDoubleClicked.connect(lambda _: self.ouvrir_pv(self.sid))
-        v.addWidget(self.seances)
-        self.vide_archive = QLabel("لا اجتماعات منعقدة بعد هذه السنة.")
-        self.vide_archive.setObjectName("etiquette")
-        self.vide_archive.setAlignment(Qt.AlignCenter)
-        v.addWidget(self.vide_archive)
+        tete = QHBoxLayout()
+        self.titre_liste = QLabel()
+        self.titre_liste.setObjectName("titreCarte")
+        tete.addWidget(self.titre_liste, 1)
+        self.f_etat = QComboBox()
+        for k, lib in (("tous", "المبرمجة والمنجزة"), ("prevu", "المبرمجة فقط"), ("fait", "المنجزة فقط")):
+            self.f_etat.addItem(lib, k)
+        self.f_etat.currentIndexChanged.connect(lambda _: self._remplir_liste())
+        tete.addWidget(self.f_etat)
+        v.addLayout(tete)
+        self.liste = tableau(["المجلس", "رقم", "التاريخ", "الساعة", "الحالة", "جدول الأعمال", "الإجراءات"],
+                             etirer=5)
+        self.liste.setMinimumHeight(300)
+        self.liste.verticalHeader().setDefaultSectionSize(46)
+        self.liste.itemSelectionChanged.connect(self._sel)
+        self.liste.itemDoubleClicked.connect(lambda _: self._ouvrir_ligne())
+        v.addWidget(self.liste)
+        self.vide_liste = QLabel("لا اجتماع مسجلاً بعد. «برمجة اجتماع واستدعاء الأعضاء» يضيف موعداً ويولد "
+                                 "استدعاءه، و«تحرير محضر اجتماع» يسجل اجتماعاً منعقداً.")
+        self.vide_liste.setObjectName("etiquette")
+        self.vide_liste.setAlignment(Qt.AlignCenter)
+        self.vide_liste.setWordWrap(True)
+        v.addWidget(self.vide_liste)
         self.barre_sel = QFrame()
         self.barre_sel.setObjectName("barreSelection")
         self.barre_sel.setStyleSheet("QFrame#barreSelection { background: #F3F7F6; border: 1px solid #CFE3DE; "
@@ -167,7 +164,7 @@ class PageConseilsEtab(QWidget):
         self.vide_docs.setAlignment(Qt.AlignCenter)
         v.addWidget(self.vide_docs)
         racine.addWidget(c)
-        self.c_graph, self.v_graph = carte("الاجتماعات المنعقدة مقابل الحد الأدنى في المرسوم")
+        self.c_graph, self.v_graph = carte("الاجتماعات المنجزة والمبرمجة لكل مجلس")
         self._graphes: list[QWidget] = []
         racine.addWidget(self.c_graph)
         racine.addStretch()
@@ -381,29 +378,22 @@ class PageConseilsEtab(QWidget):
             message(self.message, str(e), True)
             return
         self.suivi.setRowCount(len(s))
-        alertes = []
         for i, x in enumerate(s):
-            for j, v in enumerate((x["libelle"], str(x["nombre"]), str(x["minimum"]),
+            for j, v in enumerate((x["libelle"], str(x["nombre"]), str(x["programmes"]),
                                    tx.date_chiffres(x["derniere"]) if x["derniere"] else "—",
                                    "؛ ".join(x["alertes"]) or "—")):
                 self.suivi.setItem(i, j, cellule(v))
             c_ = self.cartes[x["conseil"]]
-            faits = sum(1 for r in tout if r["conseil"] == x["conseil"] and r["date_seance"] <= date.today().isoformat())
-            c_.chiffre.setText(f"{faits} / {x['minimum']}")
-            dern = f"آخر اجتماع: {tx.date_chiffres(x['derniere'])}" if x["derniere"] else "لا اجتماع بعد"
-            note = c_.findChildren(QLabel)[-1]
-            note.setText(dern + (" · " + x["alertes"][0] if x["alertes"] else " · مطابق للمرسوم"))
-            alertes += [f"{x['libelle']}: {a}" for a in x["alertes"][1:]]
-        self.alertes.setText("\n".join(alertes))
-        self.alertes.setVisible(bool(alertes))
+            c_.definir(x["nombre"])   # المنجزة؛ العدد متروك للمدير، بلا حد أدنى (طلبه 2026-11-19)
+            dern = f"آخر اجتماع: {tx.date_chiffres(x['derniere'])}" if x["derniere"] else "لا اجتماع منعقد بعد"
+            prevus = f" · مبرمج: {x['programmes']}" if x["programmes"] else ""
+            c_.note.setText(dern + prevus)
+            c_.definir_alerte("\n".join(x["alertes"]))
+        self.alertes.setText("")
         for k, c_ in self.cartes.items():
             c_.definir_actif(k == self.filtre)
-        aujourd = date.today().isoformat()
-        prog = [r for r in tout if r["date_seance"] >= aujourd]          # المبرمجة: اليوم فما بعد
-        passes = [r for r in tout if r["date_seance"] < aujourd]         # المنعقدة: الأرشيف
-        self._remplir_prog(prog)
-        self.archive = [r for r in reversed(passes) if self.filtre is None or r["conseil"] == self.filtre]
-        self._remplir_archive()
+        self.tout = tout
+        self._remplir_liste()
         self._documents()
         self._graphique(s)
         self.charger_composition()
@@ -425,42 +415,88 @@ class PageConseilsEtab(QWidget):
         it.setFont(f_)
         return it
 
-    def _remplir_prog(self, prog) -> None:
-        self.t_prog.setRowCount(len(prog))
-        for i, r in enumerate(prog):
-            n = (date.fromisoformat(r["date_seance"]) - date.today()).days
-            quand = "اليوم" if n == 0 else "غداً" if n == 1 else f"بعد {n} يوماً"
-            self.t_prog.setItem(i, 0, self._cellule_conseil(r["conseil"], r["id"]))
-            for j, v in enumerate((str(r["numero"]), tx.date_chiffres(r["date_seance"]), r["heure"] or "—", quand,
+    @staticmethod
+    def _prevu(r) -> bool:
+        return r["date_seance"] > date.today().isoformat()
+
+    def _remplir_liste(self) -> None:
+        etat = self.f_etat.currentData()
+        lignes = [r for r in getattr(self, "tout", []) if (self.filtre is None or r["conseil"] == self.filtre)
+                  and (etat == "tous" or (etat == "prevu") == self._prevu(r))]
+        prevus = [r for r in lignes if self._prevu(r)]
+        faits = sorted((r for r in lignes if not self._prevu(r)), key=lambda r: r["date_seance"], reverse=True)
+        self.lignes = prevus + faits
+        titre = ce.CONSEILS[self.filtre] if self.filtre else "كل المجالس"
+        self.titre_liste.setText(f"لائحة المجالس: {titre} · مبرمجة {len(prevus)} · منجزة {len(faits)}")
+        self.liste.blockSignals(True)
+        self.liste.clearSelection()
+        self.liste.setRowCount(len(self.lignes))
+        for i, r in enumerate(self.lignes):
+            self.liste.setItem(i, 0, self._cellule_conseil(r["conseil"], r["id"]))
+            prevu = self._prevu(r)
+            if prevu:
+                n = (date.fromisoformat(r["date_seance"]) - date.today()).days
+                etat_t, coul = ("غداً" if n == 1 else f"مبرمج · بعد {n} يوماً"), ("#C62828" if n <= 2 else "#1565C0")
+            else:
+                etat_t, coul = "منجز", "#2E7D32"
+            for j, v in enumerate((str(r["numero"]), tx.date_chiffres(r["date_seance"]), r["heure"] or "—", etat_t,
                                    "؛ ".join(json.loads(r["ordre_du_jour"]))), start=1):
                 c_ = cellule(v)
                 if j == 4:
-                    c_.setForeground(QColor("#C62828" if n <= 2 else "#1565C0"))
-                self.t_prog.setItem(i, j, c_)
-        self.t_prog.setVisible(bool(prog))
-        self.vide_prog.setVisible(not prog)
-
-    def _remplir_archive(self) -> None:
-        titre = ce.CONSEILS[self.filtre] if self.filtre else "كل المجالس"
-        self.titre_archive.setText(f"أرشيف الاجتماعات المنعقدة: {titre} ({len(self.archive)})")
-        self.seances.blockSignals(True)
-        self.seances.clearSelection()
-        self.seances.setRowCount(len(self.archive))
-        n_membres = {k: len(ce.membres_actifs(self.f.conn, k)) for k in ce.CONSEILS}
-        for i, r in enumerate(self.archive):
-            s = ce.seance(self.f.conn, r["id"])
-            pres = len(s.presents) if s.presents is not None else n_membres[r["conseil"]]
-            self.seances.setItem(i, 0, self._cellule_conseil(r["conseil"], r["id"]))
-            for j, v in enumerate((str(r["numero"]), tx.date_chiffres(r["date_seance"]),
-                                   "عادي" if r["nature"] == "ordinaire" else "استثنائي",
-                                   f"{pres} من {n_membres[r['conseil']]}" if n_membres[r["conseil"]] else "—",
-                                   "؛ ".join(json.loads(r["ordre_du_jour"]))), start=1):
-                self.seances.setItem(i, j, cellule(v))
-        self.seances.blockSignals(False)
-        self.seances.setVisible(bool(self.archive))
-        self.vide_archive.setVisible(not self.archive)
+                    c_.setForeground(QColor(coul))
+                    f_ = c_.font()
+                    f_.setBold(True)
+                    c_.setFont(f_)
+                    c_.setIcon(pictos.icone("calendrier" if prevu else "valider", coul, 16))
+                self.liste.setItem(i, j, c_)
+            self.liste.setCellWidget(i, 6, self._actions(r["id"], prevu))
+        self.liste.resizeColumnToContents(6)
+        self.liste.blockSignals(False)
+        self.liste.setVisible(bool(self.lignes))
+        self.vide_liste.setVisible(not self.lignes)
         self.sid = None
         self.barre_sel.hide()
+
+    def _actions(self, sid: int, prevu: bool) -> QWidget:
+        """أزرار أمام كل مجلس: المبرمج ← الاستدعاء وتحرير المحضر؛ المنجز ← توليد المحضر والاطلاع عليه."""
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(4, 2, 4, 2)
+        h.setSpacing(6)
+
+        def b(texte, couleur, picto, fn, aide=""):
+            x = QPushButton(texte)
+            x.setObjectName("boutonCouleur")
+            x.setIcon(pictos.icone(picto, "#FFFFFF", 15))
+            x.setToolTip(aide)
+            x.setStyleSheet(f"QPushButton {{ background: {couleur}; color: white; border: none; border-radius: 9px; "
+                            f"padding: 4px 10px; font-weight: 700; }} QPushButton:hover {{ background: {couleur}DD; }}"
+                            f" QPushButton:disabled {{ background: #B0BEC5; }}")
+            x.clicked.connect(fn)
+            h.addWidget(x)
+            return x
+        b("الاستدعاء", "#1565C0", "rappel", lambda: self.convocation_ligne(sid), "توليد استدعاء الأعضاء لهذا الاجتماع")
+        if prevu:
+            b("تعديل الموعد", "#00838F", "modifier", lambda: self.ouvrir_programmation(sid=sid))
+        else:
+            b("توليد المحضر", "#2E7D32", "document", lambda: self.pv_ligne(sid), "توليد المحضر من المعطيات المسجلة")
+            voir = b("الاطلاع على المحضر", "#6A1B9A", "apercu", lambda: self.voir_pv(sid),
+                     "فتح آخر محضر مولد لهذا الاجتماع")
+            voir.setEnabled(ce.pv_existant(self.f.conn, self.f.dossier, sid) is not None)
+        return w
+
+    def _maj_actions(self) -> None:
+        """يعيد بناء أزرار الأسطر (تفعيل «الاطلاع على المحضر» بعد توليده) دون فقد التحديد."""
+        for i, r in enumerate(getattr(self, "lignes", [])):
+            self.liste.setCellWidget(i, 6, self._actions(r["id"], self._prevu(r)))
+
+    def _ouvrir_ligne(self) -> None:
+        r = next((x for x in self.lignes if x["id"] == self.sid), None)
+        if r is not None:
+            if self._prevu(r):
+                self.ouvrir_programmation(sid=self.sid)
+            else:
+                self.ouvrir_pv(self.sid)
 
     def _documents(self) -> None:
         from idara.services import annee as annee_srv
@@ -487,8 +523,8 @@ class PageConseilsEtab(QWidget):
             w.setParent(None)
             w.deleteLater()
         g = BarresGroupees([x["libelle"] for x in s],
-                           [("الاجتماعات المنعقدة", [float(x["nombre"]) for x in s], "#2E7D32"),
-                            ("الحد الأدنى في المرسوم", [float(x["minimum"]) for x in s], "#C9A227")],
+                           [("المنجزة", [float(x["nombre"]) for x in s], "#2E7D32"),
+                            ("المبرمجة", [float(x["programmes"]) for x in s], "#1565C0")],
                            maximum=None, suffixe="")
         self.v_graph.addWidget(g)
         self._graphes = [g]
@@ -539,19 +575,19 @@ class PageConseilsEtab(QWidget):
             self.presence.addItem(it)
 
     def _sel(self) -> None:
-        rows = {i.row() for i in self.seances.selectedIndexes()}
+        rows = {i.row() for i in self.liste.selectedIndexes()}
         self.barre_sel.setVisible(len(rows) == 1)
         if len(rows) == 1:
             r = rows.pop()
-            self.sid = self.seances.item(r, 0).data(Qt.UserRole)
+            self.sid = self.liste.item(r, 0).data(Qt.UserRole)
             s = ce.seance(self.f.conn, self.sid)
             self.conseil.blockSignals(True)
             self.conseil.setCurrentIndex(self.conseil.findData(s.conseil))
             self.conseil.blockSignals(False)
             self._changer_conseil(charger_formulaire=False)
             self._formulaire(s)
-            self.l_sel.setText(f"{ce.CONSEILS[s.conseil]} · الاجتماع رقم {self.seances.item(r, 1).text()} · "
-                               f"{self.seances.item(r, 2).text()}")
+            self.l_sel.setText(f"{ce.CONSEILS[s.conseil]} · الاجتماع رقم {self.liste.item(r, 1).text()} · "
+                               f"{self.liste.item(r, 2).text()}")
 
     # ======================================================================
     # الأفعال
@@ -652,7 +688,27 @@ class PageConseilsEtab(QWidget):
             self._msg("حدد اجتماعاً مسجلاً في الجدول.", True)
             return None
         r = self._faire(lambda: ce.generer_pv(self.f.conn, self.f.dossier, self.sid), "", recharger=False)
+        if r:
+            self._maj_actions()
         return self._ouvrir(r) if r else None
+
+    def convocation_ligne(self, sid: int):
+        r = self._faire(lambda: ce.convocation_seance(self.f.conn, self.f.dossier, sid), "", recharger=False)
+        return self._ouvrir(r) if r else None
+
+    def pv_ligne(self, sid: int):
+        r = self._faire(lambda: ce.generer_pv(self.f.conn, self.f.dossier, sid), "", recharger=False)
+        if r:
+            self._maj_actions()
+        return self._ouvrir(r) if r else None
+
+    def voir_pv(self, sid: int):
+        p = ce.pv_existant(self.f.conn, self.f.dossier, sid)
+        if p is None:
+            self._msg("لم يُولد محضر هذا الاجتماع بعد: «توليد المحضر».", True)
+            return None
+        self.f.ouvrir_document(p)
+        return p
 
     def convocation(self):
         def fn():

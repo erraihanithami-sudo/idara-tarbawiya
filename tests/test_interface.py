@@ -1253,22 +1253,35 @@ def test_page_conseils_etablissement(app, config_tmp, monkeypatch):
         p.presence.item(i).setCheckState(Qt.Unchecked)
     assert not p.enregistrer(True) and "النصاب غير مكتمل" in p.message.text()
     p.convoc.setCurrentIndex(p.convoc.findData("seconde"))
-    assert p.enregistrer(True) and p.seances.rowCount() == 1
-    selectionner(p.seances, 0)
+    assert p.enregistrer(True) and p.liste.rowCount() == 1
+    selectionner(p.liste, 0)
     assert p.sid and p.odj.toPlainText().startswith("دراسة برنامج العمل السنوي")
     assert p.pv() and p.convocation() and len(ouverts) == 2
     assert ce.suivi(f.conn)[0]["nombre"] == 1
     # طلب المدير 2026-11-18: الصفحة للجدولة والأرشيف، والاستدعاء والمحضر والتركيبة في نوافذ منبثقة
-    assert p.cartes["gestion"].chiffre.text() == "1 / 2" and p.t_docs.rowCount() == 2
-    assert not p.vide_prog.isHidden() and p.t_prog.isHidden()
+    # طلب المدير 2026-11-19: لا حد أدنى؛ لائحة واحدة للمبرمجة والمنجزة وأمام كل مجلس أزراره
+    assert p.cartes["gestion"].chiffre.text() == "1" and p.t_docs.rowCount() == 2
+    assert "منجز" in p.liste.item(0, 4).text() and p.liste.cellWidget(0, 6) is not None
+    from PySide6.QtWidgets import QPushButton
+    boutons = {b.text(): b for b in p.liste.cellWidget(0, 6).findChildren(QPushButton)}
+    assert {"الاستدعاء", "توليد المحضر", "الاطلاع على المحضر"} <= set(boutons)
+    assert boutons["الاطلاع على المحضر"].isEnabled() and ce.pv_existant(f.conn, f.dossier, p.liste.item(0, 0).data(Qt.UserRole))
     d = p.ouvrir_programmation("gestion")
     assert d.isVisible() and p.c_deroulement.isHidden() and p.sid is None and p.r_conseils["gestion"].isChecked()
     p.odj.setPlainText("التحضير لنهاية السنة")
     n = len(ouverts)
     assert p.programmer_et_convoquer() and len(ouverts) == n + 1, p.message.text()
-    assert p.t_prog.rowCount() == 1 and "بعد 7 يوماً" in p.t_prog.item(0, 4).text() and p.seances.rowCount() == 1
+    assert p.liste.rowCount() == 2 and "بعد 7 يوماً" in p.liste.item(0, 4).text()
+    boutons = {b.text() for b in p.liste.cellWidget(0, 6).findChildren(QPushButton)}
+    assert boutons == {"الاستدعاء", "تعديل الموعد"}
+    n = len(ouverts)
+    assert p.convocation_ligne(p.liste.item(0, 0).data(Qt.UserRole)) and len(ouverts) == n + 1
+    assert p.cartes["gestion"].chiffre.text() == "1" and "مبرمج: 1" in p.cartes["gestion"].note.text()
+    p.f_etat.setCurrentIndex(p.f_etat.findData("fait"))
+    assert p.liste.rowCount() == 1
+    p.f_etat.setCurrentIndex(0)
     d.hide()
-    selectionner(p.seances, 0)
+    selectionner(p.liste, 1)
     assert not p.barre_sel.isHidden() and p.sid
     d = p.ouvrir_pv(p.sid)
     assert not p.c_deroulement.isHidden() and p.presence.count() == 10
@@ -1276,9 +1289,9 @@ def test_page_conseils_etablissement(app, config_tmp, monkeypatch):
     assert p.enregistrer_et_pv() and len(ouverts) == n + 2
     d.hide()
     p.filtrer("pedagogique")
-    assert p.seances.rowCount() == 0 and p.cartes["pedagogique"].actif
+    assert p.liste.rowCount() == 0 and p.cartes["pedagogique"].actif
     p.filtrer("pedagogique")
-    assert p.seances.rowCount() == 1
+    assert p.liste.rowCount() == 2
     c = p.ouvrir_composition("pedagogique")
     assert c.isVisible() and p.conseil.currentData() == "pedagogique" and p.r_conseils_c["pedagogique"].isChecked()
     c.hide()
