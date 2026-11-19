@@ -20,6 +20,7 @@ COULEURS = {
     "التلاميذ": theme.SARCELLE,
     "الموارد البشرية": theme.BLEU,
     "التدبير التربوي": theme.VIOLET,
+    "المدرسة الرائدة": "#B8860B",
     "التقييم": theme.ROSE,
     "مجالس المؤسسة": theme.SARCELLE,
     "التدبير المالي والمادي": theme.ORANGE,
@@ -149,6 +150,22 @@ def _parametres(p, a, m):        # الإعدادات: مسنن
     p.drawEllipse(c, 3.4, 3.4)
 
 
+def _pionniere(p, a, m):         # المدرسة الرائدة: وسام بشريطين ونجمة
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor(m))
+    p.drawPolygon(QPolygonF([QPointF(7, 2), QPointF(11, 2), QPointF(13, 10), QPointF(9, 11)]))
+    p.drawPolygon(QPolygonF([QPointF(17, 2), QPointF(13, 2), QPointF(11, 10), QPointF(15, 11)]))
+    p.setBrush(QColor(a))
+    p.drawEllipse(QPointF(12, 15), 7.2, 7.2)
+    pts = []
+    for k in range(10):
+        r = 4.4 if k % 2 == 0 else 1.9
+        t = -math.pi / 2 + k * math.pi / 5
+        pts.append(QPointF(12 + r * math.cos(t), 15.3 + r * math.sin(t)))
+    p.setBrush(QColor(theme.BLANC))
+    p.drawPolygon(QPolygonF(pts))
+
+
 def _vie(p, a, m):               # الحياة المدرسية: نجمة خماسية وكرتان (نشاط واحتفال)
     pts = []
     for k in range(10):
@@ -164,7 +181,7 @@ def _vie(p, a, m):               # الحياة المدرسية: نجمة خم�
 
 
 DESSINS = {
-    "الحياة المدرسية": _vie,
+    "الحياة المدرسية": _vie, "المدرسة الرائدة": _pionniere,
     "القيادة والتدبير": _tableau, "تسليم المهام": _passation,
     "لوحة القيادة": _tableau, "التلاميذ": _eleves, "الموارد البشرية": _personnel,
     "التدبير التربوي": _pedagogie, "التقييم": _evaluation, "مجالس المؤسسة": _conseils,

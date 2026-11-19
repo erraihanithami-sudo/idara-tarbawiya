@@ -165,7 +165,7 @@ class PageFicheEleve(QWidget):
         if obs and fe.a_besoin_soutien(p):
             obs.append("يُقترح إدراجه(ا) في مجموعات الدعم.")
         self.obs.setText("\n".join(obs) if obs else "لا معطيات تقويم بعد: استورد مستويات التعلم (TaRL) أو نتائج "
-                                                    "الروائز في «مؤسسات الريادة»، أو أدخل المستويات أعلاه.")
+                                                    "الروائز في «المدرسة الرائدة ← شارة الريادة»، أو أدخل المستويات أعلاه.")
         self.c_fiche.show()
 
     def enregistrer(self) -> bool:

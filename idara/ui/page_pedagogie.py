@@ -162,7 +162,7 @@ class PageTarl(QWidget):
     def __init__(self, fenetre):
         super().__init__()
         self.f = fenetre
-        racine, self.message = _page("تتبع التعلمات الأساس (مؤسسات الريادة)",
+        racine, self.message = _page("تتبع التعلمات الأساس",
                                      "من تصدير مسار «مستويات التعلم»: توزيع التلاميذ على مستويات اللغة العربية واللغة "
                                      "الفرنسية والرياضيات في رائزي الموضعة القبلي والبعدي، ونسبة بلوغ المستوى المتوقع.")
         self.setLayout(racine)
@@ -588,9 +588,7 @@ class PageRiyada(QWidget):
         from idara.services import riyada as ry
         self.ry = ry
         self.f = fenetre
-        racine, self.message = _page("مؤسسات الريادة",
-                                     "مؤشر ISA2 (نسبة التحكم في التعلمات الأساس) حسب مراحل التعليم الصريح كما يظهر في "
-                                     "مسار، ومراسلة الأساتذة بنتائج المرحلة، وملف شارة الريادة، والتقرير التركيبي.")
+        racine, self.message = _page("شارة الريادة", "")   # طلب المدير 2026-11-19: دون جملة تحت العنوان
         self.setLayout(racine)
         from idara.services import isa as isa_srv
         self.isa_srv = isa_srv

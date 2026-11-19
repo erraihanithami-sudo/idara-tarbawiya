@@ -146,8 +146,11 @@ def test_navigation_deroulante(app, config_tmp):
     from idara.ui.fenetre import SECTIONS
     f = _fenetre_avec_eleves(config_tmp)
     titres = [t for t, _ in SECTIONS]
-    assert titres[:9] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي", "الحياة المدرسية",
-                          "التدبير المالي والمادي", "التقييم", "مشروع المؤسسة", "تسليم المهام"]
+    assert titres[:10] == ["القيادة والتدبير", "التلاميذ", "الموارد البشرية", "التدبير التربوي", "المدرسة الرائدة",
+                           "الحياة المدرسية", "التدبير المالي والمادي", "التقييم", "مشروع المؤسسة", "تسليم المهام"]
+    # طلب المدير 2026-11-19: المدرسة الرائدة بمكوناتها الفرعية، والتعلمات الأساس ضمنها
+    assert [n for n, _ in dict(SECTIONS)["المدرسة الرائدة"]] == ["نتائج الريادة", "التعلمات الأساس", "تواصل الريادة",
+                                                                 "مؤشرات الريادة", "الريادة"]
     assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص", "المحاضر",
                                          "طلبات الموظفين والورقة الشخصية", "أعوان الحراسة والنظافة",
                                          "طلب ملف أستاذ وإرساله"]
@@ -1112,6 +1115,49 @@ def test_page_riyada(app, config_tmp, monkeypatch):
     assert p.enregistrer_dossier()
     assert ry.pieces(f.conn, "2026/2027")[1]["disponible"]
     assert p.document("dossier") and p.document("synthese") and len(ouverts) == 2
+    f.close()
+
+
+def test_ecole_pionniere_composants(app, config_tmp, monkeypatch):
+    """طلب المدير 2026-11-19: المدرسة الرائدة: تتبع النتائج حسب الفترات، التواصل، المؤشرات العامة، شارة الريادة."""
+    from idara.services import pionniere as pn
+    from idara.services import riyada as ry
+    f = _fenetre_avec_eleves(config_tmp)
+    ouverts = []
+    monkeypatch.setattr(f, "ouvrir_document", lambda c: ouverts.append(c))
+    a = "2026/2027"
+    ry.enregistrer_isa(f.conn, a, "1-1", 1, {"ar": "40", "fr": "70", "ma": "80"})
+    ry.enregistrer_isa(f.conn, a, "1-1", 2, {"ar": "55", "fr": "75", "ma": "85"})
+    f.aller_a("نتائج الريادة")
+    p = f.page_resultats_pionniere
+    assert f.page_courante() == "نتائج الريادة" and p.phase == 2 and p.cartes[2].chiffre.text() == "71.7%"
+    assert p.cartes[-1].chiffre.text() == "—" and p.table.rowCount() == 1 and not p.c_graph.isHidden()
+    p.choisir(1)
+    assert p.table.item(0, 1).text() == "40.00%" and p.cartes[1].actif
+    assert p.rapport() and len(ouverts) == 1
+    f.aller_a("تواصل الريادة")
+    c = f.page_comm_pionniere
+    assert c.liste.isHidden() and not c.vide.isHidden()
+    d = c.ouvrir_rencontre(type_="portes")
+    assert d.isVisible() and c.c_type.currentData() == "portes"
+    c.c_theme.setText("الأبواب المفتوحة الأولى")
+    c.c_invites.setValue(40)
+    c.c_presents.setValue(30)
+    assert c.enregistrer_et_rapport() and len(ouverts) == 2
+    d.hide()
+    assert c.liste.rowCount() == 1 and c.cartes["portes"].chiffre.text() == "1" and c.c_taux.chiffre.text() == "75.0%"
+    assert c.liste.cellWidget(0, 6) is not None and c.rapport_synthese() and len(ouverts) == 3
+    dc = c.convocations("rencontre")
+    assert dc.isVisible() and dc.vue.occasion.currentData() == "rencontre"
+    dc.hide()
+    c.supprimer(pn.rencontres(f.conn)[0].id)
+    assert c.liste.rowCount() == 0
+    f.aller_a("مؤشرات الريادة")
+    i = f.page_ind_pionniere
+    assert set(i.ind) == {"tarl", "isa2", "activites", "hadar"} and i.ind["isa2"]["etat"] == "في تحسن"
+    assert i.cartes["isa2"].valeur.text() == "71.7%" and len(i.cartes["isa2"].points) == 2
+    f.aller_a("الريادة")
+    assert f.page_riyada.findChildren(type(f.page_riyada.message))  # الصفحة القائمة: شارة الريادة
     f.close()
 
 
