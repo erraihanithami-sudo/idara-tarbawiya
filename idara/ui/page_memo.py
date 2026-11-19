@@ -513,7 +513,8 @@ class PageMemo(QWidget):
             self.notes.append(pi)
         if not self.memos:
             g.addWidget(self.sabboura.vide, 0, 0)
-        self.sabboura.vide.setParent(self.sabboura) if self.sabboura.vide.parent() is None else None
+        if self.sabboura.vide.parent() is None:
+            self.sabboura.vide.setParent(self.sabboura)
         self.sabboura.vide.setVisible(not self.memos)
         self.agenda.recharger()
 
