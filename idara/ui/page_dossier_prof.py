@@ -187,35 +187,23 @@ class PageDossierProf(QWidget):
                 f"{'تذكير' if d['rappel'] else de.SENS[d['sens']].split()[0]} · {tx.date_chiffres(d['date'])} · "
                 f"عدد \u2066{d['numero']}\u2069" if d else "—"))
             self.suivi.setCellWidget(i, 4, self._actions(x))
-        self.suivi.resizeColumnToContents(4)
+        from idara.ui.vitrine import ajuster_colonne_actions
+        ajuster_colonne_actions(self.suivi, 4)
 
     def _actions(self, x: dict) -> QWidget:
-        w = QWidget()
-        h = QHBoxLayout(w)
-        h.setContentsMargins(4, 2, 4, 2)
-        h.setSpacing(6)
-
-        def b(t, coul, pic, fn):
-            q = QPushButton(t)
-            q.setObjectName("boutonCouleur")
-            q.setIcon(pictos.icone(pic, "#FFFFFF", 15))
-            q.setStyleSheet(f"QPushButton {{ background: {coul}; color: white; border: none; border-radius: 9px; "
-                            f"padding: 4px 10px; font-weight: 700; }}")
-            q.clicked.connect(fn)
-            h.addWidget(q)
-            return q
+        from idara.ui.vitrine import boutons_ligne
         pid = x["pid"]
         if x["actif"] and not x["recu"]:
-            b("طلب الملف", "#1565C0", "envoyer", lambda: self.ouvrir_correspondance("demande", [pid]))
+            specs = [("طلب الملف", "#1565C0", "envoyer", lambda: self.ouvrir_correspondance("demande", [pid]))]
             if x["demandes"]:
-                b("تذكير بإرسال الملف", "#EF8A00", "rappel",
-                  lambda: self.ouvrir_correspondance("demande", [pid], rappel=True))
-            b("تم التوصل بالملف", "#2E7D32", "valider", lambda: self.marquer_recu(pid))
+                specs.append(("تذكير بإرسال الملف", "#EF8A00", "rappel",
+                              lambda: self.ouvrir_correspondance("demande", [pid], rappel=True)))
+            specs.append(("تم التوصل بالملف", "#2E7D32", "valider", lambda: self.marquer_recu(pid)))
         elif x["actif"]:
-            b("إلغاء التوصل", "#78909C", "annuler", lambda: self.marquer_recu(pid, False))
+            specs = [("إلغاء التوصل", "#78909C", "annuler", lambda: self.marquer_recu(pid, False))]
         else:
-            b("إرسال الملف", "#6A1B9A", "envoyer", lambda: self.ouvrir_correspondance("envoi", [pid]))
-        return w
+            specs = [("إرسال الملف", "#6A1B9A", "envoyer", lambda: self.ouvrir_correspondance("envoi", [pid]))]
+        return boutons_ligne(specs)
 
     def marquer_recu(self, pid: int, recu: bool = True) -> None:
         de.marquer_recu(self.f.conn, pid, recu)

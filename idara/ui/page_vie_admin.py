@@ -840,21 +840,12 @@ class PageEmplois(QWidget):
                 self.liste.setItem(i, j, _item(x, False))
             if depasse:
                 self.liste.item(i, 4).setIcon(icone_triangle(16))
-            w = QWidget()
-            hb = QHBoxLayout(w)
-            hb.setContentsMargins(4, 2, 4, 2)
-            hb.setSpacing(6)
-            for t, coul, pic, fn in (("عرض", "#3949AB", "apercu", lambda _=False, x=p.id: self.voir(x)),
-                                     ("مسك", "#2E7D32", "modifier", lambda _=False, x=p.id: self.saisir(x))):
-                b = QPushButton(t)
-                b.setObjectName("boutonCouleur")
-                b.setIcon(pictos.icone(pic, "#FFFFFF", 15))
-                b.setStyleSheet(f"QPushButton {{ background: {coul}; color: white; border: none; border-radius: 9px; "
-                                f"padding: 4px 12px; font-weight: 700; }}")
-                b.clicked.connect(fn)
-                hb.addWidget(b)
+            from idara.ui.vitrine import boutons_ligne
+            w = boutons_ligne([("عرض", "#3949AB", "apercu", lambda x=p.id: self.voir(x)),
+                               ("مسك", "#2E7D32", "modifier", lambda x=p.id: self.saisir(x))])
             self.liste.setCellWidget(i, 5, w)
-        self.liste.resizeColumnToContents(5)
+        from idara.ui.vitrine import ajuster_colonne_actions
+        ajuster_colonne_actions(self.liste, 5)
         self.collectif.setRowCount(len(donnees))
         for i, (p, ss, _) in enumerate(donnees):
             self.collectif.setItem(i, 0, _item(f"{p.prenom_ar} {p.nom_ar}", False, p.id))

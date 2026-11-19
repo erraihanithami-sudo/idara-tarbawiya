@@ -297,3 +297,51 @@ class AlerteTriangle(QWidget):
 
     def clear(self) -> None:
         self.setText("")
+
+
+def boutons_ligne(specs) -> QWidget:
+    """أزرار صغيرة ملونة أمام سطر في جدول: specs = [(النص، اللون، الأيقونة، الدالة)]. ارتفاع ثابت يناسب السطر،
+    وزر «حذف…» بالأحمر وعلامة الحذف كبقية أزرار الحذف."""
+    from PySide6.QtCore import QSize
+    from PySide6.QtWidgets import QPushButton
+    w = QWidget()
+    w.setStyleSheet("background: transparent;")
+    h = QHBoxLayout(w)
+    h.setContentsMargins(4, 3, 4, 3)
+    h.setSpacing(6)
+    for texte, couleur, picto, fn in specs:
+        b = QPushButton(texte)
+        if texte.startswith("حذف"):
+            from idara.ui import icones
+            b.setObjectName("danger")
+            b.setIcon(icones.corbeille())
+        else:
+            b.setObjectName("boutonCouleur")
+            b.setIcon(pictos.icone(picto, "#FFFFFF", 14))
+            fonce = QColor(couleur).darker(120).name()
+            b.setStyleSheet(f"QPushButton#boutonCouleur {{ background: {couleur}; color: white; border: none; "
+                            f"border-radius: 8px; padding: 0 10px; font-weight: 700; min-height: 0; }}"
+                            f"QPushButton#boutonCouleur:hover {{ background: {fonce}; }}"
+                            f"QPushButton#boutonCouleur:disabled {{ background: #B0BEC5; }}")
+        b.setIconSize(QSize(14, 14))
+        b.setFixedHeight(30)
+        b.setCursor(Qt.PointingHandCursor)
+        b.clicked.connect(lambda _=False, f=fn: f())
+        h.addWidget(b)
+    h.addStretch()
+    return w
+
+
+def ajuster_colonne_actions(table, col: int) -> None:
+    """عرض عمود الأزرار على قدر أوسع مجموعة، وارتفاع الأسطر يكفيها."""
+    from PySide6.QtWidgets import QHeaderView
+    larg = 0
+    for i in range(table.rowCount()):
+        w = table.cellWidget(i, col)
+        if w is not None:
+            w.adjustSize()
+            larg = max(larg, w.sizeHint().width())
+    if larg:
+        table.horizontalHeader().setSectionResizeMode(col, QHeaderView.Fixed)
+        table.setColumnWidth(col, larg + 8)
+    table.verticalHeader().setDefaultSectionSize(max(table.verticalHeader().defaultSectionSize(), 44))

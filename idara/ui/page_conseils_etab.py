@@ -450,7 +450,8 @@ class PageConseilsEtab(QWidget):
                     c_.setIcon(pictos.icone("calendrier" if prevu else "valider", coul, 16))
                 self.liste.setItem(i, j, c_)
             self.liste.setCellWidget(i, 6, self._actions(r["id"], prevu))
-        self.liste.resizeColumnToContents(6)
+        from idara.ui.vitrine import ajuster_colonne_actions
+        ajuster_colonne_actions(self.liste, 6)
         self.liste.blockSignals(False)
         self.liste.setVisible(bool(self.lignes))
         self.vide_liste.setVisible(not self.lignes)
@@ -458,37 +459,28 @@ class PageConseilsEtab(QWidget):
         self.barre_sel.hide()
 
     def _actions(self, sid: int, prevu: bool) -> QWidget:
-        """أزرار أمام كل مجلس: المبرمج ← الاستدعاء وتحرير المحضر؛ المنجز ← توليد المحضر والاطلاع عليه."""
-        w = QWidget()
-        h = QHBoxLayout(w)
-        h.setContentsMargins(4, 2, 4, 2)
-        h.setSpacing(6)
-
-        def b(texte, couleur, picto, fn, aide=""):
-            x = QPushButton(texte)
-            x.setObjectName("boutonCouleur")
-            x.setIcon(pictos.icone(picto, "#FFFFFF", 15))
-            x.setToolTip(aide)
-            x.setStyleSheet(f"QPushButton {{ background: {couleur}; color: white; border: none; border-radius: 9px; "
-                            f"padding: 4px 10px; font-weight: 700; }} QPushButton:hover {{ background: {couleur}DD; }}"
-                            f" QPushButton:disabled {{ background: #B0BEC5; }}")
-            x.clicked.connect(fn)
-            h.addWidget(x)
-            return x
-        b("الاستدعاء", "#1565C0", "rappel", lambda: self.convocation_ligne(sid), "توليد استدعاء الأعضاء لهذا الاجتماع")
+        """أزرار أمام كل مجلس: المبرمج ← الاستدعاء وتعديل الموعد؛ المنجز ← توليد المحضر والاطلاع عليه."""
+        from PySide6.QtWidgets import QPushButton as _B
+        from idara.ui.vitrine import boutons_ligne
+        specs = [("الاستدعاء", "#1565C0", "rappel", lambda: self.convocation_ligne(sid))]
         if prevu:
-            b("تعديل الموعد", "#00838F", "modifier", lambda: self.ouvrir_programmation(sid=sid))
+            specs.append(("تعديل الموعد", "#00838F", "modifier", lambda: self.ouvrir_programmation(sid=sid)))
         else:
-            b("توليد المحضر", "#2E7D32", "document", lambda: self.pv_ligne(sid), "توليد المحضر من المعطيات المسجلة")
-            voir = b("الاطلاع على المحضر", "#6A1B9A", "apercu", lambda: self.voir_pv(sid),
-                     "فتح آخر محضر مولد لهذا الاجتماع")
+            specs += [("توليد المحضر", "#2E7D32", "document", lambda: self.pv_ligne(sid)),
+                      ("الاطلاع على المحضر", "#6A1B9A", "apercu", lambda: self.voir_pv(sid))]
+        w = boutons_ligne(specs)
+        voir = next((b for b in w.findChildren(_B) if b.text() == "الاطلاع على المحضر"), None)
+        if voir is not None:
             voir.setEnabled(ce.pv_existant(self.f.conn, self.f.dossier, sid) is not None)
+            voir.setToolTip("فتح آخر محضر مولد لهذا الاجتماع")
         return w
 
     def _maj_actions(self) -> None:
         """يعيد بناء أزرار الأسطر (تفعيل «الاطلاع على المحضر» بعد توليده) دون فقد التحديد."""
         for i, r in enumerate(getattr(self, "lignes", [])):
             self.liste.setCellWidget(i, 6, self._actions(r["id"], self._prevu(r)))
+        from idara.ui.vitrine import ajuster_colonne_actions
+        ajuster_colonne_actions(self.liste, 6)
 
     def _ouvrir_ligne(self) -> None:
         r = next((x for x in self.lignes if x["id"] == self.sid), None)

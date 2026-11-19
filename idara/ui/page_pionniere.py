@@ -323,29 +323,16 @@ class PageCommunicationPionniere(QWidget):
                                    "—" if tp is None else f"{tp:.1f}%"), start=1):
                 self.liste.setItem(i, j, cellule(x))
             self.liste.setCellWidget(i, 6, self._actions(r.id))
-        self.liste.resizeColumnToContents(6)
+        from idara.ui.vitrine import ajuster_colonne_actions
+        ajuster_colonne_actions(self.liste, 6)
         self.liste.setVisible(bool(self.lignes))
         self.vide.setVisible(not self.lignes)
 
     def _actions(self, rid: int) -> QWidget:
-        w = QWidget()
-        h = QHBoxLayout(w)
-        h.setContentsMargins(4, 2, 4, 2)
-        h.setSpacing(6)
-        for t, coul, pic, fn in (("التقرير", "#2E7D32", "document", lambda: self.rapport(rid)),
-                                 ("تعديل", "#1565C0", "modifier", lambda: self.ouvrir_rencontre(rid))):
-            b = QPushButton(t)
-            b.setObjectName("boutonCouleur")
-            b.setIcon(pictos.icone(pic, "#FFFFFF", 15))
-            b.setStyleSheet(f"QPushButton {{ background: {coul}; color: white; border: none; border-radius: 9px; "
-                            f"padding: 4px 10px; font-weight: 700; }}")
-            b.clicked.connect(fn)
-            h.addWidget(b)
-        from idara.ui.composants import bouton
-        b = bouton("حذف")
-        b.clicked.connect(lambda: self.supprimer(rid))
-        h.addWidget(b)
-        return w
+        from idara.ui.vitrine import boutons_ligne
+        return boutons_ligne([("التقرير", "#2E7D32", "document", lambda: self.rapport(rid)),
+                              ("تعديل", "#1565C0", "modifier", lambda: self.ouvrir_rencontre(rid)),
+                              ("حذف", "#C62828", "annuler", lambda: self.supprimer(rid))])
 
     def filtrer(self, k: str) -> None:
         self.filtre = None if k == self.filtre else k
@@ -483,13 +470,13 @@ class CarteIndicateur(QFrame):
         val = x["valeur"]
         self.valeur.setText("—" if val is None else (f"{val:.1f}%" if u == "%" else f"{val:g}"))
         ec = x["ecart"]
-        fleche = "" if ec is None else ("▲ " if ec > 0 else "▼ " if ec < 0 else "● ")
+        fleche = "" if ec is None else ("+" if ec > 0 else "−" if ec < 0 else "±")
         refv = x["reference"]
         if refv is None:
             self.ref.setText("لا مرجع للمقارنة بعد")
         else:
             rtxt = f"{refv:.1f}%" if u == "%" else f"{refv:g}"
-            etxt = "" if ec is None else f" · {fleche}{abs(ec):.1f}{' نقطة' if u == '%' else ''}"
+            etxt = "" if ec is None else f" · التطور: \u2066{fleche}{abs(ec):.1f}\u2069{' نقطة' if u == '%' else ''}"
             self.ref.setText(f"المرجع ({x['ref_lib']}): {rtxt}{etxt}")
         cible = x.get("cible")
         self.detail.setText(x["detail"] + (f" · الهدف: {cible:g} (ضعف المرجع)" if cible else ""))

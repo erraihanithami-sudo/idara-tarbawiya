@@ -24,7 +24,7 @@ from idara.ui.formulaires import champ
 from idara.ui.saisie import ChampDate, message
 from idara.ui.vitrine import FenetreFiche, bouton_couleur
 
-JOURS = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+JOURS = ["إثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت", "أحد"]
 COUL_EV = {"memo": "#EF6C00", "ministere": "#3949AB", "local": "#00897B"}
 LIB_EV = {"memo": "تذكير", "ministere": "المقرر الوزاري", "local": "برنامج العمل السنوي"}
 
@@ -96,17 +96,17 @@ class PostIt(QWidget):
             zone = r.adjusted(10, 20, -10, -10)
             p.setPen(QColor("#2B2B2B"))
             p.setFont(_police(10.5, True))
-            p.drawText(zone.adjusted(0, 0, 0, -30), Qt.AlignRight | Qt.AlignTop | Qt.TextWordWrap, m.resume)
-            p.setFont(_police(9))
-            p.setPen(QColor("#4E342E"))
+            p.drawText(zone.adjusted(0, 0, 0, -38), Qt.AlignRight | Qt.AlignTop | Qt.TextWordWrap, m.resume)
             d = date.fromisoformat(m.date_memo)
-            ligne = f"{d.day:02d}/{d.month:02d}/{d.year}" + (f"  ·  {m.heure}" if m.heure else "")
-            p.drawText(zone, Qt.AlignLeft | Qt.AlignBottom, ligne)
             ech = mm.echeance(m)
             coul = "#C62828" if ech.startswith(("اليوم", "متأخر", "أمس")) else "#5D4037"
             p.setPen(QColor(coul))
             p.setFont(_police(8.5, True))
-            p.drawText(zone, Qt.AlignRight | Qt.AlignBottom, ech)
+            p.drawText(zone.adjusted(0, 0, 0, -18), Qt.AlignRight | Qt.AlignBottom, ech)
+            p.setFont(_police(9))
+            p.setPen(QColor("#4E342E"))
+            ligne = f"\u2066{d.day:02d}/{d.month:02d}/{d.year}" + (f"  ·  {m.heure}" if m.heure else "") + "\u2069"
+            p.drawText(zone, Qt.AlignHCenter | Qt.AlignBottom, ligne)
         # الدبوس
         cp = QPointF(r.center().x(), r.top() + 2)
         p.setPen(Qt.NoPen)
@@ -345,7 +345,7 @@ class Agenda(QWidget):
         p.setPen(QColor("#5C6B7A"))
         for col, j in enumerate(JOURS):
             x = self.width() - 8 - (col + 1) * cw
-            p.drawText(QRectF(x, haut + 4, cw, 24), Qt.AlignCenter, j[:3] if len(j) > 4 else j)
+            p.drawText(QRectF(x, haut + 4, cw, 24), Qt.AlignCenter, j)
         auj = date.today()
         for d, c in self._cases():
             evs = self.evenements.get(d.isoformat(), [])

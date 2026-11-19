@@ -498,24 +498,12 @@ class PageVieScolaire(QWidget):
         self.cartes["programmees"].definir(b["programmees"])
         self.cartes["realisees"].definir(b["realisees"])
         self.cartes["realisees"].note.setText(f"{b['taux']:.0f}% من المبرمج" if b["taux"] is not None else " ")
-        from idara.ui import pictos
+        from idara.ui.vitrine import ajuster_colonne_actions, boutons_ligne
         for i, cl in enumerate(cs):
-            w = QWidget()
-            hb = QHBoxLayout(w)
-            hb.setContentsMargins(4, 2, 4, 2)
-            hb.setSpacing(6)
-            for t, coul, pic, fn in (("فتح", "#8E24AA", "ouvrir", lambda _=False, x=cl["id"]: self.ouvrir_club(x)),
-                                     ("نشاط للنادي", "#1565C0", "ajouter",
-                                      lambda _=False, x=cl["id"]: self._activite_club(x))):
-                q = QPushButton(t)
-                q.setObjectName("boutonCouleur")
-                q.setIcon(pictos.icone(pic, "#FFFFFF", 15))
-                q.setStyleSheet(f"QPushButton {{ background: {coul}; color: white; border: none; border-radius: 9px; "
-                                f"padding: 4px 10px; font-weight: 700; }}")
-                q.clicked.connect(fn)
-                hb.addWidget(q)
+            w = boutons_ligne([("فتح", "#8E24AA", "ouvrir", lambda x=cl["id"]: self.ouvrir_club(x)),
+                               ("نشاط للنادي", "#1565C0", "ajouter", lambda x=cl["id"]: self._activite_club(x))])
             self.clubs.setCellWidget(i, 5, w)
-        self.clubs.resizeColumnToContents(5)
+        ajuster_colonne_actions(self.clubs, 5)
         self.indic.setText(
             f"الأنشطة: مبرمجة {b['programmees']}، منجزة {b['realisees']}"
             + (f" ({b['taux']:.2f}%)" if b["taux"] is not None else "")
