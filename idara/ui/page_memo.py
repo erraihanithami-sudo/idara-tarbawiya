@@ -511,9 +511,10 @@ class PageMemo(QWidget):
             pi.clique.connect(lambda x: self.ouvrir(x.id))
             g.addWidget(pi, i // cols, i % cols)
             self.notes.append(pi)
-        self.sabboura.vide.setVisible(not self.memos)
         if not self.memos:
             g.addWidget(self.sabboura.vide, 0, 0)
+        self.sabboura.vide.setParent(self.sabboura) if self.sabboura.vide.parent() is None else None
+        self.sabboura.vide.setVisible(not self.memos)
         self.agenda.recharger()
 
     def _colonnes(self) -> int:

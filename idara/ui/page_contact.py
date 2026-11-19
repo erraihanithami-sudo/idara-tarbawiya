@@ -19,6 +19,10 @@ EMAIL = "erraihani.thami@gmail.com"
 SUJET = "الشامل في الإدارة التربوية"
 
 
+def ouvrir_externe(url: str) -> bool:
+    return QDesktopServices.openUrl(QUrl(url))
+
+
 def _police(t: float, gras=False) -> QFont:
     f = QFont()
     f.setPointSizeF(t)
@@ -182,7 +186,7 @@ class PageContact(QWidget):
     def ouvrir_url(self, url: str) -> bool:
         self.ouverts.append(url)
         try:
-            return QDesktopServices.openUrl(QUrl(url))
+            return ouvrir_externe(url)
         except Exception:  # noqa: BLE001 — لا متصفح أو لا برنامج بريد
             return False
 

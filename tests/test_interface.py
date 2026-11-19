@@ -1237,7 +1237,7 @@ def test_mofakkira_et_contact(app, config_tmp, monkeypatch):
     assert not img.isNull()
     f.aller_a("التواصل")
     c = f.page_contact
-    monkeypatch.setattr(pc.QDesktopServices, "openUrl", lambda u: True)
+    monkeypatch.setattr(pc, "ouvrir_externe", lambda u: True)
     assert pc.TELEPHONE in c.wa.valeur.text() and pc.EMAIL in c.mail.valeur.text()
     c.wa.findChildren(pc.QPushButton)[0].click()
     c.mail.findChildren(pc.QPushButton)[0].click()
