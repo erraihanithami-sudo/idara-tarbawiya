@@ -82,7 +82,7 @@ class DialogueBordereau(QDialog):
         self.le.definir(date.today().isoformat())
         self.bureau = QComboBox()
         # مكاتب هيكلة المديرية (طلب المدير 2026-11-19)؛ المكتبان المعيَّنان يحملان مفتاح إعدادهما
-        conn = parent.f.conn
+        conn = getattr(parent, "f", parent).conn   # الصفحة أو النافذة الرئيسية
         par = cg.parametres(conn)
         cles = {par["bureau_conges"]: "bureau_conges", par["bureau_etablissements"]: "bureau_etablissements"}
         for sv, bu in cg.bureaux_direction(conn):
