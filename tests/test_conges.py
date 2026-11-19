@@ -257,3 +257,19 @@ def test_rukhsat_radaa(base):
     m_id = rh.enregistrer(base, rh.Personnel(nom_ar="الحارس", prenom_ar="علي", sexe="M", categorie="gardien"))
     with pytest.raises(cg.ErreurConge, match="الموظفات"):
         _conge(base, m_id, type_conge_id=rid, date_debut=debut, duree_jours=5, date_naissance_enfant="2025-03-01")
+
+
+def test_structure_direction(base):  # noqa: F811
+    """طلب المدير 2026-11-19: هيكلة المديرية تختلف من مديرية إلى أخرى."""
+    st = cg.structure_direction(base)
+    assert st[0]["service"] == "مصلحة تدبير الموارد البشرية" and len(st[0]["bureaux"]) == 2
+    with pytest.raises(cg.ErreurConge, match="حدد المصلحة"):
+        cg.enregistrer_structure_direction(base, [("", "مكتب يتيم")])
+    with pytest.raises(cg.ErreurConge, match="غير موجود"):
+        cg.enregistrer_structure_direction(base, [("مصلحة أ", "مكتب 1")], {"bureau_conges": "مكتب 9"})
+    assert cg.structure_direction(base) == st   # لا كتابة جزئية عند الخطأ
+    cg.enregistrer_structure_direction(base, [("مصلحة أ", "مكتب 1"), ("", "مكتب 2"), ("مصلحة ب", "")],
+                                       {"service_rh": "مصلحة أ", "bureau_conges": "مكتب 2"})
+    assert cg.bureaux_direction(base) == [("مصلحة أ", "مكتب 1"), ("مصلحة أ", "مكتب 2")]
+    v = cg.valeurs_bordereau(base, [("وثيقة", 1)], "1", "2026-11-19", "مكتب 1")
+    assert v["dest_bureau"] == "مكتب 1" and cg.valeurs_bordereau(base, [("و", 1)], "1", "2026-11-19")["dest_bureau"] == "مكتب 2"

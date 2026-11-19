@@ -6,7 +6,7 @@ from datetime import date
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QDialogButtonBox,
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QHeaderView,
                                QFormLayout, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
@@ -81,8 +81,15 @@ class DialogueBordereau(QDialog):
         self.le = ChampDate()
         self.le.definir(date.today().isoformat())
         self.bureau = QComboBox()
-        self.bureau.addItem("مكتب الرخص والتغيبات (إعداد المراسلات)", "bureau_conges")
-        self.bureau.addItem("مكتب تسيير المؤسسات (إعداد المراسلات)", "bureau_etablissements")
+        # مكاتب هيكلة المديرية (طلب المدير 2026-11-19)؛ المكتبان المعيَّنان يحملان مفتاح إعدادهما
+        conn = parent.f.conn
+        par = cg.parametres(conn)
+        cles = {par["bureau_conges"]: "bureau_conges", par["bureau_etablissements"]: "bureau_etablissements"}
+        for sv, bu in cg.bureaux_direction(conn):
+            self.bureau.addItem(f"{bu} ({sv})", cles.get(bu, bu))
+        for k in ("bureau_conges", "bureau_etablissements"):
+            if self.bureau.findData(k) < 0:
+                self.bureau.addItem(par[k], k)
         self.bureau.setCurrentIndex(max(0, self.bureau.findData(bureau)))
         f.addRow("الموضوع (لسجل الصادر)", self.objet)
         f.addRow("التاريخ", self.le)
@@ -845,18 +852,126 @@ class PageSortants(QWidget):
         h.addWidget(self.le)
         h.addWidget(b)
         v.addLayout(h)
+        h2 = QHBoxLayout()
         b2 = QPushButton("ورقة إرسال حرة...")
         b2.clicked.connect(self.dialogue_bordereau)
-        v.addWidget(b2, 0, Qt.AlignRight)
+        h2.addWidget(b2)
+        h2.addStretch()
+        from idara.ui.vitrine import bouton_couleur
+        self.b_structure = bouton_couleur("هيكلة المديرية: المصالح والمكاتب", "#1565C0", "personnes",
+                                          "تختلف من مديرية إلى أخرى: أضف مصالح مديريتك ومكاتبها")
+        self.b_structure.clicked.connect(lambda: self.ouvrir_structure())
+        h2.addWidget(self.b_structure)
+        v.addLayout(h2)
+        self.l_structure = QLabel()
+        self.l_structure.setWordWrap(True)
+        self.l_structure.setTextFormat(Qt.RichText)
+        self.l_structure.setStyleSheet("background: #F3F7FC; border: 1px solid #D5E3F3; border-radius: 12px; "
+                                       "padding: 10px 14px;")
+        v.addWidget(self.l_structure)
         self.table = tableau(["الرقم", "التاريخ", "الموضوع"], etirer=2)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.setMinimumHeight(420)
         v.addWidget(self.table)
         racine.addWidget(c)
         racine.addStretch()
+        self._construire_structure()
         self.rafraichir()
 
+    # ---- هيكلة المديرية في نافذة منبثقة (طلب المدير 2026-11-19) ----
+    def _construire_structure(self) -> None:
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        w = QWidget()
+        v = QVBoxLayout(w)
+        aide = QLabel("سطر لكل مكتب: المصلحة ثم المكتب التابع لها. مصلحة دون مكاتب: اترك خانة المكتب فارغة. "
+                      "ثم حدد المصلحة والمكتبين اللذين تُوجَّه إليهما الرخص وأوراق الإرسال.")
+        aide.setObjectName("etiquette")
+        aide.setWordWrap(True)
+        v.addWidget(aide)
+        self.t_structure = QTableWidget(0, 2)
+        self.t_structure.setHorizontalHeaderLabels(["المصلحة", "المكتب"])
+        self.t_structure.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.t_structure.verticalHeader().setVisible(False)
+        self.t_structure.setMinimumHeight(280)
+        v.addWidget(self.t_structure)
+        h = QHBoxLayout()
+        b = QPushButton("+ مكتب أو مصلحة")
+        b.clicked.connect(lambda: self._ligne_structure("", ""))
+        h.addWidget(b)
+        b = bouton("حذف السطر المحدد")
+        b.clicked.connect(lambda: self.t_structure.removeRow(self.t_structure.currentRow()))
+        h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        f = QFormLayout()
+        self.aff = {k: QComboBox() for k in ("service_rh", "bureau_conges", "bureau_etablissements")}
+        for k, cb in self.aff.items():
+            cb.setEditable(True)
+            f.addRow({"service_rh": "المصلحة المختصة بالرخص", "bureau_conges": "مكتب الرخص (طلبات الرخص)",
+                      "bureau_etablissements": "مكتب تسيير المؤسسات (أوراق الإرسال)"}[k], cb)
+        v.addLayout(f)
+        h = QHBoxLayout()
+        b = bouton_couleur("حفظ الهيكلة", "#1565C0", "enregistrer")
+        b.clicked.connect(lambda: self.enregistrer_structure())
+        h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        self.message_structure = QLabel()
+        self.message_structure.setWordWrap(True)
+        self.message_structure.hide()
+        v.addWidget(self.message_structure)
+        self.fiche_structure = FenetreFiche(self, "هيكلة المديرية الإقليمية", "", w, largeur=760)
+
+    def _ligne_structure(self, sv: str, bu: str) -> None:
+        i = self.t_structure.rowCount()
+        self.t_structure.insertRow(i)
+        self.t_structure.setItem(i, 0, QTableWidgetItem(sv))
+        self.t_structure.setItem(i, 1, QTableWidgetItem(bu))
+
+    def ouvrir_structure(self):
+        st = cg.structure_direction(self.f.conn)
+        self.t_structure.setRowCount(0)
+        for x in st:
+            for b in x["bureaux"] or [""]:
+                self._ligne_structure(x["service"], b)
+        par = cg.parametres(self.f.conn)
+        for k, cb in self.aff.items():
+            cb.clear()
+            cb.addItems([x["service"] for x in st] if k == "service_rh" else [b for x in st for b in x["bureaux"]])
+            cb.setCurrentText(par[k])
+        self.message_structure.hide()
+        self.fiche_structure.ouvrir()
+        return self.fiche_structure
+
+    def enregistrer_structure(self) -> bool:
+        self.t_structure.setCurrentItem(None)
+        lignes = [tuple((self.t_structure.item(i, j).text() if self.t_structure.item(i, j) else "") for j in range(2))
+                  for i in range(self.t_structure.rowCount())]
+        try:
+            cg.enregistrer_structure_direction(self.f.conn, lignes, {k: cb.currentText() for k, cb in self.aff.items()})
+        except cg.ErreurConge as e:
+            message(self.message_structure, str(e), True)
+            return False
+        message(self.message_structure, "حُفظت هيكلة المديرية.")
+        self._afficher_structure()
+        # إعادة ملء قوائم الاختيار بالمصالح والمكاتب الجديدة
+        self.ouvrir_structure()
+        message(self.message_structure, "حُفظت هيكلة المديرية.")
+        return True
+
+    def _afficher_structure(self) -> None:
+        st = cg.structure_direction(self.f.conn)
+        par = cg.parametres(self.f.conn)
+        puce = ("<span style='background:{c};color:white;border-radius:8px;padding:2px 8px;'>&nbsp;{t}&nbsp;</span>")
+        lignes = []
+        for x in st:
+            bs = " ".join(puce.format(c="#2E7D32" if b in (par["bureau_conges"], par["bureau_etablissements"])
+                                      else "#78909C", t=b) for b in x["bureaux"]) or "—"
+            lignes.append(f"<b style='color:#1565C0'>{x['service']}</b>: {bs}")
+        self.l_structure.setText("<div dir='rtl'><b>هيكلة المديرية</b><br>" + "<br>".join(lignes) + "</div>")
+
     def rafraichir(self) -> None:
+        self._afficher_structure()
         try:
             lignes = cg.sortants(self.f.conn)
             self.prochain.setText(f"الرقم الموالي: {cg.prochain_numero(self.f.conn)}")

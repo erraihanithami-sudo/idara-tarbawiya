@@ -61,6 +61,57 @@ def definir_parametres(conn: sqlite3.Connection, valeurs: dict[str, str]) -> Non
                          "ON CONFLICT(cle) DO UPDATE SET valeur=excluded.valeur", (k, v))
 
 
+# ---------- هيكلة المديرية (طلب المدير 2026-11-19: تختلف من مديرية إلى أخرى) ----------
+# المصالح ومكاتبها كما يُدخلها المدير؛ وتُختار منها المصلحة والمكتبان اللذان تُوجَّه إليهما الرخص وأوراق الإرسال.
+
+def structure_direction(conn: sqlite3.Connection) -> list[dict]:
+    """[{"service": ..., "bureaux": [...]}]. إن لم تُدخل بعد: مصلحة الموارد البشرية ومكتباها الافتراضيان."""
+    from idara.services import fiches
+    d = fiches.lire(conn, "structure_direction")
+    if d and d.get("services"):
+        return d["services"]
+    p = parametres(conn)
+    return [{"service": p["service_rh"], "bureaux": [p["bureau_conges"], p["bureau_etablissements"]]}]
+
+
+def enregistrer_structure_direction(conn: sqlite3.Connection, lignes: list[tuple[str, str]],
+                                    affectations: dict[str, str] | None = None) -> list[dict]:
+    """lignes: [(المصلحة، المكتب)] (المكتب اختياري). affectations: service_rh، bureau_conges، bureau_etablissements."""
+    from idara.services import fiches
+    services: dict[str, list[str]] = {}
+    courant = ""
+    for sv, bu in lignes:
+        sv, bu = " ".join((sv or "").split()), " ".join((bu or "").split())
+        sv = sv or courant
+        if not sv:
+            if bu:
+                raise ErreurConge(f"المكتب «{bu}»: حدد المصلحة التي يتبع لها.")
+            continue
+        courant = sv
+        services.setdefault(sv, [])
+        if bu and bu not in services[sv]:
+            services[sv].append(bu)
+    if not services:
+        raise ErreurConge("أدخل مصلحة واحدة على الأقل.")
+    res = [{"service": k, "bureaux": v} for k, v in services.items()]
+    affectations = {k: " ".join((v or "").split()) for k, v in (affectations or {}).items()}
+    tous_b = {b for x in res for b in x["bureaux"]}
+    for k, v in affectations.items():
+        if k == "service_rh" and v and v not in services:
+            raise ErreurConge(f"المصلحة «{v}» غير موجودة في الهيكلة.")
+        if k != "service_rh" and v and v not in tous_b:
+            raise ErreurConge(f"المكتب «{v}» غير موجود في الهيكلة.")
+    fiches.ecrire(conn, "structure_direction", {"services": res})
+    if any(affectations.values()):
+        definir_parametres(conn, {k: v for k, v in affectations.items() if v})
+    return res
+
+
+def bureaux_direction(conn: sqlite3.Connection) -> list[tuple[str, str]]:
+    """[(المصلحة، المكتب)] لاختيار المكتب في أوراق الإرسال."""
+    return [(x["service"], b) for x in structure_direction(conn) for b in x["bureaux"]]
+
+
 def _destination(conn) -> dict[str, str]:
     p = parametres(conn)
     d = p["destinataire"]
@@ -513,7 +564,7 @@ def valeurs_bordereau(conn, pieces: list[tuple[str, int]], numero: str, le: str,
     v = _communs(conn)
     # رقم الإرسال يُترك فارغاً ويكتبه المدير بيده (قرار المدير 2026-11-09)
     v.update({"date_redaction": tx.date_ar(le), "numero": "", "date_enregistrement": tx.date_ar(le),
-              "dest_bureau": v[bureau]})
+              "dest_bureau": v.get(bureau) or bureau})   # مفتاح إعداد أو اسم مكتب من هيكلة المديرية
     for i in range(1, 9):
         if i <= len(pieces):
             v[f"piece_{i}"], v[f"nb_{i}"] = pieces[i - 1][0], f"*{int(pieces[i - 1][1]):02d}"

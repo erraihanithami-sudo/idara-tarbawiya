@@ -598,6 +598,20 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     assert s.table.rowCount() == 2 and "3" in s.prochain.text()
     s.objet.setText("مراسلة يدوية")
     assert s.ajouter() == "3/26-27" and s.table.rowCount() == 3
+    # طلب المدير 2026-11-19: هيكلة المديرية (المصالح والمكاتب) في نافذة منبثقة
+    d = s.ouvrir_structure()
+    assert d.isVisible() and s.t_structure.rowCount() == 2 and "مصلحة تدبير الموارد البشرية" in s.l_structure.text()
+    s._ligne_structure("مصلحة الشؤون التربوية", "مكتب التخطيط")
+    s._ligne_structure("", "مكتب الحياة المدرسية")
+    s.aff["bureau_etablissements"].setCurrentText("مكتب الحياة المدرسية")
+    assert s.enregistrer_structure(), s.message_structure.text()
+    assert cg.structure_direction(f.conn)[1] == {"service": "مصلحة الشؤون التربوية",
+                                                 "bureaux": ["مكتب التخطيط", "مكتب الحياة المدرسية"]}
+    assert cg.parametres(f.conn)["bureau_etablissements"] == "مكتب الحياة المدرسية"
+    assert "مكتب التخطيط" in s.l_structure.text()
+    s.aff["bureau_conges"].setCurrentText("مكتب غير موجود")
+    assert not s.enregistrer_structure() and "غير موجود" in s.message_structure.text()
+    d.hide()
     f.aller_a("الرخص")
     # طلب المدير 2026-11-18: وثائق الرخصة المحددة من الصفحة، و«حفظ وتوليد طلب الرخصة» من ملفها
     from idara.ui.saisie import selectionner
