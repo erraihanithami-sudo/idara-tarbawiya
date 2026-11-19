@@ -2349,6 +2349,7 @@ def test_pages_vie_admin(app, config_tmp, monkeypatch):
     t.t_el.item(1, 2).setText("حافلة 7")
     assert not t.enregistrer() and "غير موجودة" in t.message.text()
     # استعمالات الزمن
+    from idara.services import vie_admin as va
     f.aller_a("استعمالات الزمن")
     e = f.page_emplois
     e.prof.setCurrentIndex(e.prof.findData(pid))
@@ -2379,6 +2380,12 @@ def test_pages_vie_admin(app, config_tmp, monkeypatch):
     k = next(k for k in range(e.collectif.rowCount()) if e.collectif.item(k, 0).data(Qt.UserRole) == pid)
     assert any(e.collectif.item(k, j).text() == "08:30–10:00" for j in range(1, e.collectif.columnCount()))
     assert e.ouvrir_quotas().isVisible()
+    # طلب المدير 2026-11-19: الحصيص حسب المستوى
+    e.niveau_quota.setCurrentIndex(e.niveau_quota.findData("3AP"))
+    assert all(not (e.t_quotas.item(k, 1) and e.t_quotas.item(k, 1).text()) for k in range(e.t_quotas.rowCount()))
+    assert "الحصيص العام" in e.l_niveau_quota.text()
+    e.t_quotas.item(0, 1).setText("120")
+    assert e.enregistrer_quotas() and va.lire_quotas(f.conn, "3AP")[e.t_quotas.item(0, 0).text()] == 120
     f.close()
 
 

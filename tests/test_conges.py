@@ -273,3 +273,10 @@ def test_structure_direction(base):  # noqa: F811
     assert cg.bureaux_direction(base) == [("مصلحة أ", "مكتب 1"), ("مصلحة أ", "مكتب 2")]
     v = cg.valeurs_bordereau(base, [("وثيقة", 1)], "1", "2026-11-19", "مكتب 1")
     assert v["dest_bureau"] == "مكتب 1" and cg.valeurs_bordereau(base, [("و", 1)], "1", "2026-11-19")["dest_bureau"] == "مكتب 2"
+
+
+def test_directeur_sans_conges(base):  # noqa: F811
+    """طلب المدير 2026-11-19: المدير غير معني بالرخص في البرنامج (ينجزها في المديرية)."""
+    did = next(p.id for p in rh.lister(base) if p.categorie == "directeur")
+    with pytest.raises(cg.ErreurConge, match="المديرية"):
+        _conge(base, did)

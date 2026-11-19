@@ -77,6 +77,16 @@ def test_emploi_du_temps(base, dossier):  # noqa: F811
     va.enregistrer_quotas(base, {"الرياضيات": "300", "اللغة العربية": 45, "النشاط العلمي": ""})
     etats = {m["matiere"]: m["etat"] for m in va.controle_emploi(base, pid)["matieres"]}
     assert etats == {"الرياضيات": "الحصيص غير مستكمل: ينقص 150 دقيقة", "اللغة العربية": "الحصيص مكتمل"}
+    # طلب المدير 2026-11-19: الحصيص يختلف حسب المستوى؛ المستوى دون حصيص خاص يأخذ العام
+    with pytest.raises(va.ErreurVieAdmin, match="مستوى"):
+        va.enregistrer_quotas(base, {"الرياضيات": "200"}, "9AP")
+    va.enregistrer_quotas(base, {"الرياضيات": "150", "اللغة العربية": "60"}, "3AP")
+    assert va.quotas_definis(base) == ["3AP"] and va.lire_quotas(base, "3AP")["الرياضيات"] == 150
+    assert va.lire_quotas(base, "5AP")["الرياضيات"] == 300 and va.lire_quotas(base)["الرياضيات"] == 300
+    etats = {m["matiere"]: m["etat"] for m in va.controle_emploi(base, pid)["matieres"]}
+    assert etats == {"الرياضيات": "الحصيص مكتمل", "اللغة العربية": "الحصيص غير مستكمل: ينقص 15 دقيقة"}
+    va.enregistrer_quotas(base, {}, "3AP")
+    assert va.quotas_definis(base) == []
     assert va.demi_journees(base, pid)["الاثنين"] == ["08:30–10:15", ""]
     assert va.demi_journees(base, pid)["الثلاثاء"] == ["", "14:00–15:30"]
     _, cel, t = _cellules(va.generer_emploi(base, dossier, pid))

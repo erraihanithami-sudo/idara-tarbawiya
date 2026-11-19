@@ -343,6 +343,8 @@ def enregistrer(conn: sqlite3.Connection, c: Conge) -> int:
     p = rh.lire(conn, c.personnel_id)
     if p.statut != "actif":
         raise ErreurConge("الموظف غير عامل حالياً.")
+    if p.categorie == "directeur":   # طلب المدير 2026-11-19
+        raise ErreurConge("رخص المدير تُنجز في المديرية الإقليمية، لا في البرنامج.")
     if not conn.execute("SELECT 1 FROM type_conge WHERE id=?", (c.type_conge_id,)).fetchone():
         raise ErreurConge("نوع الرخصة غير معروف.")
     radaa = est_allaitement(conn, c.type_conge_id)

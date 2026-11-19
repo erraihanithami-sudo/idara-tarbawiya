@@ -775,11 +775,23 @@ class PageEmplois(QWidget):
         # ---- نافذة الحصيص ----
         w = QWidget()
         wv = QVBoxLayout(w)
-        aide = QLabel("أدخلوا مرة واحدة عدد الدقائق الأسبوعي لكل مادة حسب المنهاج المعتمد عندكم. البرنامج لا يفترض "
-                      "أي حصيص: المادة دون حصيص لا تُراقب.")
+        aide = QLabel("عدد الدقائق الأسبوعي لكل مادة حسب المستوى الدراسي والمنهاج المعتمد عندكم. المستوى الذي لا تُدخل "
+                      "له حصيصاً يأخذ «الحصيص العام». البرنامج لا يفترض أي حصيص: المادة دون حصيص لا تُراقب.")
         aide.setObjectName("etiquette")
         aide.setWordWrap(True)
         wv.addWidget(aide)
+        hq = QHBoxLayout()
+        hq.addWidget(QLabel("المستوى:"))
+        self.niveau_quota = QComboBox()
+        self.niveau_quota.addItem("الحصيص العام (كل المستويات)", None)
+        for n in va.NIVEAUX_QUOTAS:
+            self.niveau_quota.addItem(f"المستوى {tx.niveau_ar(n)}", n)
+        self.niveau_quota.currentIndexChanged.connect(lambda _: self._charger_quotas())
+        hq.addWidget(self.niveau_quota)
+        self.l_niveau_quota = QLabel()
+        self.l_niveau_quota.setObjectName("etiquette")
+        hq.addWidget(self.l_niveau_quota, 1)
+        wv.addLayout(hq)
         self.t_quotas = _grille(("المادة", "الدقائق في الأسبوع"), 260)
         wv.addWidget(self.t_quotas)
         h = QHBoxLayout()
@@ -896,8 +908,7 @@ class PageEmplois(QWidget):
                 self.prof.addItem(f"{p.prenom_ar} {p.nom_ar}", p.id)
         self.prof.setCurrentIndex(max(0, self.prof.findData(actuel)))
         self.prof.blockSignals(False)
-        q = va.lire_quotas(self.f.conn)
-        _remplir(self.t_quotas, [[m, str(q.get(m, ""))] for m in list(dict.fromkeys(list(va.MATIERES) + list(q)))])
+        self._charger_quotas()
         self.charger()
         self._afficher()
 
@@ -943,9 +954,17 @@ class PageEmplois(QWidget):
             message(self.message_fiche, "حُفظ استعمال الزمن.")
         return True
 
+    def _charger_quotas(self) -> None:
+        n = self.niveau_quota.currentData()
+        propres = n in va.quotas_definis(self.f.conn) if n else True
+        q = va.lire_quotas(self.f.conn, n) if propres else {}
+        _remplir(self.t_quotas, [[m, str(q.get(m, ""))] for m in list(dict.fromkeys(list(va.MATIERES) + list(q)))])
+        self.l_niveau_quota.setText("" if propres else "لا حصيص خاص بهذا المستوى: يأخذ الحصيص العام إلى أن تملأه.")
+
     def enregistrer_quotas(self) -> bool:
         try:
-            va.enregistrer_quotas(self.f.conn, {l[0]: l[1] for l in _lire(self.t_quotas)})
+            va.enregistrer_quotas(self.f.conn, {l[0]: l[1] for l in _lire(self.t_quotas)},
+                                  self.niveau_quota.currentData())
         except va.ErreurVieAdmin as e:
             message(self.message, str(e), True)
             return False

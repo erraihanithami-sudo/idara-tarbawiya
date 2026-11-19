@@ -292,12 +292,32 @@ def enregistrer_emploi(conn: sqlite3.Connection, pid: int, seances: list[list[st
     fiches.ecrire(conn, f"emploi:{int(pid)}", {"seances": propres})
 
 
-def lire_quotas(conn: sqlite3.Connection) -> dict[str, int]:
-    """الحصيص الأسبوعي بالدقائق لكل مادة، كما أدخله المدير (لا قيم مفترضة)."""
-    return {k: int(v) for k, v in (fiches.lire(conn, "emploi_quotas") or {}).items() if v}
+# الحصيص الأسبوعي يختلف حسب المستوى الدراسي (طلب المدير 2026-11-19). التخزين:
+# {"tous": {المادة: دقائق}, "par_niveau": {"1AP": {...}, ...}}؛ الصيغة القديمة (قاموس مسطح) تُقرأ «لكل المستويات».
+NIVEAUX_QUOTAS = ("1AP", "2AP", "3AP", "4AP", "5AP", "6AP")
 
 
-def enregistrer_quotas(conn: sqlite3.Connection, quotas: dict[str, object]) -> None:
+def _quotas_bruts(conn) -> dict:
+    d = fiches.lire(conn, "emploi_quotas") or {}
+    if "par_niveau" in d or "tous" in d:
+        return {"tous": d.get("tous", {}), "par_niveau": d.get("par_niveau", {})}
+    return {"tous": d, "par_niveau": {}}
+
+
+def lire_quotas(conn: sqlite3.Connection, niveau: str | None = None) -> dict[str, int]:
+    """الحصيص الأسبوعي بالدقائق لكل مادة كما أدخله المدير (لا قيم مفترضة). niveau: رمز المستوى (3AP…)؛
+    دونه الحصيص العام. المستوى الذي لم يُدخل له حصيص خاص يأخذ العام."""
+    d = _quotas_bruts(conn)
+    q = d["par_niveau"].get(niveau) if niveau else None
+    return {k: int(v) for k, v in (q if q else d["tous"]).items() if v}
+
+
+def quotas_definis(conn: sqlite3.Connection) -> list[str]:
+    """المستويات التي لها حصيص خاص."""
+    return [n for n, q in _quotas_bruts(conn)["par_niveau"].items() if q]
+
+
+def enregistrer_quotas(conn: sqlite3.Connection, quotas: dict[str, object], niveau: str | None = None) -> None:
     propres = {}
     for k, v in quotas.items():
         k = " ".join(str(k).split())
@@ -310,19 +330,63 @@ def enregistrer_quotas(conn: sqlite3.Connection, quotas: dict[str, object]) -> N
         if n < 0:
             raise ErreurVieAdmin(f"حصيص «{k}» لا يكون سالباً.")
         propres[k] = n
-    fiches.ecrire(conn, "emploi_quotas", propres)
+    if niveau and niveau not in NIVEAUX_QUOTAS:
+        raise ErreurVieAdmin("مستوى غير معروف.")
+    d = _quotas_bruts(conn)
+    if niveau:
+        d["par_niveau"][niveau] = propres
+    else:
+        d["tous"] = propres
+    fiches.ecrire(conn, "emploi_quotas", d)
+
+
+def _niveaux_texte(t: str) -> list[str]:
+    """رموز المستويات المذكورة في خانة «المستوى أو القسم»: 3AP، 4APG-5APG، «الثالث»…"""
+    from idara.services.massar import niveaux_du_code_classe
+    t = (t or "").strip()
+    if not t:
+        return []
+    res = []
+    try:
+        res = [n for n in niveaux_du_code_classe(t) if n in NIVEAUX_QUOTAS]
+    except Exception:  # noqa: BLE001 — نص حر
+        res = []
+    for n in NIVEAUX_QUOTAS:
+        if n not in res and (n in t.upper() or tx.niveau_ar(n) in t.split()):
+            res.append(n)
+    return res
+
+
+def niveaux_enseignant(conn: sqlite3.Connection, pid: int) -> list[str]:
+    """مستويات الأستاذ من أقسامه المسندة، وإلا من «مستوى التدريس» المكتوب في ملفه."""
+    p = rh.lire(conn, pid)
+    from idara.services.massar import niveaux_du_code_classe
+    res: list[str] = []
+    if p.classes:
+        for r in conn.execute(f"SELECT code FROM classe WHERE id IN ({','.join('?' * len(p.classes))})", p.classes):
+            for n in niveaux_du_code_classe(r[0]):
+                if n in NIVEAUX_QUOTAS and n not in res:
+                    res.append(n)
+    if not res:
+        res = _niveaux_texte(p.niveau_enseigne or "")
+    return res
 
 
 def controle_emploi(conn: sqlite3.Connection, pid: int) -> dict:
-    """مجموع الدقائق الأسبوعي، ولكل مادة: المنجز، الحصيص (إن أُدخل)، والفرق."""
+    """مجموع الدقائق الأسبوعي، ولكل مادة (ولكل مستوى إن اختلف الحصيص): المنجز، الحصيص، والفرق.
+    مستوى الحصة: ما كُتب في خانتها، وإلا مستويات الأستاذ (القسم المشترك: الحصة تُحسب لكل مستوياته)."""
     ss = lire_emploi(conn, pid)
-    par: dict[str, int] = {}
+    defaut = niveaux_enseignant(conn, pid)
+    par_niv = bool(quotas_definis(conn))
+    par: dict[tuple[str, str], int] = {}
     for s in ss:
-        par[s[3]] = par.get(s[3], 0) + _minutes(s[2]) - _minutes(s[1])
-    q = lire_quotas(conn)
+        d = _minutes(s[2]) - _minutes(s[1])
+        nivs = (_niveaux_texte(s[4]) or defaut) if par_niv else []
+        for n in nivs or [""]:
+            par[(s[3], n)] = par.get((s[3], n), 0) + d
     matieres = []
-    for m in list(dict.fromkeys(list(par) + [k for k in q if k in par])):
-        fait, quota = par.get(m, 0), q.get(m)
+    for (m, n), fait in par.items():
+        quota = lire_quotas(conn, n or None).get(m)
         if quota is None:
             etat = ""
         elif fait > quota:
@@ -331,8 +395,9 @@ def controle_emploi(conn: sqlite3.Connection, pid: int) -> dict:
             etat = f"الحصيص غير مستكمل: ينقص {quota - fait} دقيقة"
         else:
             etat = "الحصيص مكتمل"
-        matieres.append({"matiere": m, "minutes": fait, "quota": quota, "etat": etat})
-    total = sum(par.values())
+        lib = f"{m} ({tx.niveau_ar(n)})" if n and len({x for (_, x) in par}) > 1 else m
+        matieres.append({"matiere": lib, "minutes": fait, "quota": quota, "etat": etat, "niveau": n})
+    total = sum(_minutes(s[2]) - _minutes(s[1]) for s in ss)
     return {"total": total, "heures": f"{total // 60} س {total % 60:02d} د", "matieres": matieres, "seances": len(ss)}
 
 

@@ -422,7 +422,7 @@ class PageConges(QWidget):
     def rafraichir(self) -> None:
         conn = self.f.conn
         actuel = self.personnel.currentData()
-        self.personnels = rh.lister(conn)
+        self.personnels = [p for p in rh.lister(conn) if p.categorie != "directeur"]   # المدير ينجز رخصه في المديرية (2026-11-19)
         self.personnel.blockSignals(True)
         self.personnel.clear()
         for p in self.personnels:
