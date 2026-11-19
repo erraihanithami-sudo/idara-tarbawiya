@@ -50,9 +50,8 @@ class PageConseils(QWidget):
         h.addWidget(self.niveau)
         h.addStretch()
         v.addLayout(h)
-        self.verif = QLabel()
-        self.verif.setObjectName("alerte")
-        self.verif.setWordWrap(True)
+        from idara.ui.vitrine import AlerteTriangle
+        self.verif = AlerteTriangle("قبل التوليد")
         v.addWidget(self.verif)
         self.niveaux_manquants = tableau(["التلميذ (قسم مشترك)", "المستوى"], etirer=0)
         self.niveaux_manquants.setMaximumHeight(200)

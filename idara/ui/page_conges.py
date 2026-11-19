@@ -20,7 +20,7 @@ from idara.ui.formulaires import champ, etiquette
 from idara.ui import pictos
 from idara.ui.graphiques import Anneau, BarresGroupees
 from idara.ui.saisie import ChampDate, cellule, message, tableau
-from idara.ui.vitrine import CarteFiltre, FenetreFiche, bouton_couleur, grille_cartes
+from idara.ui.vitrine import AlerteTriangle, CarteFiltre, FenetreFiche, bouton_couleur, grille_cartes
 
 DOCS_COULEURS = {"demande": "#2E7D32", "recu": "#1565C0", "remp": "#6A1B9A", "bord": "#00838F",
                  "reprise": "#EF6C00"}
@@ -200,9 +200,7 @@ class PageConges(QWidget):
         b3.clicked.connect(lambda: self.fiche_params.ouvrir())
         h.addWidget(b3)
         racine.addLayout(h)
-        self.alertes = QLabel()
-        self.alertes.setObjectName("alerte")
-        self.alertes.setWordWrap(True)
+        self.alertes = AlerteTriangle("رخص تحتاج إجراء")   # مثلث التنبيه (طلب المدير 2026-11-19)
         racine.addWidget(self.alertes)
         self.l_radaa = QLabel()
         self.l_radaa.setObjectName("info")

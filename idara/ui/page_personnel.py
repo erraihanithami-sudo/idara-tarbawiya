@@ -18,7 +18,7 @@ from idara.ui.composants import bouton, carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.graphiques import Anneau, BarresGroupees
 from idara.ui.saisie import ChampDate, cellule, message, selectionner, tableau
-from idara.ui.vitrine import CarteFiltre, FenetreFiche, grille_cartes
+from idara.ui.vitrine import CarteFiltre, FenetreFiche, grille_cartes, icone_triangle, info_bulle
 
 # بطاقات الأرقام: (المفتاح، العنوان، اللون، الأيقونة، سطر تعريفي)؛ المفتاح فئة أو مجموعة فئات
 GROUPES = [
@@ -138,7 +138,7 @@ class PagePersonnel(QWidget):
         cv.addLayout(filtres)
         # قرار المدير 2026-11-03: المهمة بدل الفئة، مع الوحدة المدرسية؛ 2026-11-18: الجدول بعرض الصفحة
         self.liste = tableau(["الاسم", "الوحدة المدرسية", "المهمة", "الفئة", "رقم التأجير", "الإطار", "الدرجة",
-                              "التدريس", "الهاتف", "اكتمال الملف"], etirer=0)
+                              "التدريس", "الهاتف"], etirer=0)   # 2026-11-19: «اكتمال الملف» صار مثلثاً قرب الاسم
         h = self.liste.horizontalHeader()
         h.setSectionResizeMode(h.ResizeMode.ResizeToContents)
         h.setStretchLastSection(True)
@@ -389,7 +389,7 @@ class PagePersonnel(QWidget):
             w.addItems(rh.suggestions(self.f.conn, k))
             w.setEditText(t)
         actifs = rh.lister(self.f.conn)
-        self.incomplets = {p.id for p in actifs if rh.manquants_documents(self.f.conn, p)}
+        self.incomplets = {p.id: m for p in actifs if (m := rh.manquants_documents(self.f.conn, p))}
         n = {"tous": len(actifs), "enseignant": eff["enseignant"], "educatrice": eff["educatrice"],
              "directeur": eff["directeur"], "agents": sum(eff[k] for k in AGENTS), "incomplet": len(self.incomplets)}
         for k, c_ in self.cartes.items():
@@ -432,11 +432,12 @@ class PagePersonnel(QWidget):
             self.liste.setItem(i, 6, cellule(p.grade or "—"))
             self.liste.setItem(i, 7, cellule(" · ".join(x for x in (p.matiere, p.niveau_enseigne) if x) or "—"))
             self.liste.setItem(i, 8, cellule(f"\u2066{p.telephone}\u2069" if p.telephone else "—"))
-            inc = p.id in getattr(self, "incomplets", set())
-            c8 = cellule("ناقص" if inc else "مكتمل")
-            c8.setForeground(QColor("#C62828" if inc else "#2E7D32"))
-            self.liste.setItem(i, 9, c8)
-            self.liste.item(i, 0).setToolTip(f"{rh.libelle_categorie(p.categorie, p.sexe)} · رقم التأجير: {p.ppr or '—'}")
+            m = getattr(self, "incomplets", {}).get(p.id)
+            if m:   # مثلث برتقالي قرب الاسم؛ النافذة الصغيرة تحدد ما ينقص (طلب المدير 2026-11-19)
+                it.setIcon(icone_triangle(18))
+                it.setToolTip(info_bulle("\n".join(["ملف ناقص لوثائق الرخص ومحضر الاستئناف:"] + m)))
+            else:
+                it.setToolTip(f"{rh.libelle_categorie(p.categorie, p.sexe)} · رقم التأجير: {p.ppr or '—'}")
 
     def _graphiques(self, actifs: list) -> None:
         for w in self._graphes:

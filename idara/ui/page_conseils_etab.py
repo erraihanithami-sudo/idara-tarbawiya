@@ -28,7 +28,7 @@ from idara.ui.formulaires import champ, etiquette
 from idara.ui.graphiques import BarresGroupees
 from idara.ui.page_pedagogie import _grille, _page
 from idara.ui.saisie import ChampDate, cellule, message, tableau
-from idara.ui.vitrine import CarteFiltre, FenetreFiche, bouton_couleur, grille_cartes
+from idara.ui.vitrine import AlerteTriangle, CarteFiltre, FenetreFiche, bouton_couleur, grille_cartes
 
 COULEURS = {"gestion": "#1565C0", "pedagogique": "#2E7D32", "enseignement": "#6A1B9A"}
 PICTOS = {"gestion": "personnes", "pedagogique": "document", "enseignement": "statistiques"}
@@ -97,11 +97,7 @@ class PageConseilsEtab(QWidget):
             h.addWidget(b)
         h.addStretch()
         racine.addLayout(h)
-        self.alertes = QLabel()
-        self.alertes.setObjectName("alerte")
-        self.alertes.setWordWrap(True)
-        self.alertes.setStyleSheet("QLabel#alerte { background: #FFF4E5; border: 1px solid #F0B46A; "
-                                   "border-right: 5px solid #EF6C00; border-radius: 12px; padding: 10px 14px; }")
+        self.alertes = AlerteTriangle("تنبيهات")
         racine.addWidget(self.alertes)
 
         # ---- جدولة المجالس ----

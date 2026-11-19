@@ -53,7 +53,17 @@ class CarteFiltre(QFrame):
             n.setWordWrap(True)
             v.addWidget(n)
         h.addLayout(v, 1)
+        self.triangle = QLabel()
+        self.triangle.setPixmap(pixmap_triangle(20))
+        self.triangle.setStyleSheet("background: transparent;")
+        self.triangle.hide()
+        h.addWidget(self.triangle, 0, Qt.AlignTop)
         self.definir_actif(False)
+
+    def definir_alerte(self, texte: str) -> None:
+        """مثلث برتقالي في زاوية البطاقة، ونص المشكل عند مرور الفأرة."""
+        self.triangle.setVisible(bool(texte))
+        self.triangle.setToolTip(info_bulle(texte) if texte else "")
 
     def definir(self, n) -> None:
         self.chiffre.setText(str(n))
@@ -200,3 +210,89 @@ class CarteDocument(QFrame):
         if ev.button() == Qt.LeftButton:
             self.clique.emit(self.cle)
         super().mouseReleaseEvent(ev)
+
+
+# ======================================================================
+# مثلث التنبيه البرتقالي (طلب المدير 2026-11-19): بدل فقرات التحذير، مثلث صغير قرب المكون المعني، والمشكل
+# يظهر في نافذة صغيرة عند مرور الفأرة.
+# ======================================================================
+
+ORANGE = "#EF8A00"
+
+
+def pixmap_triangle(taille: int = 22, couleur: str = ORANGE):
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QPainter, QPainterPath, QPen, QPixmap
+    n = taille * 3
+    pm = QPixmap(n, n)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    ch = QPainterPath()
+    ch.moveTo(n / 2, n * 0.08)
+    ch.lineTo(n * 0.96, n * 0.9)
+    ch.lineTo(n * 0.04, n * 0.9)
+    ch.closeSubpath()
+    p.fillPath(ch, QColor(couleur))
+    p.setPen(QPen(QColor(couleur).darker(130), n * 0.03))
+    p.drawPath(ch)
+    p.setPen(QPen(QColor("white"), n * 0.09, Qt.SolidLine, Qt.RoundCap))
+    p.drawLine(QPointF(n / 2, n * 0.36), QPointF(n / 2, n * 0.6))
+    p.drawPoint(QPointF(n / 2, n * 0.75))
+    p.end()
+    pm.setDevicePixelRatio(3)
+    return pm
+
+
+def icone_triangle(taille: int = 16):
+    from PySide6.QtGui import QIcon
+    return QIcon(pixmap_triangle(taille))
+
+
+def info_bulle(texte: str) -> str:
+    """نص النافذة الصغيرة: عنوان وقائمة، بخط مقروء."""
+    lignes = [l for l in (texte or "").splitlines() if l.strip()]
+    corps = "".join(f"<li style='margin-bottom:4px'>{l}</li>" for l in lignes)
+    return (f"<div dir='rtl' style='font-size:11pt'><b style='color:{ORANGE}'>تنبيه</b>"
+            f"<ul style='margin:4px 0 0 0'>{corps}</ul></div>")
+
+
+class AlerteTriangle(QWidget):
+    """يحل محل فقرة التحذير: مثلث برتقالي (وعدد التنبيهات)، والنص كاملاً في النافذة الصغيرة عند مرور الفأرة.
+    يحتفظ بواجهة QLabel التي تستعملها الصفحات (setText، text، setWordWrap)."""
+
+    def __init__(self, libelle: str = ""):
+        super().__init__()
+        self._texte = ""
+        self.setObjectName("alerteTriangle")
+        self.setCursor(Qt.WhatsThisCursor)
+        h = QHBoxLayout(self)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(6)
+        self.icone = QLabel()
+        self.icone.setPixmap(pixmap_triangle(24))
+        self.icone.setFixedSize(26, 26)
+        h.addWidget(self.icone)
+        self.compte = QLabel()
+        self.compte.setStyleSheet(f"color: {ORANGE}; font-weight: 700;")
+        h.addWidget(self.compte)
+        self.libelle = libelle
+        h.addStretch()
+        self.hide()
+
+    def setText(self, texte: str) -> None:   # noqa: N802
+        self._texte = texte or ""
+        n = len([l for l in self._texte.splitlines() if l.strip()])
+        self.compte.setText(f"{self.libelle} ({n})" if self.libelle and n else "")
+        self.setToolTip(info_bulle(self._texte) if self._texte else "")
+        self.icone.setToolTip(self.toolTip())
+        self.setVisible(bool(self._texte))
+
+    def text(self) -> str:
+        return self._texte
+
+    def setWordWrap(self, _v) -> None:   # noqa: N802
+        pass
+
+    def clear(self) -> None:
+        self.setText("")

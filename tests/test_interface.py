@@ -426,7 +426,7 @@ def test_page_personnel(app, config_tmp):
     assert rh.lire(f.conn, pid).echelon == "7" and rh.lire(f.conn, pid).sans_inspection
     assert p.liste.rowCount() == 2 and "الأساتذة: 1" in p.effectifs.text()
     # قرار المدير (2026-11-03): المهمة بدل الفئة (التدريس أو الإدارة)، دون عمود الملف
-    assert p.liste.columnCount() == 10 and p.liste.horizontalHeaderItem(2).text() == "المهمة"
+    assert p.liste.columnCount() == 9 and p.liste.horizontalHeaderItem(2).text() == "المهمة"
     # طلب المدير 2026-11-18: الصفحة للمعلومات والإحصائيات، والملف في نافذة منبثقة
     assert p.cartes["tous"].chiffre.text() == "2" and p.cartes["enseignant"].chiffre.text() == "1"
     assert not p.c_graph.isHidden()
@@ -436,6 +436,9 @@ def test_page_personnel(app, config_tmp):
     assert p.liste.rowCount() == 2
     p.filtrer("incomplet")
     assert p.liste.rowCount() == int(p.cartes["incomplet"].chiffre.text())
+    # طلب المدير 2026-11-19: مثلث برتقالي قرب الاسم بدل عمود «اكتمال الملف»، والسبب في النافذة الصغيرة
+    if p.liste.rowCount():
+        assert not p.liste.item(0, 0).icon().isNull() and "تنبيه" in p.liste.item(0, 0).toolTip()
     p.filtrer("tous")
     d = p.ouvrir_nouveau()
     assert d.isVisible() and p.pid is None and d.windowTitle() == "إضافة موظف جديد"

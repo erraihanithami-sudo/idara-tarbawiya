@@ -27,7 +27,7 @@ from idara.ui.composants import carte, entete
 from idara.ui.formulaires import champ, etiquette
 from idara.ui.graphiques import Anneau, BarresGroupees
 from idara.ui.saisie import ChampDate, cellule, message, tableau
-from idara.ui.vitrine import CarteFiltre
+from idara.ui.vitrine import AlerteTriangle, CarteFiltre
 
 COULEURS = {"arrive": "#2E7D32", "parti": "#1565C0", "interrompu": "#EF6C00", "exclu": "#C62828",
             "non_rejoint": "#6A1B9A"}
@@ -319,12 +319,7 @@ class PageMouvements(QWidget):
         self.message.setWordWrap(True)
         self.message.hide()
         racine.addWidget(self.message)
-        self.alertes = QLabel()
-        self.alertes.setObjectName("alerte")
-        self.alertes.setWordWrap(True)
-        self.alertes.setStyleSheet("QLabel#alerte { background: #FFF4E5; border: 1px solid #F0B46A; "
-                                   "border-right: 5px solid #EF6C00; border-radius: 12px; padding: 10px 14px; }")
-        racine.addWidget(self.alertes)
+        self.alertes = AlerteTriangle("ملفات تحتاج إجراء")   # مثلث قرب «تتبع الملفات» (طلب المدير 2026-11-19)
 
         # ---- الجدول والمعايير ----
         c, cv = carte()
@@ -385,6 +380,7 @@ class PageMouvements(QWidget):
         aide.setObjectName("etiquette")
         aide.setWordWrap(True)
         dv.addWidget(aide)
+        dv.addWidget(self.alertes)
         self.etape: str | None = None
         self.cartes_dossier: dict[str, CarteFiltre] = {}
         ge = QGridLayout()

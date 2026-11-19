@@ -288,9 +288,8 @@ class PageExamen(QWidget):
 
         # ---- الوثائق ----
         c, v = carte("الوثائق")
-        self.l_manquants = QLabel()
-        self.l_manquants.setObjectName("alerte")
-        self.l_manquants.setWordWrap(True)
+        from idara.ui.vitrine import AlerteTriangle
+        self.l_manquants = AlerteTriangle("معطيات ناقصة")
         v.addWidget(self.l_manquants)
         groupes = {1: "المترشحون", 2: "المكلفون", 3: "الإعلان والتنقيط", 4: "المحاضر والتقارير"}
         self.boutons_docs = {}
