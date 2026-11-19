@@ -154,7 +154,7 @@ def test_navigation_deroulante(app, config_tmp):
     assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص", "المحاضر",
                                          "طلبات الموظفين والورقة الشخصية", "أعوان الحراسة والنظافة",
                                          "طلب ملف أستاذ وإرساله"]
-    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
+    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "مفكرة المدير", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
                                          "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة",
                                          "السبورة المرجعية"]
     assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
@@ -1158,6 +1158,55 @@ def test_ecole_pionniere_composants(app, config_tmp, monkeypatch):
     assert i.cartes["isa2"].valeur.text() == "71.7%" and len(i.cartes["isa2"].points) == 2
     f.aller_a("الريادة")
     assert f.page_riyada.findChildren(type(f.page_riyada.message))  # الصفحة القائمة: شارة الريادة
+    f.close()
+
+
+def test_mofakkira_et_contact(app, config_tmp, monkeypatch):
+    """طلب المدير 2026-11-19: مفكرة المدير (سبورة وبطاقات وساعة ويومية) وصفحة التواصل مع صاحب البرنامج."""
+    from datetime import date, timedelta
+
+    from idara.services import calendrier as cal
+    from idara.services import memo as mm
+    from idara.ui import page_contact as pc
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("مفكرة المدير")
+    p = f.page_memo
+    assert f.page_courante() == "مفكرة المدير" and not p.sabboura.vide.isHidden() and len(p.paquet) == 6
+    p.paquet["rose"].clique.emit("rose")
+    assert p.fiche.isVisible() and p.c_couleur.currentData() == "rose" and p.b_fait.isHidden()
+    assert p.enregistrer() is None and "موضوع" in p.message_fiche.text()
+    p.c_sujet.setText("زيارة المفتش التربوي")
+    p.c_heure.setText("9:30")
+    demain = (date.today() + timedelta(days=1)).isoformat()
+    p.c_date.definir(demain)
+    mid = p.enregistrer()
+    assert mid and not p.fiche.isVisible() and len(p.notes) == 1 and p.sabboura.vide.isHidden()
+    assert p.notes[0].memo.heure == "09:30" and "زيارة المفتش" in p.notes[0].toolTip()
+    assert p.agenda.evenements[demain][0][0] == "memo"
+    cal.enregistrer_locale(f.conn, "يوم تواصلي", demain)
+    p.rafraichir()
+    assert {t for t, _ in p.agenda.evenements[demain]} == {"memo", "local"}
+    p.agenda.jour_clique.emit(demain)
+    assert p.fiche.isVisible() and p.c_date.iso() == demain
+    p.fiche.hide()
+    p.notes[0].clique.emit(p.notes[0].memo)
+    assert p.mid == mid and not p.b_fait.isHidden()
+    p.marquer_fait()
+    assert p.notes == [] and mm.lister(f.conn, inclure_faits=True)[0].fait
+    m0 = p.agenda.mois
+    p.agenda.changer_mois(1)
+    assert p.agenda.mois != m0
+    img = p.grab()
+    assert not img.isNull()
+    f.aller_a("التواصل")
+    c = f.page_contact
+    monkeypatch.setattr(pc.QDesktopServices, "openUrl", lambda u: True)
+    assert pc.TELEPHONE in c.wa.valeur.text() and pc.EMAIL in c.mail.valeur.text()
+    c.wa.findChildren(pc.QPushButton)[0].click()
+    c.mail.findChildren(pc.QPushButton)[0].click()
+    assert c.ouverts[0] == "https://wa.me/212666949280" and c.ouverts[1].startswith("mailto:erraihani.thami@gmail.com")
+    c.copier(pc.EMAIL)
+    assert "نُسخ" in c.l_copie.text()
     f.close()
 
 

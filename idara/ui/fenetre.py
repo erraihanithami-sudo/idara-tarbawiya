@@ -515,7 +515,8 @@ class PageAVenir(QWidget):
 # الموارد البشرية أضافها المدير بعد ذلك (2026-11-03). المراسلات والإعدادات لم تردا في ترتيبه، فأُبقيتا بعده
 # حتى لا تضيع وظائفهما.
 SECTIONS = [
-    ("القيادة والتدبير", [("لوحة القيادة", "لوحة القيادة"), ("الإحصائيات", "إحصائيات المؤسسة"),
+    ("القيادة والتدبير", [("لوحة القيادة", "لوحة القيادة"), ("مفكرة المدير", "مفكرة المدير"),
+                          ("الإحصائيات", "إحصائيات المؤسسة"),
                           ("برنامج العمل", "برنامج العمل السنوي والتذكيرات"),
                           ("أداء المؤسسة", "الأداء العام للمؤسسة"),
                           ("تتبع الغياب", "تتبع الغياب"), ("مجالس المؤسسة", "مجالس المؤسسة"),
@@ -554,7 +555,8 @@ SECTIONS = [
     ("تسليم المهام", [("تسليم المهام", "تسليم المهام")]),
     ("المراسلات", [("سجل الصادر", "سجل الصادر")]),
     ("الإعدادات", [("إعداد المؤسسة", "المؤسسة"), ("الوثائق", "نماذج الوثائق"),
-                   ("دليل الاستخدام", "كيفية استخدام البرنامج")]),
+                   ("دليل الاستخدام", "كيفية استخدام البرنامج"),
+                   ("التواصل", "التواصل مع صاحب البرنامج")]),
 ]
 A_VENIR = {
     "الجمعية الرياضية": (
@@ -761,6 +763,10 @@ class FenetrePrincipale(QMainWindow):
         self.page_resultats_pionniere = PageResultatsPionniere(self)
         self.page_comm_pionniere = PageCommunicationPionniere(self)
         self.page_ind_pionniere = PageIndicateursPionniere(self)
+        from idara.ui.page_contact import PageContact
+        from idara.ui.page_memo import PageMemo
+        self.page_memo = PageMemo(self)
+        self.page_contact = PageContact(self)
         from idara.ui.page_fiche_eleve import PageFicheEleve
         self.page_fiche_eleve = PageFicheEleve(self)
         from idara.ui.page_dossier_prof import PageDossierProf
@@ -816,7 +822,7 @@ class FenetrePrincipale(QMainWindow):
                       "لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves, "بطاقة التلميذ": self.page_fiche_eleve, "ملفات الأساتذة": self.page_dossier_prof,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
-                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "نتائج الريادة": self.page_resultats_pionniere, "تواصل الريادة": self.page_comm_pionniere, "مؤشرات الريادة": self.page_ind_pionniere, "التنظيم التربوي": self.page_tanzim, "محاضر نهاية الأسدوس": self.page_deliberations,
+                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "نتائج الريادة": self.page_resultats_pionniere, "تواصل الريادة": self.page_comm_pionniere, "مؤشرات الريادة": self.page_ind_pionniere, "مفكرة المدير": self.page_memo, "التواصل": self.page_contact, "التنظيم التربوي": self.page_tanzim, "محاضر نهاية الأسدوس": self.page_deliberations,
                       "الامتحان": self.page_examen, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,
