@@ -242,13 +242,7 @@ class PageGarde(QWidget):
         self.l_jour = QLabel()
         self.l_jour.setWordWrap(True)
         self.l_jour.setTextFormat(Qt.RichText)
-        v.addWidget(self.l_jour)
-        h = QHBoxLayout()
-        b = QPushButton("طبع ورقة حراسة اليوم")
-        b.clicked.connect(lambda: self.generer("jour"))
-        h.addWidget(b)
-        h.addStretch()
-        v.addLayout(h)
+        v.addWidget(self.l_jour)   # للاطلاع فقط: جدول الأسابيع الأربعة يكفي للطبع (طلب المدير 2026-11-19)
         racine.addWidget(self.c_jour)
 
         c, v = carte("المناطق والدورة")
@@ -294,6 +288,10 @@ class PageGarde(QWidget):
         b.setToolTip("يملأ كل أسابيع الدورة بأساتذة المؤسسة النشيطين، دوراً بعد دور")
         b.clicked.connect(lambda: self.repartir())
         h.addWidget(b)
+        self.b_annuler_rep = bouton("إلغاء التوزيع")
+        self.b_annuler_rep.setToolTip("يفرغ خانات الأساتذة في كل أسابيع الدورة (المناطق والأيام تبقى)")
+        self.b_annuler_rep.clicked.connect(lambda: self.annuler_repartition())
+        h.addWidget(self.b_annuler_rep)
         v.addLayout(h)
         self.table = TableauRapide(0, 0)
         self.table.verticalHeader().setVisible(True)
@@ -442,6 +440,16 @@ class PageGarde(QWidget):
             return False
         self._remplir()
         message(self.message, "وُزّع الأساتذة على المناطق. راجع الجدول ثم احفظ.")
+        return True
+
+    def annuler_repartition(self) -> bool:
+        """طلب المدير 2026-11-19: إلغاء التوزيع (آلياً كان أو يدوياً) وحفظ الجدول فارغاً."""
+        self._lire_ecran()
+        self.g["grille"] = gd._grille_vide(self.g["semaines"], self.g["jours"], self.g["nb_zones"])
+        self._remplir()
+        if not self.enregistrer():
+            return False
+        message(self.message, "أُلغي توزيع الأساتذة على المناطق.")
         return True
 
     def enregistrer(self, afficher: bool = False) -> bool:

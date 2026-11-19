@@ -2289,6 +2289,7 @@ def test_page_sabboura(app, config_tmp, monkeypatch):
 
 def test_pages_vie_admin(app, config_tmp, monkeypatch):
     """الوثائق القانونية للجمعيات، الحراسة، النقل، استعمالات الزمن (2026-11-13)."""
+    from PySide6.QtWidgets import QPushButton
     from idara.services import bureautique
     from idara.services import personnel as rh
     from idara.services import vie_admin as va
@@ -2334,6 +2335,9 @@ def test_pages_vie_admin(app, config_tmp, monkeypatch):
     g.repartir()   # أساتذة المؤسسة الوهميون أقل من منطقتين أو أكثر: رسالة أو جدول ممتلئ
     assert g.table.item(0, 0).text() or "أقل من عدد المناطق" in g.message.text()
     assert "حراسة اليوم" not in g.l_jour.text() and g.l_jour.text()
+    # طلب المدير 2026-11-19: إلغاء التوزيع، ولا طبع لورقة اليوم
+    assert g.annuler_repartition() and not any(x for j in gd.lire(f.conn)["grille"]["1"].values() for x in j)
+    assert not any(b.text() == "طبع ورقة حراسة اليوم" for b in g.findChildren(QPushButton))
     f.tableau.rafraichir()
     assert f.tableau.garde_jour["jour"]
     # النقل
