@@ -49,7 +49,13 @@ def _propre(v) -> str:
 
 
 def libelle_zone(zones: list[str], k: int) -> str:
-    return f"المنطقة {k + 1}" + (f": {zones[k]}" if k < len(zones) and zones[k] else "")
+    """عنوان العمود: «منطقة 01»؛ شرح المنطقة في المفتاح أسفل الجدول (طلب المدير 2026-11-20)."""
+    return f"منطقة {k + 1:02d}"
+
+
+def cle_zones(zones: list[str]) -> list[tuple[str, str]]:
+    """مفتاح الجدول: [(«منطقة 01»، شرحها)] للمناطق المشروحة."""
+    return [(libelle_zone(zones, k), z) for k, z in enumerate(zones) if z]
 
 
 def _grille_vide(semaines: int, jours: list[str], nz: int, ancienne: dict | None = None) -> dict:
@@ -231,6 +237,9 @@ def _tableau(conn, dossier, g, unite, _jour) -> Path:
         if g["semaines"] > 1:
             para(d, f"الأسبوع {sem}", gras=True, taille=13, centre=True, apres=4)
         _table(d, entetes, [[j, *js[j]] for j in g["jours"]], larg, taille=10 if nz <= 6 else 9)
+        cle = cle_zones(g["zones"])
+        if cle:   # مفتاح المناطق أسفل كل جدول
+            para(d, "مفتاح المناطق: " + " · ".join(f"{a}: {b}" for a, b in cle), taille=10, apres=0)
     b = bilan(conn, unite)
     if b:
         para(d, "", apres=4)
@@ -276,7 +285,7 @@ def _note(conn, dossier, g, unite, _jour) -> Path:
     if any(g["zones"]):
         para(d, "", apres=4)
         para(d, "مناطق الحراسة", gras=True, taille=12, apres=2)
-        _table(d, ["المنطقة", "التحديد"], [[f"{k + 1}", z] for k, z in enumerate(g["zones"])], [3.0, 14.4], taille=11)
+        _table(d, ["المنطقة", "الشرح"], [[a, b] for a, b in cle_zones(g["zones"])], [3.0, 14.4], taille=11)
     return _sauver(d, dossier, "مذكرة_الحراسة")
 
 

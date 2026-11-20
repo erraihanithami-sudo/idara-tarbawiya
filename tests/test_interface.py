@@ -2418,6 +2418,12 @@ def test_pages_vie_admin(app, config_tmp, monkeypatch):
     g.repartir()   # أساتذة المؤسسة الوهميون أقل من منطقتين أو أكثر: رسالة أو جدول ممتلئ
     assert g.table.item(0, 0).text() or "أقل من عدد المناطق" in g.message.text()
     assert "حراسة اليوم" not in g.l_jour.text() and g.l_jour.text()
+    # طلب المدير 2026-11-20: شرح المناطق في نافذة منبثقة، ومفتاح أسفل الجدول
+    d = g.ouvrir_zones()
+    assert d.isVisible() and g.t_zones.verticalHeaderItem(0).text() == "منطقة 01"
+    g.t_zones.item(0, 0).setText("الباب الرئيسي")
+    assert g.enregistrer_zones() and not d.isVisible() and "منطقة 01: الباب الرئيسي" in g.l_cle.text()
+    assert g.table.horizontalHeaderItem(0).text() == "منطقة 01"
     # طلب المدير 2026-11-19: إلغاء التوزيع، ولا طبع لورقة اليوم
     assert g.annuler_repartition() and not any(x for j in gd.lire(f.conn)["grille"]["1"].values() for x in j)
     assert not any(b.text() == "طبع ورقة حراسة اليوم" for b in g.findChildren(QPushButton))

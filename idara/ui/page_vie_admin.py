@@ -270,14 +270,37 @@ class PageGarde(QWidget):
         v.addLayout(g)
         v.addWidget(QLabel("أيام الحراسة:"))
         v.addLayout(hj)
+        # شرح المناطق في نافذة منبثقة، ويُدرج مفتاحاً أسفل كل جدول (طلب المدير 2026-11-20)
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        hz = QHBoxLayout()
+        self.b_zones = bouton_couleur("شرح المناطق", "#00897B", "modifier",
+                                      "منطقة 01: الباب الرئيسي، منطقة 02: الساحة الشمالية…")
+        self.b_zones.clicked.connect(lambda: self.ouvrir_zones())
+        hz.addWidget(self.b_zones)
+        self.l_cle = QLabel()
+        self.l_cle.setObjectName("etiquette")
+        self.l_cle.setWordWrap(True)
+        hz.addWidget(self.l_cle, 1)
+        v.addLayout(hz)
+        racine.addWidget(c)
+        wz = QWidget()
+        vz = QVBoxLayout(wz)
+        az = QLabel("اكتب شرح كل منطقة (عدد المناطق تحدده أنت في «عدد المناطق»). الشرح يظهر مفتاحاً أسفل كل "
+                    "جدول حراسة مطبوع، وفي مذكرة الحراسة.")
+        az.setObjectName("etiquette")
+        az.setWordWrap(True)
+        vz.addWidget(az)
         self.t_zones = TableauRapide(0, 1)
-        self.t_zones.setHorizontalHeaderLabels(["تحديد المنطقة (اختياري): الباب الرئيسي، الساحة الشمالية..."])
+        self.t_zones.setHorizontalHeaderLabels(["شرح المنطقة: الباب الرئيسي، الساحة الشمالية، المراحيض..."])
         self.t_zones.horizontalHeader().setStretchLastSection(True)
         self.t_zones.verticalHeader().setVisible(True)
         self.t_zones.setEditTriggers(QAbstractItemView.AllEditTriggers)
-        self.t_zones.setMaximumHeight(200)
-        v.addWidget(self.t_zones)
-        racine.addWidget(c)
+        self.t_zones.setMinimumHeight(260)
+        vz.addWidget(self.t_zones)
+        bz = bouton_couleur("حفظ شرح المناطق", "#00897B", "enregistrer")
+        bz.clicked.connect(lambda: self.enregistrer_zones())
+        vz.addWidget(bz, 0, Qt.AlignLeft)
+        self.fiche_zones = FenetreFiche(self, "شرح مناطق الحراسة", "", wz, largeur=640)
 
         c, v = carte("الجدول: الأستاذ(ة) المكلف(ة) أمام كل منطقة")
         h = QHBoxLayout()
@@ -347,9 +370,25 @@ class PageGarde(QWidget):
     def _zones(self) -> None:
         nz = self.g["nb_zones"]
         self.t_zones.setRowCount(nz)
-        self.t_zones.setVerticalHeaderLabels([f"المنطقة {k + 1}" for k in range(nz)])
+        self.t_zones.setVerticalHeaderLabels([gd.libelle_zone(self.g["zones"], k) for k in range(nz)])
         for k in range(nz):
             self.t_zones.setItem(k, 0, QTableWidgetItem(self.g["zones"][k]))
+        cle = gd.cle_zones(self.g["zones"][:nz])
+        self.l_cle.setText("مفتاح المناطق: " + " · ".join(f"{a}: {b}" for a, b in cle) if cle
+                           else "لم تُشرح المناطق بعد: «شرح المناطق».")
+
+    def ouvrir_zones(self):
+        self._zones()
+        self.fiche_zones.ouvrir()
+        return self.fiche_zones
+
+    def enregistrer_zones(self) -> bool:
+        if not self.enregistrer(True):
+            return False
+        self.fiche_zones.hide()
+        self._zones()
+        self._remplir()
+        return True
 
     def _pilules(self) -> None:
         while self.pilules.count():
@@ -369,6 +408,9 @@ class PageGarde(QWidget):
         nz, jours = self.g["nb_zones"], self.g["jours"]
         self.table.setColumnCount(nz)
         self.table.setHorizontalHeaderLabels([gd.libelle_zone(self.g["zones"], k) for k in range(nz)])
+        for k in range(nz):
+            if self.g["zones"][k] and self.table.horizontalHeaderItem(k):
+                self.table.horizontalHeaderItem(k).setToolTip(self.g["zones"][k])
         self.table.setRowCount(len(jours))
         self.table.setVerticalHeaderLabels(jours)
         grille = self.g["grille"][str(self.semaine)]
