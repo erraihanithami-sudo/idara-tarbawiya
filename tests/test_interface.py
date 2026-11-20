@@ -2688,6 +2688,9 @@ def test_editeur_de_documents(app, config_tmp, monkeypatch, tmp_path):
     # المحرر المطوَّر: جدول، قائمة، تباعد، بحث واستبدال، إبراز، فاصل صفحات، تاريخ
     e2.b_modifier.click()
     assert e2.zone.isHidden() and not e2.fond.isHidden()
+    # الوثيقة كاملة في المحرر (2026-11-20): الورقة بطول الوثيقة دون شريط تمرير داخلي
+    assert not e2.defil_papier.isHidden() and e2.edit.verticalScrollBarPolicy() == Qt.ScrollBarAlwaysOff
+    assert e2.edit.height() >= int(e2.edit.document().size().height())
     c = e2.edit.textCursor()
     c.movePosition(c.MoveOperation.End)
     e2.edit.setTextCursor(c)

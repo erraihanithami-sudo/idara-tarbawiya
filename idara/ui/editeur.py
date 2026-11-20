@@ -680,16 +680,27 @@ class EditeurDocument(QWidget):
         self.edit.setLayoutDirection(Qt.RightToLeft)
         self.edit.setAcceptRichText(True)
         self.edit.document().setDocumentMargin(MARGE_ECRAN)
-        self.edit.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        # طلب المدير 2026-11-20: الوثيقة كاملة في المحرر — الورقة تطول بطول الوثيقة، والتمرير للمساحة كلها
+        self.edit.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.edit.setLineWrapMode(QTextEdit.FixedPixelWidth)
-        self.edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.edit.cursorPositionChanged.connect(self._synchroniser)
+        self.edit.cursorPositionChanged.connect(self._suivre_curseur)
+        self.edit.document().documentLayout().documentSizeChanged.connect(lambda _: self._ajuster_hauteur())
         self.edit.viewport().installEventFilter(self)
         hf.addStretch()
         hf.addWidget(self.edit)
         hf.addStretch()
-        vf.addLayout(hf, 1)
-        v.addWidget(self.fond, 1)
+        vf.addLayout(hf)
+        vf.addStretch()
+        from PySide6.QtWidgets import QScrollArea
+        self.defil_papier = QScrollArea()
+        self.defil_papier.setWidgetResizable(True)
+        self.defil_papier.setFrameShape(QFrame.NoFrame)
+        self.defil_papier.setStyleSheet(f"QScrollArea {{ background: {GRIS_FOND}; border-radius: 10px; }}")
+        self.defil_papier.setWidget(self.fond)
+        v.addWidget(self.defil_papier, 1)
         self._geometrie_page()
 
         # ---- المعاينة ----
@@ -977,9 +988,28 @@ class EditeurDocument(QWidget):
         self.edit.setMaximumWidth(larg + 24)
         self.edit.setMinimumWidth(min(larg + 24, 560))
         self.regle.setFixedWidth(larg)
+        self._ajuster_hauteur()
         if hasattr(self, "b_portrait"):
             self.b_portrait.setChecked(not self.page.paysage)
             self.b_paysage.setChecked(self.page.paysage)
+
+    def _ajuster_hauteur(self) -> None:
+        """الورقة بطول الوثيقة كلها (صفحة واحدة على الأقل)، فتُرى كاملة بالتمرير."""
+        if not hasattr(self, "hauteur_contenu"):
+            return
+        doc = int(self.edit.document().size().height()) + 8
+        page = int(self.hauteur_contenu + 2 * MARGE_ECRAN)
+        h = max(doc, page)
+        if self.edit.height() != h:
+            self.edit.setFixedHeight(h)
+
+    def _suivre_curseur(self) -> None:
+        """التمرير يتبع المؤشر عند الكتابة أسفل الجزء الظاهر."""
+        if not hasattr(self, "defil_papier") or self.edit.isReadOnly():
+            return
+        r = self.edit.cursorRect()
+        p = self.edit.viewport().mapTo(self.fond, r.center())
+        self.defil_papier.ensureVisible(p.x(), p.y(), 40, 60)
 
     def orientation(self, paysage: bool) -> None:
         """ورقة عمودية أو أفقية: تتغير الورقة على الشاشة والمعاينة والطبع."""
@@ -1098,12 +1128,15 @@ class EditeurDocument(QWidget):
         self.edit.setReadOnly(not actif)
         self.outils.setVisible(actif)
         self.fond.setVisible(actif)
+        self.defil_papier.setVisible(actif)
         self.zone.setVisible(not actif)
         self.barre_zoom.setVisible(not actif)
         self.edit.setTextInteractionFlags(Qt.TextEditorInteraction if actif else
                                           Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
         self.b_enregistrer.setVisible(actif)
         if actif:
+            self._ajuster_hauteur()
+            self.defil_papier.verticalScrollBar().setValue(0)   # تُفتح الوثيقة من أولها
             self.edit.setFocus()
         else:
             self.actualiser_apercu()
