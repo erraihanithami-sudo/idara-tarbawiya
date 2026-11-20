@@ -308,7 +308,7 @@ class PageTableauBord(QWidget):
         grille.setSpacing(16)
         self.tuiles = []
         for i, (lib, val, note, coul, sec) in enumerate([
-                ("التلاميذ يتابعون دراستهم", str(n_eleves), f"ذكور {ind['garcons']} · إناث {ind['filles']}",
+                ("تلاميذ يتابعون دراستهم", str(n_eleves), f"ذكور {ind['garcons']} · إناث {ind['filles']}",
                  theme.BLEU, "التلاميذ"),
                 ("الأقسام", str(n_classes), "", theme.VIOLET, "التدبير التربوي"),
                 ("الموظفون", str(n_pers), "دون المدير", theme.SARCELLE, "الموارد البشرية"),
