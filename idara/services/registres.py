@@ -125,6 +125,19 @@ REGISTRES: dict[str, Registre] = {r.cle: r for r in (
                   colonnes=("date", "eleve", "classe", "lieu", "blessure", "envoi"))),
              filtre="lieu", etat="envoi", defaut_etat=ENVOIS_ACCIDENT[0], dossier=True,
              internes=("envoi", "date_envoi", "reference")),
+    Registre("examens_medicaux", "الفحوصات الطبية",
+             "الفحوصات الطبية والتلقيحات التي استفاد منها التلاميذ ونتائجها، وما تقرر بعدها. معطيات صحية: لا تُنشر.",
+             (Champ("date", "تاريخ الفحص", "date", requis=True),
+              Champ("eleve", "التلميذ(ة)", "eleve", requis=True), Champ("classe", "القسم"),
+              Champ("type", "نوع الفحص", "choix", ("الفحص الطبي المنتظم", "فحص البصر", "فحص السمع", "فحص الأسنان",
+                                                   "التلقيح", "فحص آخر"), requis=True),
+              Champ("intervenant", "الطبيب(ة) أو الجهة"),
+              Champ("resultat", "النتيجة أو الملاحظة", "long", colonne=False),
+              Champ("suite", "الإجراء بعد الفحص", "choix", ("لا شيء", "إخبار ولي الأمر", "توجيه نحو طبيب مختص",
+                                                           "متابعة داخل المؤسسة"))),
+             (Doc("fiche", "بطاقة الفحص", "بطاقة الفحص المحدد.", "ligne"),
+              Doc("liste", "لائحة الفحوصات الطبية", "كل فحوصات السنة، أو لنوع واحد.")),
+             filtre="type"),
     Registre("cellule_membres", "التركيبة والأدوار",
              "أعضاء خلية اليقظة وخلية الإنصات والمصالحة، وصفة كل عضو ودوره.",
              (Champ("cellule", "الخلية", "choix", CELLULES, requis=True),
@@ -291,6 +304,21 @@ def lister(conn: sqlite3.Connection, cle: str, filtre: str | None = None, texte:
     if any(c.cle == "date" for c in r.champs):
         ls.sort(key=lambda l: (l.get("date") or "", l["id"]), reverse=True)
     return ls
+
+
+def lignes_eleve(conn: sqlite3.Connection, cle: str, nom: str) -> list[dict]:
+    """أسطر تلميذ في سجل عبر كل السنوات (للبطاقة الشاملة)، مع السنة، الأحدث أولاً."""
+    import json
+    r = registre(cle)
+    nom = _texte(nom)
+    res = []
+    for k, donnees in conn.execute("SELECT cle, donnees FROM fiche_json WHERE cle LIKE ?", (f"reg:{cle}:%",)):
+        an = k.split(":", 2)[2]
+        for l in (json.loads(donnees) or {}).get("lignes") or []:
+            if _texte(l.get("eleve")) == nom:
+                res.append({c.cle: l.get(c.cle, "") for c in r.champs} | {"id": l["id"], "annee": an})
+    res.sort(key=lambda l: (l.get("date") or "", l["id"]), reverse=True)
+    return res
 
 
 def etat(r: Registre, l: dict) -> tuple[str, bool]:

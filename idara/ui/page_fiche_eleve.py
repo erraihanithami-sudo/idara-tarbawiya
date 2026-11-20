@@ -97,6 +97,41 @@ class PageFicheEleve(QWidget):
         v.addWidget(self.obs)
         self.c_fiche.hide()
         racine.addWidget(self.c_fiche)
+
+        # ---- الملف الشامل (طلب المدير 2026-11-20) ----
+        self.c_dossier, v = carte("الملف الشامل للتلميذ(ة)")
+        s = QLabel("كل ما سُجّل للتلميذ(ة) عبر السنوات: المسار الدراسي، المعدلات، الحركية، السلوك، الفحوصات الطبية، "
+                   "والتنويهات والتشجيعات. يُطبع مع البطاقة.")
+        s.setObjectName("sousTitre")
+        s.setWordWrap(True)
+        v.addWidget(s)
+        h = QHBoxLayout()
+        h.setSpacing(8)
+        self.pilules_dossier: dict[str, QPushButton] = {}
+        couleurs = {"parcours": "#1565C0", "moyennes": "#2E7D32", "mouvements": "#00838F", "comportement": "#C62828",
+                    "medical": "#AD1457", "distinctions": "#EF6C00"}
+        self.couleurs_dossier = couleurs
+        for cle, titre, *_ in fe.SECTIONS_DOSSIER:
+            b = QPushButton(titre)
+            b.setObjectName("pilule")
+            b.setCheckable(True)
+            b.setCursor(Qt.PointingHandCursor)
+            b.clicked.connect(lambda _=False, k=cle: self.choisir_section(k))
+            self.pilules_dossier[cle] = b
+            h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        self.t_dossier = tableau([""], etirer=0)
+        self.t_dossier.setMinimumHeight(200)
+        v.addWidget(self.t_dossier)
+        self.l_dossier_vide = QLabel()
+        self.l_dossier_vide.setObjectName("etiquette")
+        self.l_dossier_vide.setWordWrap(True)
+        v.addWidget(self.l_dossier_vide)
+        self.c_dossier.hide()
+        racine.addWidget(self.c_dossier)
+        self.dossier: dict | None = None
+        self.section = "parcours"
         racine.addStretch()
         self.lignes: list[dict] = []
         self.rafraichir()
@@ -167,6 +202,41 @@ class PageFicheEleve(QWidget):
         self.obs.setText("\n".join(obs) if obs else "لا معطيات تقويم بعد: استورد مستويات التعلم (TaRL) أو نتائج "
                                                     "الروائز في «المدرسة الرائدة ← شارة الريادة»، أو أدخل المستويات أعلاه.")
         self.c_fiche.show()
+        self.dossier = fe.dossier_complet(self.f.conn, self.eid)
+        for cle, titre, *_ in fe.SECTIONS_DOSSIER:
+            n = len(self.dossier[cle])
+            self.pilules_dossier[cle].setText(f"{titre} ({n})" if n else titre)
+        self.choisir_section(self.section)
+        self.c_dossier.show()
+
+    def choisir_section(self, cle: str) -> None:
+        from PySide6.QtGui import QBrush, QColor
+        self.section = cle
+        for k, b in self.pilules_dossier.items():
+            b.setChecked(k == cle)
+        if self.dossier is None:
+            return
+        _, titre, entetes, champs = next(x for x in fe.SECTIONS_DOSSIER if x[0] == cle)
+        lignes = self.dossier[cle]
+        t = self.t_dossier
+        t.clear()
+        t.setColumnCount(len(entetes))
+        t.setHorizontalHeaderLabels(list(entetes))
+        t.setRowCount(len(lignes))
+        couleur = QColor(self.couleurs_dossier[cle])
+        for i, x in enumerate(lignes):
+            for j, c in enumerate(champs):
+                it = cellule(fe.valeur_dossier(c, x[c]))
+                if c in ("mention", "type", "statut", "nature") and x[c]:
+                    it.setForeground(QBrush(couleur))
+                    f = it.font()
+                    f.setBold(True)
+                    it.setFont(f)
+                t.setItem(i, j, it)
+        t.horizontalHeader().setStretchLastSection(True)
+        t.setVisible(bool(lignes))
+        self.l_dossier_vide.setText("" if lignes else f"لا شيء مسجل في «{titre}» لهذا التلميذ(ة).")
+        self.l_dossier_vide.setVisible(not lignes)
 
     def enregistrer(self) -> bool:
         if self.p is None:

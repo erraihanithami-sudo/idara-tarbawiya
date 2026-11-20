@@ -1388,6 +1388,16 @@ def test_page_fiche_eleve(app, config_tmp, monkeypatch):
     assert not g.isNull()
     assert p.generer() and len(ouverts) == 1
     assert p.generer(tous=True) is None and "اختر قسماً" in p.message.text()
+    # الملف الشامل (طلب المدير 2026-11-20)
+    assert not p.c_dossier.isHidden() and p.pilules_dossier["parcours"].isChecked() and p.t_dossier.rowCount() >= 1
+    p.pilules_dossier["medical"].click()
+    assert p.t_dossier.isHidden() and "الفحوصات الطبية" in p.l_dossier_vide.text()
+    from idara.services import comportement as cp
+    cp.enregistrer(f.conn, cp.Observation(p.eid, "2026-10-05", "شغب في القسم", "", "أستاذ القسم", ""))
+    p.afficher()
+    p.pilules_dossier["comportement"].click()
+    assert p.t_dossier.rowCount() == 1 and p.t_dossier.item(0, 2).text() == "شغب في القسم"
+    assert p.pilules_dossier["comportement"].text() == "السلوك (1)"
     f.close()
 
 

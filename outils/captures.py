@@ -320,8 +320,17 @@ def main(sortie: Path) -> None:
                 _fe.enregistrer_etape(f.conn, fp.eid, fp.p["annee"], ph, "ar", n)
             for ph, n in ((-1, "C"), (0, "C"), (1, "B"), (2, "B")):
                 _fe.enregistrer_etape(f.conn, fp.eid, fp.p["annee"], ph, "ma", n)
+            from idara.services import registres as _rg
+            _n = fp.p["eleve"]["nom"]
+            _rg.enregistrer(f.conn, "examens_medicaux", {"date": "2026-10-20", "eleve": _n, "type": "فحص البصر",
+                                                          "resultat": "ضعف خفيف", "suite": "إخبار ولي الأمر"})
+            _rg.enregistrer(f.conn, "tahfiz", {"date": "2026-11-02", "eleve": _n, "type": "تشجيع",
+                                                "motif": "المواظبة والانضباط"})
             fp.afficher()
             photo(f, "70_fiche_eleve")
+            fp.choisir_section("comportement")
+            photo(fp.c_dossier, "70_fiche_dossier_comportement")
+            fp.choisir_section("parcours")
             fp.g_etapes.grab().save(str(sortie / "70_fiche_eleve_etapes.png"))
             import shutil as _sh2
             _sh2.copy(_fe.generer(f.conn, f.dossier, [fp.eid], fp.p["annee"], _gr), sortie / "70_fiche_eleve.docx")

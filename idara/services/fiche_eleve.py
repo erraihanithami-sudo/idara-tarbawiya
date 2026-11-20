@@ -112,6 +112,80 @@ def parcours(conn: sqlite3.Connection, eleve_id: int, annee: str | None = None) 
     return {"annee": annee, "eleve": idt, "tarl": res_tarl, "etapes": etapes}
 
 
+def dossier_complet(conn: sqlite3.Connection, eleve_id: int) -> dict:
+    """الملف الشامل للتلميذ عبر السنوات (طلب المدير 2026-11-20): المسار الدراسي، المعدلات، الحركية، السلوك،
+    الفحوصات الطبية، والتنويهات والتشجيعات. كل قسم لائحة أسطر (قد تكون فارغة)."""
+    from idara.services import deliberations as dl
+    from idara.services import eleves as el
+    from idara.services import registres as rg
+    idt = identite(conn, eleve_id)
+    code = idt["code_massar"]
+    parcours_ = [{"annee": r["annee"], "classe": r["classe"] or "", "niveau": r["niveau"] or "",
+                  "statut": el.STATUTS.get(r["statut"], r["statut"]), "entree": r["date_entree"] or "",
+                  "sortie": r["date_sortie"] or "", "motif": r["motif_sortie"] or ""}
+                 for r in conn.execute(
+                     "SELECT a.libelle AS annee, c.code AS classe, n.libelle_ar AS niveau, i.statut, i.date_entree, "
+                     "i.date_sortie, i.motif_sortie FROM inscription i JOIN annee_scolaire a ON a.id=i.annee_id "
+                     "LEFT JOIN classe c ON c.id=i.classe_id LEFT JOIN niveau n ON n.id=i.niveau_id "
+                     "WHERE i.eleve_id=? ORDER BY a.libelle DESC", (eleve_id,))]
+    moyennes = [{"annee": r["annee"], "classe": r["classe"], "moyenne": r["moyenne"],
+                 "mention": dl.mention(r["moyenne"])}
+                for r in conn.execute(
+                    "SELECT a.libelle AS annee, r.classe, r.moyenne FROM resultat r JOIN annee_scolaire a "
+                    "ON a.id=r.annee_id WHERE r.eleve_id=? OR (r.code_massar=? AND ?<>'') ORDER BY a.libelle DESC",
+                    (eleve_id, code, code))]
+    mouvements = [{"annee": r["annee"], "sens": "وافد" if r["sens"] == "arrive" else "مغادر",
+                   "date": r["date_mouvement"], "etablissement": r["etablissement"] or "",
+                   "dossier": ("توصّلنا بالملف " + tx.date_chiffres(r["dossier_recu_le"]) if r["dossier_recu_le"] else
+                               "أُرسل الملف " + tx.date_chiffres(r["dossier_envoye_le"]) if r["dossier_envoye_le"]
+                               else "الملف في الانتظار")}
+                  for r in conn.execute(
+                      "SELECT a.libelle AS annee, m.* FROM mouvement m JOIN annee_scolaire a ON a.id=m.annee_id "
+                      "WHERE m.eleve_id=? ORDER BY m.date_mouvement DESC", (eleve_id,))]
+    comportement = [{"annee": r["annee"], "date": r["date_obs"], "nature": r["nature"], "mesure": r["mesure"] or "",
+                     "convocation": r["date_convocation"] or ""}
+                    for r in conn.execute(
+                        "SELECT a.libelle AS annee, o.* FROM observation_comportement o JOIN annee_scolaire a "
+                        "ON a.id=o.annee_id WHERE o.eleve_id=? ORDER BY o.date_obs DESC, o.id DESC", (eleve_id,))]
+    medical = [{"annee": l["annee"], "date": l["date"], "type": l["type"], "resultat": l["resultat"],
+                "suite": l["suite"]} for l in rg.lignes_eleve(conn, "examens_medicaux", idt["nom"])]
+    distinctions = [{"annee": l["annee"], "date": l["date"], "type": l["type"], "motif": l["motif"],
+                     "periode": l["periode"]} for l in rg.lignes_eleve(conn, "tahfiz", idt["nom"])]
+    for m in moyennes:   # الميزة المستحقة بالمعدل السنوي (تنويه، تشجيع، لوحة الشرف)
+        if m["mention"]:
+            distinctions.append({"annee": m["annee"], "date": "", "type": m["mention"],
+                                 "motif": f"المعدل السنوي {m['moyenne']:.2f}", "periode": "نهاية السنة"})
+    return {"eleve": idt, "parcours": parcours_, "moyennes": moyennes, "mouvements": mouvements,
+            "comportement": comportement, "medical": medical, "distinctions": distinctions}
+
+
+# أقسام الملف الشامل: (المفتاح، العنوان، رؤوس الأعمدة، الحقول)
+SECTIONS_DOSSIER = (
+    ("parcours", "المسار الدراسي", ("السنة", "المستوى", "القسم", "الوضعية", "تاريخ الخروج", "السبب"),
+     ("annee", "niveau", "classe", "statut", "sortie", "motif")),
+    ("moyennes", "المعدلات السنوية", ("السنة", "القسم", "المعدل", "الميزة"), ("annee", "classe", "moyenne", "mention")),
+    ("mouvements", "الحركية", ("السنة", "الحركة", "التاريخ", "المؤسسة", "الملف"),
+     ("annee", "sens", "date", "etablissement", "dossier")),
+    ("comportement", "السلوك", ("السنة", "التاريخ", "الملاحظة", "الإجراء", "استدعاء ولي الأمر"),
+     ("annee", "date", "nature", "mesure", "convocation")),
+    ("medical", "الفحوصات الطبية", ("السنة", "التاريخ", "نوع الفحص", "النتيجة", "الإجراء"),
+     ("annee", "date", "type", "resultat", "suite")),
+    ("distinctions", "التنويهات والتشجيعات", ("السنة", "التاريخ", "النوع", "المناسبة أو السبب", "الفترة"),
+     ("annee", "date", "type", "motif", "periode")),
+)
+
+
+def valeur_dossier(cle: str, v) -> str:
+    """قيمة خانة في الملف الشامل كما تُعرض (التواريخ بالأرقام، المعدل برقمين بعد الفاصلة)."""
+    if v in ("", None):
+        return ""
+    if cle == "moyenne":
+        return f"{float(v):.2f}"
+    if cle in ("date", "sortie", "convocation") and len(str(v)) == 10 and str(v)[4] == "-":
+        return tx.date_chiffres(v)
+    return str(v).replace("\n", " · ")
+
+
 def enregistrer_etape(conn: sqlite3.Connection, eleve_id: int, annee: str, phase: int, matiere: str,
                       niveau: str | None) -> None:
     """مستوى التحكم A/B/C لتلميذ في مادة ورائز أو مرحلة (فارغ: يُحذف)."""
@@ -236,6 +310,19 @@ def generer(conn: sqlite3.Connection, dossier: DossierDonnees, eleve_ids: list[i
                 para(d, "- " + o, taille=11, apres=0)
             if a_besoin_soutien(p):
                 para(d, "يُقترح إدراجه(ا) في مجموعات الدعم.", gras=True, taille=11, apres=0)
+        dos = dossier_complet(conn, eid)
+        if any(dos[k] for k, *_ in SECTIONS_DOSSIER):
+            para(d, "4. الملف الشامل", gras=True, taille=12, apres=2)
+            for cle, titre, entetes, champs in SECTIONS_DOSSIER:
+                if not dos[cle]:
+                    continue
+                para(d, titre, gras=True, taille=11, apres=1)
+                _table(d, list(entetes), [[_ltr(valeur_dossier(c, x[c])) if c in ("annee", "moyenne", "date")
+                                           and x[c] not in ("", None) else valeur_dossier(c, x[c]) for c in champs]
+                                          for x in dos[cle]],
+                       [round(18.0 / len(entetes), 2)] * len(entetes), taille=10)
+            if not p["tarl"] and not p["etapes"] and any(dos[k] for k, *_ in SECTIONS_DOSSIER if k != "parcours"):
+                vides -= 1
         _signature(d, conn)
     if vides == len(eleve_ids):
         raise ErreurFiche("لا معطيات تقويم لهذا التلميذ: استورد مستويات التعلم أو نتائج الروائز، أو أدخل المستويات "

@@ -71,3 +71,30 @@ def test_recherche_et_riyada_tarl(base, tmp_path):  # noqa: F811
     d = ry.isa(base, "2026/2027")[cl]
     assert n == 5 and d["ma"][-1] == 12.0 and d["ar"][-1] == 0.0 and d["ar"][0] == 100.0 and d["fr"][0] == 100.0
     assert ry.remplir_depuis_tarl(base, "2026/2027") == 0
+
+
+def test_dossier_complet(base, dossier):  # noqa: F811
+    """طلب المدير 2026-11-20: البطاقة تحتفظ بالمسار والمعدلات والحركية والسلوك والفحوصات والتنويهات."""
+    from idara.services import comportement as cp
+    from idara.services import registres as rg
+    eid, code, cl = _eleve(base)
+    dos = fe.dossier_complet(base, eid)
+    assert dos["parcours"] and dos["parcours"][0]["classe"] == cl and dos["parcours"][0]["statut"] == "يتابع دراسته"
+    assert not any(dos[k] for k in ("moyennes", "mouvements", "comportement", "medical", "distinctions"))
+    nom = dos["eleve"]["nom"]
+    cp.enregistrer(base, cp.Observation(eid, "2026-10-05", "شغب في القسم", "", "أستاذ القسم", "تنبيه شفوي"))
+    rg.enregistrer(base, "examens_medicaux", {"date": "2026-10-20", "eleve": nom, "classe": cl,
+                                              "type": "فحص البصر", "resultat": "ضعف خفيف", "suite": "إخبار ولي الأمر"})
+    rg.enregistrer(base, "tahfiz", {"date": "2026-11-02", "eleve": nom, "classe": cl, "type": "تشجيع",
+                                    "motif": "المواظبة"})
+    aid = base.execute("SELECT id FROM annee_scolaire WHERE est_courante=1").fetchone()[0]
+    with base:
+        base.execute("INSERT INTO resultat(annee_id, code_massar, eleve_id, nom, classe, moyennes, moyenne) "
+                     "VALUES (?,?,?,?,?,?,?)", (aid, code, eid, nom, cl, "{}", 8.25))
+    dos = fe.dossier_complet(base, eid)
+    assert dos["comportement"][0]["nature"] == "شغب في القسم" and dos["medical"][0]["type"] == "فحص البصر"
+    assert dos["moyennes"][0]["mention"] == "تنويه"
+    assert {x["type"] for x in dos["distinctions"]} == {"تشجيع", "تنويه"}
+    assert fe.valeur_dossier("moyenne", 8.25) == "8.25" and fe.valeur_dossier("date", "2026-10-05") == "05/10/2026"
+    _, txt, cells = _texte(fe.generer(base, dossier, [eid]))
+    assert "4. الملف الشامل" in txt and "فحص البصر" in cells and "شغب في القسم" in cells and "تنويه" in cells
