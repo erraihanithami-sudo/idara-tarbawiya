@@ -34,32 +34,48 @@ class PageAnciens(QWidget):
         self.message.setWordWrap(True)
         self.message.hide()
         racine.addWidget(self.message)
+        # طلب المدير 2026-11-20: إضافة تلميذ أو شهادة مدرسية من نافذة منبثقة؛ الصفحة الثابتة للائحة
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        hb = QHBoxLayout()
+        self.b_ajouter = bouton_couleur("تلميذ قديم جديد", "#1565C0", "ajouter",
+                                        "إدخال تلميذ درس قبل مسار ثم توليد شهادته المدرسية")
+        self.b_ajouter.clicked.connect(lambda: self.ouvrir_nouveau())
+        self.b_certificat = bouton_couleur("شهادة مدرسية للتلميذ المحدد", "#2E7D32", "document",
+                                           "اختر التلميذ من اللائحة ثم أدخل اسم متسلم الشهادة")
+        self.b_certificat.clicked.connect(lambda: self.ouvrir_certificat(self.eleve_id))
+        hb.addWidget(self.b_ajouter)
+        hb.addWidget(self.b_certificat)
+        hb.addStretch()
+        racine.addLayout(hb)
         corps = QHBoxLayout()
         corps.setSpacing(20)
         racine.addLayout(corps, 1)
 
         # البحث
-        c, cv = carte()
+        c, cv = carte("التلاميذ القدامى المسجلون")
         self.recherche = QLineEdit()
         self.recherche.setPlaceholderText("رقم التسجيل في السجل العام أو الاسم")
         self.recherche.setClearButtonEnabled(True)
         self.recherche.textChanged.connect(self.chercher)
         cv.addWidget(etiquette("بحث", self.recherche))
         cv.addWidget(self.recherche)
-        self.resultats = tableau(["رقم السجل", "الاسم"])
+        self.resultats = tableau(["رقم السجل", "الاسم", "آخر قسم", "الشهادات المسلمة", ""], etirer=1)
         self.resultats.setMinimumHeight(380)
         self.resultats.itemSelectionChanged.connect(self._selection)
+        self.resultats.itemDoubleClicked.connect(
+            lambda it: self.ouvrir_certificat(self.resultats.item(it.row(), 0).data(Qt.UserRole)))
         cv.addWidget(self.resultats, 1)
-        b_nouveau = QPushButton("+ تلميذ قديم جديد")
-        b_nouveau.clicked.connect(self.nouveau)
-        cv.addWidget(b_nouveau)
-        corps.addWidget(c, 4)
+        corps.addWidget(c, 1)
 
         # الاستمارة
         c2, fv = carte()
         self.titre = QLabel("تلميذ جديد")
         self.titre.setObjectName("titreCarte")
         fv.addWidget(self.titre)
+        self.m_fiche = QLabel()
+        self.m_fiche.setWordWrap(True)
+        self.m_fiche.hide()
+        fv.addWidget(self.m_fiche)
         note = QLabel("كل الحقول المعلَّمة بـ * إجبارية: الشهادة لا تُولَّد بحقل فارغ.")
         note.setObjectName("etiquette")
         fv.addWidget(note)
@@ -145,7 +161,7 @@ class PageAnciens(QWidget):
         aide = QLabel("نقرة مزدوجة على سطر لإعادة طباعة الشهادة بنفس بياناتها.")
         aide.setObjectName("etiquette")
         fv.addWidget(aide)
-        corps.addWidget(c2, 7)
+        self.fiche = FenetreFiche(self, "تلميذ قديم جديد", "", c2, largeur=920)
         self.chercher("")
 
     # ---------- البحث ----------
@@ -154,11 +170,47 @@ class PageAnciens(QWidget):
         self.chercher(self.recherche.text())
 
     def chercher(self, texte: str) -> None:
+        from idara.ui.vitrine import ajuster_colonne_actions, boutons_ligne, vider_colonne_widgets
         lignes = el.rechercher(self.f.conn, texte, source="avant_massar")
+        vider_colonne_widgets(self.resultats, 4)
         self.resultats.setRowCount(len(lignes))
         for i, r in enumerate(lignes):
             self.resultats.setItem(i, 0, cellule(r["num_registre"], r["id"]))
             self.resultats.setItem(i, 1, cellule(f"{r['prenom_ar']} {r['nom_ar']}"))
+            try:
+                niv = an.lire(self.f.conn, r["id"]).dernier_niveau
+            except an.ErreurAncien:
+                niv = ""
+            self.resultats.setItem(i, 2, cellule(niv))
+            n = len(an.remises(self.f.conn, r["id"]))
+            self.resultats.setItem(i, 3, cellule(str(n) if n else "لا شيء"))
+            self.resultats.setCellWidget(i, 4, boutons_ligne([
+                ("شهادة مدرسية", "#2E7D32", "document", lambda _=False, k=r["id"]: self.ouvrir_certificat(k)),
+                ("تعديل", "#1565C0", "modifier", lambda _=False, k=r["id"]: self.ouvrir_certificat(k, False))]))
+        ajuster_colonne_actions(self.resultats, 4)
+
+    def _msg(self, texte: str, erreur: bool = False) -> None:
+        message(self.message, texte, erreur)
+        message(self.m_fiche, texte, erreur)
+
+    def ouvrir_nouveau(self):
+        self.nouveau()
+        self.fiche.definir_titre("تلميذ قديم جديد", "أدخل بياناته كما في السجل العام، ثم متسلم "
+                                                                      "الشهادة إن أردت توليدها الآن.")
+        self.fiche.ouvrir()
+        return self.fiche
+
+    def ouvrir_certificat(self, eleve_id: int | None, certificat: bool = True):
+        if eleve_id is None:
+            self._msg("اختر التلميذ من اللائحة أولاً، أو أضف تلميذاً قديماً جديداً.", True)
+            return None
+        self.afficher(eleve_id)
+        a = an.lire(self.f.conn, eleve_id)
+        self.fiche.definir_titre("شهادة مدرسية" if certificat else "تعديل بيانات التلميذ",
+                                 f"{a.prenom_ar} {a.nom_ar} · رقم السجل {a.num_registre}")
+        self.fiche.ouvrir()
+        (self.c_dest if certificat else self.c_nom).setFocus()
+        return self.fiche
 
     def _selection(self) -> None:
         lignes = {i.row() for i in self.resultats.selectedIndexes()}
@@ -183,6 +235,7 @@ class PageAnciens(QWidget):
             r.setAutoExclusive(True)
         self.remises.setRowCount(0)
         self.message.hide()
+        self.m_fiche.hide()
         self.c_num.setFocus()
 
     def afficher(self, eleve_id: int) -> None:
@@ -210,6 +263,7 @@ class PageAnciens(QWidget):
             self.remises.setItem(i, 2, cellule(r["destinataire_cin"]))
             self.remises.setItem(i, 3, cellule("إعادة الطباعة ↵"))
         self.message.hide()
+        self.m_fiche.hide()
 
     def _lire(self) -> an.Ancien:
         dates = {}
@@ -231,18 +285,18 @@ class PageAnciens(QWidget):
         try:
             eid = an.enregistrer(self.f.conn, self._lire())
         except an.ErreurAncien as e:
-            message(self.message, str(e), True)
+            self._msg(str(e), True)
             return None
         self.eleve_id = eid
         self.chercher(self.recherche.text())
         self.afficher(eid)
-        message(self.message, "حُفظت بيانات التلميذ.")
+        self._msg("حُفظت بيانات التلميذ.")
         return eid
 
     def generer(self):
         dest, cin = self.c_dest.text().strip(), self.c_cin.text().strip()
         if not dest or not cin:
-            message(self.message, "اسم متسلم الشهادة ورقم بطاقته الوطنية إجباريان.", True)
+            self._msg("اسم متسلم الشهادة ورقم بطاقته الوطنية إجباريان.", True)
             return None
         if self.enregistrer() is None:
             return None
@@ -251,10 +305,10 @@ class PageAnciens(QWidget):
             doc = an.generer_certificat(self.f.conn, self.f.dossier, self.eleve_id, dest, cin,
                                         date(q.year(), q.month(), q.day()))
         except (an.ErreurAncien, dc.ErreurDocument) as e:
-            message(self.message, str(e), True)
+            self._msg(str(e), True)
             return None
         self.afficher(self.eleve_id)
-        message(self.message, f"وُلّدت الشهادة وسُجّل تسليمها: \u2066{doc.chemin.name}\u2069")
+        self._msg(f"وُلّدت الشهادة وسُجّل تسليمها: \u2066{doc.chemin.name}\u2069")
         self._ouvrir(doc.chemin)
         return doc
 
@@ -263,9 +317,9 @@ class PageAnciens(QWidget):
         try:
             doc = dc.regenerer(self.f.conn, self.f.dossier, doc_id)
         except dc.ErreurDocument as e:
-            message(self.message, str(e), True)
+            self._msg(str(e), True)
             return None
-        message(self.message, f"أُعيد توليد الشهادة: \u2066{doc.chemin.name}\u2069")
+        self._msg(f"أُعيد توليد الشهادة: \u2066{doc.chemin.name}\u2069")
         self._ouvrir(doc.chemin)
         return doc
 
@@ -273,4 +327,4 @@ class PageAnciens(QWidget):
         try:
             bureautique.ouvrir(chemin)
         except OSError as e:
-            message(self.message, f"تعذر فتح الملف تلقائياً: {e}", True)
+            self._msg(f"تعذر فتح الملف تلقائياً: {e}", True)

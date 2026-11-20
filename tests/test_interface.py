@@ -341,6 +341,8 @@ def test_page_anciens_tous_champs(app, config_tmp, monkeypatch):
     f.aller_a("التلاميذ القدامى")
     p = f.page_anciens
     assert p.resultats.rowCount() == 0
+    assert p.ouvrir_certificat(None) is None and "اختر التلميذ" in p.message.text()
+    assert p.ouvrir_nouveau().isVisible() and p.fiche.windowTitle() == "تلميذ قديم جديد"   # نافذة منبثقة 2026-11-20
     p.c_num.setText("8173")
     p.c_nom.setText("القديم")
     p.c_prenom.setText("فيصل")
@@ -358,6 +360,11 @@ def test_page_anciens_tous_champs(app, config_tmp, monkeypatch):
     doc = p.generer()
     assert doc is not None, p.message.text()
     assert ouverts == [doc.chemin] and p.remises.rowCount() == 1
+    assert p.resultats.rowCount() == 1 and p.resultats.item(0, 3).text() == "1" and p.resultats.cellWidget(0, 4)
+    p.fiche.hide()
+    p.resultats.cellWidget(0, 4).findChildren(__import__("PySide6.QtWidgets", fromlist=["x"]).QPushButton)[0].click()
+    assert p.fiche.isVisible() and p.fiche.windowTitle() == "شهادة مدرسية" and p.c_nom.text() == "القديم"
+    p.fiche.hide()
     p.nouveau()
     assert p.c_num.text() == "" and p.eleve_id is None
     p.recherche.setText("8173")

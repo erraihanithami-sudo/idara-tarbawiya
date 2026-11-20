@@ -117,6 +117,7 @@ def main(sortie: Path) -> None:
     f.aller_a("التلاميذ القدامى")
     a2 = f.page_anciens
     photo(f, "18_anciens_vide")
+    a2.ouvrir_nouveau()
     a2.c_num.setText("8173")
     a2.c_nom.setText("القديم")
     a2.c_prenom.setText("فيصل")
@@ -129,6 +130,8 @@ def main(sortie: Path) -> None:
     a2.c_dest.setText("فيصل القديم")
     a2.c_cin.setText("A000000")
     a2.generer()
+    photo(a2.fiche, "19_anciens_fiche_popup")
+    a2.fiche.hide()
     photo(f, "19_anciens_certificat")
     # الموارد البشرية
     f.aller_a("الموارد البشرية")
