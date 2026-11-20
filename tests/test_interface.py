@@ -628,15 +628,21 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     assert s.ajouter() == "3/26-27" and s.table.rowCount() == 3
     # طلب المدير 2026-11-19: هيكلة المديرية (المصالح والمكاتب) في نافذة منبثقة
     d = s.ouvrir_structure()
-    assert d.isVisible() and s.t_structure.rowCount() == 2 and "مصلحة تدبير الموارد البشرية" in s.l_structure.text()
-    s._ligne_structure("مصلحة الشؤون التربوية", "مكتب التخطيط")
-    s._ligne_structure("", "مكتب الحياة المدرسية")
+    assert d.isVisible() and len(s.blocs_services) == 1 and len(s.blocs_services[0].champs) == 2
+    assert "مصلحة تدبير الموارد البشرية" in s.l_structure.text()
+    # 2026-11-20: المصلحة ومكاتبها ثم مصلحة أخرى، ومكاتب غير تابعة لأي مصلحة
+    bs = s.ajouter_service("مصلحة الشؤون التربوية", ["مكتب التخطيط"])
+    bs.ajouter_bureau("مكتب الحياة المدرسية")
+    s.bloc_independant.ajouter_bureau("مكتب الضبط")
+    vide = s.ajouter_service()
+    s.retirer_service(vide)
     s.aff["bureau_etablissements"].setCurrentText("مكتب الحياة المدرسية")
     assert s.enregistrer_structure(), s.message_structure.text()
     assert cg.structure_direction(f.conn)[1] == {"service": "مصلحة الشؤون التربوية",
                                                  "bureaux": ["مكتب التخطيط", "مكتب الحياة المدرسية"]}
     assert cg.parametres(f.conn)["bureau_etablissements"] == "مكتب الحياة المدرسية"
-    assert "مكتب التخطيط" in s.l_structure.text()
+    assert "مكتب التخطيط" in s.l_structure.text() and "مكتب الضبط" in s.l_structure.text()
+    assert cg.bureaux_independants(f.conn) == ["مكتب الضبط"] and len(s.blocs_services) == 2
     s.aff["bureau_conges"].setCurrentText("مكتب غير موجود")
     assert not s.enregistrer_structure() and "غير موجود" in s.message_structure.text()
     d.hide()

@@ -86,7 +86,7 @@ class DialogueBordereau(QDialog):
         par = cg.parametres(conn)
         cles = {par["bureau_conges"]: "bureau_conges", par["bureau_etablissements"]: "bureau_etablissements"}
         for sv, bu in cg.bureaux_direction(conn):
-            self.bureau.addItem(f"{bu} ({sv})", cles.get(bu, bu))
+            self.bureau.addItem(f"{bu} ({sv})" if sv else bu, cles.get(bu, bu))
         for k in ("bureau_conges", "bureau_etablissements"):
             if self.bureau.findData(k) < 0:
                 self.bureau.addItem(par[k], k)
@@ -878,28 +878,34 @@ class PageSortants(QWidget):
         self._construire_structure()
         self.rafraichir()
 
-    # ---- هيكلة المديرية في نافذة منبثقة (طلب المدير 2026-11-19) ----
+    # ---- هيكلة المديرية في نافذة منبثقة (2026-11-19)، مصلحةً مصلحة مع مكاتبها (2026-11-20) ----
     def _construire_structure(self) -> None:
+        from PySide6.QtWidgets import QScrollArea
+
         from idara.ui.vitrine import FenetreFiche, bouton_couleur
         w = QWidget()
         v = QVBoxLayout(w)
-        aide = QLabel("سطر لكل مكتب: المصلحة ثم المكتب التابع لها. مصلحة دون مكاتب: اترك خانة المكتب فارغة. "
-                      "ثم حدد المصلحة والمكتبين اللذين تُوجَّه إليهما الرخص وأوراق الإرسال.")
+        aide = QLabel("أضف المصلحة ثم المكاتب التابعة لها، ثم انتقل إلى مصلحة أخرى وهكذا. المكاتب التي لا تتبع أي "
+                      "مصلحة تُضاف في الإطار الأخير. ثم حدد المصلحة والمكتبين اللذين تُوجَّه إليهما الرخص "
+                      "وأوراق الإرسال.")
         aide.setObjectName("etiquette")
         aide.setWordWrap(True)
         v.addWidget(aide)
-        self.t_structure = QTableWidget(0, 2)
-        self.t_structure.setHorizontalHeaderLabels(["المصلحة", "المكتب"])
-        self.t_structure.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.t_structure.verticalHeader().setVisible(False)
-        self.t_structure.setMinimumHeight(280)
-        v.addWidget(self.t_structure)
+        defil = QScrollArea()
+        defil.setWidgetResizable(True)
+        defil.setFrameShape(QFrame.NoFrame)
+        defil.setMinimumHeight(380)
+        conteneur = QWidget()
+        self.l_blocs = QVBoxLayout(conteneur)
+        self.l_blocs.setSpacing(12)
+        self.l_blocs.addStretch()
+        defil.setWidget(conteneur)
+        v.addWidget(defil, 1)
+        self.blocs_services: list[BlocService] = []
+        self.bloc_independant = BlocService(None, self)
         h = QHBoxLayout()
-        b = QPushButton("+ مكتب أو مصلحة")
-        b.clicked.connect(lambda: self._ligne_structure("", ""))
-        h.addWidget(b)
-        b = bouton("حذف السطر المحدد")
-        b.clicked.connect(lambda: self.t_structure.removeRow(self.t_structure.currentRow()))
+        b = bouton_couleur("مصلحة جديدة", "#1565C0", "ajouter", "تضاف مصلحة فارغة، ثم أضف مكاتبها")
+        b.clicked.connect(lambda: self.ajouter_service("", [""]))
         h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
@@ -911,7 +917,7 @@ class PageSortants(QWidget):
                       "bureau_etablissements": "مكتب تسيير المؤسسات (أوراق الإرسال)"}[k], cb)
         v.addLayout(f)
         h = QHBoxLayout()
-        b = bouton_couleur("حفظ الهيكلة", "#1565C0", "enregistrer")
+        b = bouton_couleur("حفظ الهيكلة", "#2E7D32", "enregistrer")
         b.clicked.connect(lambda: self.enregistrer_structure())
         h.addWidget(b)
         h.addStretch()
@@ -920,42 +926,64 @@ class PageSortants(QWidget):
         self.message_structure.setWordWrap(True)
         self.message_structure.hide()
         v.addWidget(self.message_structure)
-        self.fiche_structure = FenetreFiche(self, "هيكلة المديرية الإقليمية", "", w, largeur=760)
+        self.fiche_structure = FenetreFiche(self, "هيكلة المديرية الإقليمية", "", w, largeur=820)
 
-    def _ligne_structure(self, sv: str, bu: str) -> None:
-        i = self.t_structure.rowCount()
-        self.t_structure.insertRow(i)
-        self.t_structure.setItem(i, 0, QTableWidgetItem(sv))
-        self.t_structure.setItem(i, 1, QTableWidgetItem(bu))
+    def _placer_blocs(self) -> None:
+        for b in self.blocs_services + [self.bloc_independant]:
+            self.l_blocs.removeWidget(b)
+        k = 0
+        for b in self.blocs_services:
+            self.l_blocs.insertWidget(k, b)
+            k += 1
+        self.l_blocs.insertWidget(k, self.bloc_independant)
+
+    def ajouter_service(self, nom: str = "", bureaux: list[str] | None = None) -> "BlocService":
+        b = BlocService(nom, self)
+        for x in bureaux or []:
+            b.ajouter_bureau(x)
+        self.blocs_services.append(b)
+        self._placer_blocs()
+        if not nom:
+            b.nom.setFocus()
+        return b
+
+    def retirer_service(self, bloc: "BlocService") -> None:
+        if bloc in self.blocs_services:
+            self.blocs_services.remove(bloc)
+            self.l_blocs.removeWidget(bloc)
+            bloc.deleteLater()
 
     def ouvrir_structure(self):
         st = cg.structure_direction(self.f.conn)
-        self.t_structure.setRowCount(0)
+        for b in list(self.blocs_services):
+            self.retirer_service(b)
         for x in st:
-            for b in x["bureaux"] or [""]:
-                self._ligne_structure(x["service"], b)
+            self.ajouter_service(x["service"], x["bureaux"])
+        self.bloc_independant.vider()
+        for b in cg.bureaux_independants(self.f.conn):
+            self.bloc_independant.ajouter_bureau(b)
+        self._placer_blocs()
         par = cg.parametres(self.f.conn)
+        indep = cg.bureaux_independants(self.f.conn)
         for k, cb in self.aff.items():
             cb.clear()
-            cb.addItems([x["service"] for x in st] if k == "service_rh" else [b for x in st for b in x["bureaux"]])
+            cb.addItems([x["service"] for x in st] if k == "service_rh"
+                        else [b for x in st for b in x["bureaux"]] + indep)
             cb.setCurrentText(par[k])
         self.message_structure.hide()
         self.fiche_structure.ouvrir()
         return self.fiche_structure
 
     def enregistrer_structure(self) -> bool:
-        self.t_structure.setCurrentItem(None)
-        lignes = [tuple((self.t_structure.item(i, j).text() if self.t_structure.item(i, j) else "") for j in range(2))
-                  for i in range(self.t_structure.rowCount())]
+        services = [(b.nom.text(), b.bureaux()) for b in self.blocs_services]
         try:
-            cg.enregistrer_structure_direction(self.f.conn, lignes, {k: cb.currentText() for k, cb in self.aff.items()})
+            cg.enregistrer_structure(self.f.conn, services, self.bloc_independant.bureaux(),
+                                     {k: cb.currentText() for k, cb in self.aff.items()})
         except cg.ErreurConge as e:
             message(self.message_structure, str(e), True)
             return False
-        message(self.message_structure, "حُفظت هيكلة المديرية.")
         self._afficher_structure()
-        # إعادة ملء قوائم الاختيار بالمصالح والمكاتب الجديدة
-        self.ouvrir_structure()
+        self.ouvrir_structure()   # إعادة ملء قوائم الاختيار بالمصالح والمكاتب الجديدة
         message(self.message_structure, "حُفظت هيكلة المديرية.")
         return True
 
@@ -968,6 +996,11 @@ class PageSortants(QWidget):
             bs = " ".join(puce.format(c="#2E7D32" if b in (par["bureau_conges"], par["bureau_etablissements"])
                                       else "#78909C", t=b) for b in x["bureaux"]) or "—"
             lignes.append(f"<b style='color:#1565C0'>{x['service']}</b>: {bs}")
+        indep = cg.bureaux_independants(self.f.conn)
+        if indep:
+            lignes.append("<b style='color:#B07A16'>مكاتب غير تابعة لأي مصلحة</b>: " + " ".join(
+                puce.format(c="#2E7D32" if b in (par["bureau_conges"], par["bureau_etablissements"]) else "#78909C",
+                            t=b) for b in indep))
         self.l_structure.setText("<div dir='rtl'><b>هيكلة المديرية</b><br>" + "<br>".join(lignes) + "</div>")
 
     def rafraichir(self) -> None:
@@ -1006,3 +1039,85 @@ class PageSortants(QWidget):
                 return
             self.rafraichir()
             _ouvrir(self.message, doc)
+
+
+class BlocService(QFrame):
+    """إطار مصلحة: اسمها ومكاتبها التابعة لها (nom=None: المكاتب غير التابعة لأي مصلحة)."""
+
+    def __init__(self, nom: str | None, page):
+        super().__init__()
+        from idara.ui.vitrine import bouton_couleur
+        self.page = page
+        self.independant = nom is None
+        couleur = "#B07A16" if self.independant else "#1565C0"
+        self.setObjectName("blocService")
+        self.setStyleSheet(f"QFrame#blocService {{ background: #FFFFFF; border: 1px solid #E0D2AE; "
+                           f"border-right: 5px solid {couleur}; border-radius: 14px; }}")
+        v = QVBoxLayout(self)
+        v.setContentsMargins(16, 12, 16, 12)
+        v.setSpacing(8)
+        h = QHBoxLayout()
+        if self.independant:
+            t = QLabel("مكاتب غير تابعة لأي مصلحة")
+            t.setStyleSheet(f"color: {couleur}; font-weight: 800; font-size: 12pt; border: 0;")
+            h.addWidget(t)
+            self.nom = QLineEdit()
+            self.nom.hide()
+        else:
+            t = QLabel("المصلحة")
+            t.setStyleSheet(f"color: {couleur}; font-weight: 800; border: 0;")
+            h.addWidget(t)
+            self.nom = QLineEdit(nom)
+            self.nom.setPlaceholderText("مثال: مصلحة الشؤون التربوية")
+            self.nom.setStyleSheet("font-weight: 700;")
+            h.addWidget(self.nom, 1)
+        h.addStretch(0 if not self.independant else 1)
+        self.b_bureau = bouton_couleur("مكتب", couleur, "ajouter", "إضافة مكتب " +
+                                       ("غير تابع لأي مصلحة" if self.independant else "تابع لهذه المصلحة"))
+        self.b_bureau.clicked.connect(lambda: self.ajouter_bureau("", focus=True))
+        h.addWidget(self.b_bureau)
+        if not self.independant:
+            self.b_suppr = bouton("حذف المصلحة")
+            self.b_suppr.clicked.connect(lambda: self.page.retirer_service(self))
+            h.addWidget(self.b_suppr)
+        v.addLayout(h)
+        self.l_bureaux = QVBoxLayout()
+        self.l_bureaux.setSpacing(6)
+        v.addLayout(self.l_bureaux)
+        self.champs: list[QLineEdit] = []
+
+    def ajouter_bureau(self, texte: str = "", focus: bool = False) -> QLineEdit:
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(24, 0, 0, 0)
+        puce = QLabel("–")
+        puce.setStyleSheet("color: #C9A04A; font-weight: 800; border: 0;")
+        h.addWidget(puce)
+        c = QLineEdit(texte)
+        c.setPlaceholderText("اسم المكتب")
+        h.addWidget(c, 1)
+        b = bouton("حذف")
+        b.setToolTip("حذف هذا المكتب")
+        b.clicked.connect(lambda: self._retirer(w, c))
+        h.addWidget(b)
+        self.l_bureaux.addWidget(w)
+        self.champs.append(c)
+        if focus:
+            c.setFocus()
+        return c
+
+    def _retirer(self, w, c) -> None:
+        if c in self.champs:
+            self.champs.remove(c)
+        self.l_bureaux.removeWidget(w)
+        w.deleteLater()
+
+    def vider(self) -> None:
+        while self.l_bureaux.count():
+            it = self.l_bureaux.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+        self.champs = []
+
+    def bureaux(self) -> list[str]:
+        return [c.text() for c in self.champs]

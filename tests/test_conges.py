@@ -280,3 +280,23 @@ def test_directeur_sans_conges(base):  # noqa: F811
     did = next(p.id for p in rh.lister(base) if p.categorie == "directeur")
     with pytest.raises(cg.ErreurConge, match="المديرية"):
         _conge(base, did)
+
+
+def test_structure_par_service_et_bureaux_independants(base):  # noqa: F811
+    """طلب المدير 2026-11-20: المصلحة ومكاتبها ثم مصلحة أخرى، ومكاتب غير تابعة لأي مصلحة."""
+    with pytest.raises(cg.ErreurConge, match="اكتب اسم المصلحة"):
+        cg.enregistrer_structure(base, [("", ["مكتب يتيم"])])
+    with pytest.raises(cg.ErreurConge, match="مكررة"):
+        cg.enregistrer_structure(base, [("مصلحة أ", []), ("مصلحة  أ", [])])
+    with pytest.raises(cg.ErreurConge, match="غير موجود"):
+        cg.enregistrer_structure(base, [("مصلحة أ", ["مكتب 1"])], [], {"bureau_conges": "مكتب 9"})
+    cg.enregistrer_structure(base, [("مصلحة أ", ["مكتب 1", "مكتب 2", "", "مكتب 1"]), ("مصلحة ب", []),
+                                    ("", [])], ["مكتب الضبط", "  "],
+                             {"service_rh": "مصلحة أ", "bureau_etablissements": "مكتب الضبط"})
+    assert cg.structure_direction(base) == [{"service": "مصلحة أ", "bureaux": ["مكتب 1", "مكتب 2"]},
+                                            {"service": "مصلحة ب", "bureaux": []}]
+    assert cg.bureaux_independants(base) == ["مكتب الضبط"]
+    assert cg.bureaux_direction(base)[-1] == ("", "مكتب الضبط")
+    assert cg.parametres(base)["bureau_etablissements"] == "مكتب الضبط"
+    v = cg.valeurs_bordereau(base, [("وثيقة", 1)], "1", "2026-11-20", "bureau_etablissements")
+    assert v["dest_bureau"] == "مكتب الضبط"

@@ -101,15 +101,67 @@ def enregistrer_structure_direction(conn: sqlite3.Connection, lignes: list[tuple
             raise ErreurConge(f"المصلحة «{v}» غير موجودة في الهيكلة.")
         if k != "service_rh" and v and v not in tous_b:
             raise ErreurConge(f"المكتب «{v}» غير موجود في الهيكلة.")
-    fiches.ecrire(conn, "structure_direction", {"services": res})
+    fiches.ecrire(conn, "structure_direction", {"services": res, "independants": bureaux_independants(conn)})
+    if any(affectations.values()):
+        definir_parametres(conn, {k: v for k, v in affectations.items() if v})
+    return res
+
+
+def bureaux_independants(conn: sqlite3.Connection) -> list[str]:
+    """مكاتب غير تابعة لأي مصلحة (طلب المدير 2026-11-20)."""
+    from idara.services import fiches
+    d = fiches.lire(conn, "structure_direction") or {}
+    return list(d.get("independants") or [])
+
+
+def enregistrer_structure(conn: sqlite3.Connection, services: list[tuple[str, list[str]]],
+                          independants: list[str] | None = None,
+                          affectations: dict[str, str] | None = None) -> list[dict]:
+    """الهيكلة مصلحةً مصلحة (طلب المدير 2026-11-20): [(المصلحة، [مكاتبها])]، ثم المكاتب غير التابعة لأي مصلحة."""
+    from idara.services import fiches
+    res: list[dict] = []
+    vus: set[str] = set()
+    for sv, bus in services:
+        sv = " ".join((sv or "").split())
+        bus = [" ".join((b or "").split()) for b in bus]
+        bus = [b for b in bus if b]
+        if not sv:
+            if bus:
+                raise ErreurConge(f"المكتب «{bus[0]}»: اكتب اسم المصلحة التي يتبع لها، أو انقله إلى «مكاتب غير تابعة "
+                                  f"لأي مصلحة».")
+            continue
+        if sv in vus:
+            raise ErreurConge(f"المصلحة «{sv}» مكررة.")
+        vus.add(sv)
+        uniques: list[str] = []
+        for b in bus:
+            if b not in uniques:
+                uniques.append(b)
+        res.append({"service": sv, "bureaux": uniques})
+    indep: list[str] = []
+    for b in independants or []:
+        b = " ".join((b or "").split())
+        if b and b not in indep:
+            indep.append(b)
+    if not res and not indep:
+        raise ErreurConge("أدخل مصلحة أو مكتباً واحداً على الأقل.")
+    affectations = {k: " ".join((v or "").split()) for k, v in (affectations or {}).items()}
+    tous_b = {b for x in res for b in x["bureaux"]} | set(indep)
+    for k, v in affectations.items():
+        if k == "service_rh" and v and v not in vus:
+            raise ErreurConge(f"المصلحة «{v}» غير موجودة في الهيكلة.")
+        if k != "service_rh" and v and v not in tous_b:
+            raise ErreurConge(f"المكتب «{v}» غير موجود في الهيكلة.")
+    fiches.ecrire(conn, "structure_direction", {"services": res, "independants": indep})
     if any(affectations.values()):
         definir_parametres(conn, {k: v for k, v in affectations.items() if v})
     return res
 
 
 def bureaux_direction(conn: sqlite3.Connection) -> list[tuple[str, str]]:
-    """[(المصلحة، المكتب)] لاختيار المكتب في أوراق الإرسال."""
-    return [(x["service"], b) for x in structure_direction(conn) for b in x["bureaux"]]
+    """[(المصلحة، المكتب)] لاختيار المكتب في أوراق الإرسال؛ المكتب غير التابع لمصلحة: المصلحة فارغة."""
+    return [(x["service"], b) for x in structure_direction(conn) for b in x["bureaux"]] + \
+        [("", b) for b in bureaux_independants(conn)]
 
 
 def _destination(conn) -> dict[str, str]:
