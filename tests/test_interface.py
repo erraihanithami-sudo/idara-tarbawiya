@@ -2571,7 +2571,7 @@ def test_rihab_et_registres(app, config_tmp, monkeypatch):
     assert fd.isVisible() and v.dossier_valeurs["description"] == "سقوط في الساحة"
     fd.hide()
     v.remplir({"envoi": "أُرسل إلى المديرية الإقليمية", "date_envoi": "2026-11-12"})
-    assert v.enregistrer() == lid and "✔" in v.table.item(0, col - 1).text()
+    assert v.enregistrer() == lid and "أُرسل" in v.table.item(0, col - 1).text()
     v.nouveau()
     assert v.lid is None and not v.b_suppr.isEnabled() and v.generer("declaration") is None
     selectionner(v.table, 0)

@@ -248,7 +248,7 @@ class VueRegistre(QWidget):
                 it = cellule(rg.afficher(ch, l.get(ch.cle)), l["id"])
                 if ch.cle == self.r.etat:   # الوضعية ملونة (طلب المدير 2026-11-20)
                     texte, fait = rg.etat(self.r, l)
-                    it.setText(("✔ " if fait else "● ") + texte)
+                    it.setText(texte)
                     it.setForeground(QBrush(QColor("#2E7D32" if fait else "#E65100")))
                     f = it.font()
                     f.setBold(True)
@@ -302,7 +302,7 @@ class VueRegistre(QWidget):
         v.setSpacing(10)
         texte, fait = rg.etat(self.r, l)
         if self.r.etat:
-            e = QLabel(("✔ " if fait else "● ") + texte)
+            e = QLabel(texte)
             e.setStyleSheet(f"background: {'#2E7D32' if fait else '#E65100'}; color: white; border-radius: 12px; "
                             "padding: 6px 16px; font-weight: 700; font-size: 12pt;")
             he = QHBoxLayout()

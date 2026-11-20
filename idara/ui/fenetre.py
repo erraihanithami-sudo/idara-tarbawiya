@@ -1011,10 +1011,6 @@ class FenetrePrincipale(QMainWindow):
                 for page, lib in fils:
                     sb = BoutonSous(lib if page in self.pages else f"{lib}  ·  قريباً")
                     sb.setCursor(Qt.PointingHandCursor)
-                    from idara.ui.rihab import ICONES_PAGES
-                    if page in ICONES_PAGES:
-                        from idara.ui import pictos as _pc
-                        sb.setIcon(_pc.icone(ICONES_PAGES[page], "#C9A04A", 18))
                     sb.clicked.connect(lambda _=False, page=page: self.aller_a(page))
                     self.groupe.addButton(sb)
                     self.boutons_pages[page] = sb
