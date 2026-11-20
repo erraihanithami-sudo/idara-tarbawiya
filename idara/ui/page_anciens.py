@@ -307,6 +307,7 @@ class PageAnciens(QWidget):
         except (an.ErreurAncien, dc.ErreurDocument) as e:
             self._msg(str(e), True)
             return None
+        self.chercher(self.recherche.text())
         self.afficher(self.eleve_id)
         self._msg(f"وُلّدت الشهادة وسُجّل تسليمها: \u2066{doc.chemin.name}\u2069")
         self._ouvrir(doc.chemin)
