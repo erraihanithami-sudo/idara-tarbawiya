@@ -137,3 +137,24 @@ def test_documents_refuses_si_incomplet(base, dossier):  # noqa: F811
     with pytest.raises(exs.ErreurExamen, match="أكمل أولاً"):
         de.generer(base, dossier, ex["id"], "listes")
     assert "جدولة المواد" in exs.manquants(base, ex["id"])
+
+
+def test_repartition_aleatoire_sur_les_salles(base):  # noqa: F811
+    """طلب المدير 2026-11-20: توزيع عشوائي للتلاميذ على القاعات في الامتحان المحلي."""
+    ex = exs.examen(base, "local")
+    exs.modifier(base, ex["id"], ex["intitule"], ex["session"], ex["centre"], "", 501, 1)
+    with pytest.raises(exs.ErreurExamen, match="لا مترشحين"):
+        exs.repartir_aleatoire(base, ex["id"])
+    exs.preparer_local(base, ex["id"])
+    avant = [c["code_massar"] for c in exs.candidats(base, ex["id"])]
+    ordres = set()
+    for g in range(12):
+        assert exs.repartir_aleatoire(base, ex["id"], graine=g) == 2
+        cs = exs.candidats(base, ex["id"])
+        assert [c["numero"] for c in cs] == [501, 502] and [c["salle_nom"] for c in cs] == ["القاعة 1", "القاعة 2"]
+        assert sorted(c["code_massar"] for c in cs) == sorted(avant)
+        ordres.add(tuple(c["code_massar"] for c in cs))
+    assert len(ordres) == 2          # الترتيب يتغير فعلاً بين مرة وأخرى
+    pro = exs.examen(base, "provincial")
+    with pytest.raises(exs.ErreurExamen, match="المحلي فقط"):
+        exs.repartir_aleatoire(base, pro["id"])

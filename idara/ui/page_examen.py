@@ -208,6 +208,13 @@ class PageExamen(QWidget):
         for b in (self.b_local, self.b_prov):
             b.setObjectName("principal")
             h.addWidget(b)
+        # طلب المدير 2026-11-20: توزيع عشوائي للتلاميذ على القاعات (الامتحان المحلي)
+        from idara.ui.vitrine import bouton_couleur
+        self.b_aleatoire = bouton_couleur("توزيع عشوائي على القاعات", "#6A1B9A", "repartir",
+                                          "يخلط ترتيب المترشحين ثم يعيد ترقيمهم من الرقم الأول ويوزعهم على القاعات "
+                                          "حسب طاقتها، فلا يتجاور تلاميذ القسم الواحد.")
+        self.b_aleatoire.clicked.connect(lambda: self.repartir_aleatoire())
+        h.addWidget(self.b_aleatoire)
         h.addStretch()
         v.addLayout(h)
         self.l_cands = QLabel()
@@ -291,23 +298,36 @@ class PageExamen(QWidget):
         from idara.ui.vitrine import AlerteTriangle
         self.l_manquants = AlerteTriangle("معطيات ناقصة")
         v.addWidget(self.l_manquants)
-        groupes = {1: "المترشحون", 2: "المكلفون", 3: "الإعلان والتنقيط", 4: "المحاضر والتقارير"}
+        # أزرار أنيقة ملونة حسب المجموعة (طلب المدير 2026-11-20)
+        from idara.ui.vitrine import bouton_couleur
+        groupes = {1: ("المترشحون", "#1565C0"), 2: ("المكلفون", "#00897B"), 3: ("الإعلان والتنقيط", "#EF6C00"),
+                   4: ("المحاضر والتقارير", "#6A1B9A")}
+        pictos_docs = {"listes": "personnes", "presence": "valider", "tables": "document", "convocations": "envoyer",
+                       "repartition": "repartir", "convocations_profs": "envoyer", "badges": "image",
+                       "secretariat": "modifier", "annonce": "calendrier", "notation": "statistiques"}
         self.boutons_docs = {}
-        for g, lib in groupes.items():
+        for g, (lib, couleur) in groupes.items():
             t = QLabel(lib)
-            t.setObjectName("etiquette")
-            v.addWidget(t)
+            t.setStyleSheet(f"background: {couleur}; color: white; border-radius: 11px; padding: 3px 14px; "
+                            "font-weight: 700;")
+            ht = QHBoxLayout()
+            ht.addWidget(t)
+            ht.addStretch()
+            v.addLayout(ht)
             grille = QGridLayout()   # ثلاثة أزرار في كل سطر حتى لا تتجاوز الصفحة عرضها
-            grille.setHorizontalSpacing(8)
+            grille.setHorizontalSpacing(10)
+            grille.setVerticalSpacing(10)
             k = 0
             for code, (nom, gg) in de.DOCUMENTS.items():
                 if gg != g:
                     continue
-                b = QPushButton(nom)
+                b = bouton_couleur(nom, couleur, pictos_docs.get(code, "document"), f"توليد «{nom}» وفتحه للمعاينة")
                 b.clicked.connect(lambda _=False, code=code: self.generer(code))
                 self.boutons_docs[code] = b
                 grille.addWidget(b, k // 3, k % 3)
                 k += 1
+            for j in range(3):
+                grille.setColumnStretch(j, 1)
             v.addLayout(grille)
         racine.addWidget(c)
         racine.addStretch()
@@ -334,6 +354,7 @@ class PageExamen(QWidget):
         self.premier.setEnabled(local)
         self.b_local.setVisible(local)
         self.b_prov.setVisible(not local)
+        self.b_aleatoire.setVisible(local)
         cs = exs.candidats(self.f.conn, self.eid)
         self.cands.setRowCount(len(cs))
         for i, c in enumerate(cs):
@@ -434,6 +455,10 @@ class PageExamen(QWidget):
             return None
         return self._faire(lambda: exs.preparer_local(self.f.conn, self.eid),
                            "حُضّرت لائحة المترشحين من تلاميذ السادس.")
+
+    def repartir_aleatoire(self, graine: int | None = None):
+        return self._faire(lambda: exs.repartir_aleatoire(self.f.conn, self.eid, graine),
+                           lambda n: f"وُزّع {n} مترشحاً عشوائياً على القاعات وأعيد ترقيمهم.")
 
     def supprimer_candidat(self, cid: int, nom: str = ""):
         return self._faire(lambda: exs.supprimer_candidat(self.f.conn, self.eid, cid),

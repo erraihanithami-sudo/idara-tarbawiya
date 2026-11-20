@@ -1620,6 +1620,10 @@ def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
         p.cands.cellWidget(0, 5).click()
         assert p.cands.rowCount() == n - 1 and p.cands.item(0, 0).text() == "11"
         p.preparer_local()
+    # توزيع عشوائي على القاعات وأزرار وثائق ملونة (طلب المدير 2026-11-20)
+    assert not p.b_aleatoire.isHidden() and p.repartir_aleatoire(graine=3), p.message.text()
+    assert "عشوائياً" in p.message.text() and p.cands.item(0, 0).text() == "11"
+    assert all(b.objectName() == "boutonCouleur" for b in p.boutons_docs.values()) and len(p.boutons_docs) == 17
     cb = p.mats.cellWidget(0, 0)   # مقترحات المواد بترتيب المدير، مع إمكانية الكتابة (2026-11-12)
     assert [cb.itemText(i) for i in range(cb.count())] == list(exs.MATIERES_SUGGEREES) and cb.isEditable()
     assert exs.MATIERES_SUGGEREES[:2] == ("اللغة العربية", "التربية الإسلامية")
@@ -1639,7 +1643,7 @@ def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
     assert p.generer("listes") and p.generer("convocations_profs") and len(ouverts) == 2
     # الإقليمي: أرقام المديرية
     p.type.setCurrentIndex(p.type.findData("provincial"))
-    assert p.b_local.isHidden() and not p.b_prov.isHidden()
+    assert p.b_local.isHidden() and not p.b_prov.isHidden() and p.b_aleatoire.isHidden()
     assert p.importer_provincial(_liste_direction(tmp_path / "d.xlsx")), p.message.text()
     assert p.cands.item(0, 0).text() == "7903" and "7903–7905" in p.l_cands.text()
     f.close()
