@@ -248,6 +248,12 @@ def main(sortie: Path) -> None:
     f.aller_a("تتبع السلوك")
     __import__("idara.ui.saisie", fromlist=["x"]).selectionner(f.page_comportement.liste, 0)
     photo(f, "33_comportement")
+    try:
+        _fc = f.page_comportement.ouvrir_nouvelle()
+        photo(_fc, "33_comportement_nouvelle")
+        _fc.hide()
+    except Exception as e:  # noqa: BLE001
+        print("capture comportement:", e)
     from tests.fabrique_resultats import classeur_resultats
     fic = classeur_resultats(tmp / "res.xlsx", {
         "PS1-PS2": [], "4APG-5APG-6APG": [("X000000001", "التجريبي سعيد", [8] * 8),
@@ -461,6 +467,16 @@ def main(sortie: Path) -> None:
         v.remplir({"date": "2026-11-10", "lieu": "الساحة", "description": "سقوط أثناء الاستراحة", "declare": "نعم"})
         v.enregistrer()
     photo(f, "63_registre_accidents")
+    try:
+        if v.lignes:
+            _fd = v.ouvrir_dossier(v.lignes[0]["id"])
+            photo(_fd, "63_accident_dossier")
+            _fd.hide()
+        _fn = v.ouvrir_nouveau()
+        photo(_fn, "63_accident_nouveau")
+        _fn.hide()
+    except Exception as e:  # noqa: BLE001
+        print("capture accidents:", e)
     f.aller_a("خليتا اليقظة والإنصات")
     photo(f, "64_cellules")
     f.aller_a("التحفيز والتهاني")

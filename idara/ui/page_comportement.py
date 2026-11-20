@@ -70,9 +70,18 @@ class PageComportement(QWidget):
         self.obs.setMinimumHeight(180)
         self.obs.itemSelectionChanged.connect(self._selection_obs)
         fv.addWidget(self.obs)
-        t = QLabel("ملاحظة جديدة")
-        t.setObjectName("titreCarte")
-        fv.addWidget(t)
+        # طلب المدير 2026-11-20: الملاحظة الجديدة تُضاف من نافذة منبثقة
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        hb = QHBoxLayout()
+        self.b_nouvelle = bouton_couleur("ملاحظة جديدة", "#C62828", "ajouter",
+                                         "تسجيل ملاحظة على سلوك التلميذ المحدد، مع إمكانية استدعاء ولي الأمر")
+        self.b_nouvelle.clicked.connect(lambda: self.ouvrir_nouvelle())
+        hb.addWidget(self.b_nouvelle)
+        hb.addStretch()
+        fv.addLayout(hb)
+        wf = QWidget()
+        fvf = QVBoxLayout(wf)
+        fvf.setContentsMargins(4, 4, 4, 4)
         self.date = ChampDate()
         self.nature, self.mesure, self.signale = _combo(), _combo(), _combo()
         self.description = champ("تفاصيل (اختياري)")
@@ -88,7 +97,7 @@ class PageComportement(QWidget):
             g.addWidget(etiquette(lib, w), i * 2, 0, 1, 2)
             g.addWidget(w, i * 2 + 1, 0, 1, 2)
         g.setColumnStretch(1, 1)
-        fv.addLayout(g)
+        fvf.addLayout(g)
         h = QHBoxLayout()
         self.b_save = QPushButton("تسجيل الملاحظة")
         self.b_save.clicked.connect(lambda: self.enregistrer(False))
@@ -97,10 +106,16 @@ class PageComportement(QWidget):
         self.b_conv.clicked.connect(lambda: self.enregistrer(True))
         self.b_suppr = bouton("حذف الملاحظة المحددة")
         self.b_suppr.clicked.connect(self.supprimer)
-        for b in (self.b_conv, self.b_save, self.b_suppr):
+        for b in (self.b_conv, self.b_save):
             h.addWidget(b)
         h.addStretch()
-        fv.addLayout(h)
+        fvf.addLayout(h)
+        fvf.addStretch()
+        self.fiche = FenetreFiche(self, "ملاحظة جديدة على السلوك", "", wf, largeur=720)
+        hs = QHBoxLayout()
+        hs.addWidget(self.b_suppr)
+        hs.addStretch()
+        fv.addLayout(hs)
         fv.addStretch()
         self.zone = c2
         corps.addWidget(c2, 6)
@@ -108,7 +123,8 @@ class PageComportement(QWidget):
         self._activer(False)
 
     def _activer(self, oui: bool) -> None:
-        for w in (self.date, self.nature, self.mesure, self.signale, self.description, self.b_save, self.b_conv):
+        for w in (self.date, self.nature, self.mesure, self.signale, self.description, self.b_save, self.b_conv,
+                  self.b_nouvelle):
             w.setEnabled(oui)
         self.b_suppr.setEnabled(False)
 
@@ -172,6 +188,19 @@ class PageComportement(QWidget):
         self._activer(True)
         self.message.hide()
 
+    def ouvrir_nouvelle(self):
+        if self.eleve_id is None:
+            message(self.message, "اختر تلميذاً أولاً.", True)
+            return None
+        r = el.fiche(self.f.conn, self.eleve_id)
+        self.fiche.definir_titre("ملاحظة جديدة على السلوك", f"{el.nom_complet(r)} · {r['classe'] or '—'}")
+        self.date.definir(date.today().isoformat())
+        for w in (self.nature, self.mesure, self.signale):
+            w.setEditText("")
+        self.description.clear()
+        self.fiche.ouvrir()
+        return self.fiche
+
     def _selection_obs(self) -> None:
         rows = {i.row() for i in self.obs.selectedIndexes()}
         self.obs_id = self.obs.item(rows.pop(), 0).data(Qt.UserRole) if len(rows) == 1 else None
@@ -192,6 +221,7 @@ class PageComportement(QWidget):
             message(self.message, str(e), True)
             return None
         eid = self.eleve_id
+        self.fiche.hide()
         self.rafraichir()
         self.afficher(eid)
         if doc:

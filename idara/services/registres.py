@@ -58,12 +58,18 @@ class Registre:
     docs: tuple
     filtre: str | None = None  # حقل تُصفّى به الأسطر (والوثائق)
     par_annee: bool = True
+    etat: str | None = None    # حقل الوضعية: يُلوَّن في الجدول (أخضر إن تمّ، برتقالي إن لم يتمّ)
+    defaut_etat: str = ""      # ما يُعرض حين يكون حقل الوضعية فارغاً
+    dossier: bool = False      # زر «الاطلاع على الملف كاملاً» أمام كل سطر
+    internes: tuple = ()       # حقول تتبع داخلية لا تُطبع في بطاقة السطر (مثل وضعية الإرسال)
 
     def champ(self, cle: str) -> Champ:
         return next(c for c in self.champs if c.cle == cle)
 
 
 _OUI_NON = ("نعم", "لا")
+ENVOIS_ACCIDENT = ("لم يُرسل بعد", "أُرسل إلى المديرية الإقليمية", "أُرسل إلى التأمين المدرسي",
+                   "أُرسل إلى المديرية والتأمين")
 
 REGISTRES: dict[str, Registre] = {r.cle: r for r in (
     Registre("agents", "بطاقات الأعوان",
@@ -101,7 +107,7 @@ REGISTRES: dict[str, Registre] = {r.cle: r for r in (
              filtre="type"),
     Registre("accidents", "الحوادث المدرسية",
              "سجل الحوادث التي تقع للتلاميذ داخل المؤسسة أو في محيطها، والتصريح بكل حادثة.",
-             (Champ("date", "تاريخ الحادثة", "date", requis=True), Champ("heure", "الساعة"),
+             (Champ("date", "تاريخ الحادثة", "date", requis=True), Champ("heure", "الساعة", colonne=False),
               Champ("eleve", "التلميذ(ة)", "eleve", requis=True), Champ("classe", "القسم"),
               Champ("lieu", "المكان", "choix", ("الساحة", "القسم", "الملعب", "المرافق الصحية", "الدرج",
                                                "الطريق إلى المدرسة", "مكان آخر")),
@@ -109,10 +115,16 @@ REGISTRES: dict[str, Registre] = {r.cle: r for r in (
               Champ("blessure", "طبيعة الإصابة"),
               Champ("temoin", "الشاهد أو المكلف بالحراسة", "personnel", colonne=False),
               Champ("mesures", "الإجراءات المتخذة", "long", colonne=False),
-              Champ("declare", "صُرّح بها للتأمين", "choix", _OUI_NON)),
+              Champ("declare", "صُرّح بها للتأمين", "choix", _OUI_NON, colonne=False),
+              # طلب المدير 2026-11-20: وضعية ملف الحادثة (هل أُرسل؟)
+              Champ("envoi", "وضعية ملف الحادثة", "choix", ENVOIS_ACCIDENT),
+              Champ("date_envoi", "تاريخ الإرسال", "date", colonne=False),
+              Champ("reference", "مرجع الإرسال", colonne=False)),
              (Doc("declaration", "تصريح بحادثة مدرسية", "تصريح الحادثة المحددة، للتأمين المدرسي والمديرية.", "ligne"),
-              Doc("registre", "سجل الحوادث المدرسية", "كل حوادث السنة في جدول واحد.")),
-             filtre="lieu"),
+              Doc("registre", "سجل الحوادث المدرسية", "كل حوادث السنة في جدول واحد.",
+                  colonnes=("date", "eleve", "classe", "lieu", "blessure", "envoi"))),
+             filtre="lieu", etat="envoi", defaut_etat=ENVOIS_ACCIDENT[0], dossier=True,
+             internes=("envoi", "date_envoi", "reference")),
     Registre("cellule_membres", "التركيبة والأدوار",
              "أعضاء خلية اليقظة وخلية الإنصات والمصالحة، وصفة كل عضو ودوره.",
              (Champ("cellule", "الخلية", "choix", CELLULES, requis=True),
@@ -281,6 +293,14 @@ def lister(conn: sqlite3.Connection, cle: str, filtre: str | None = None, texte:
     return ls
 
 
+def etat(r: Registre, l: dict) -> tuple[str, bool]:
+    """(نص الوضعية، هل تمّ؟) لسطر في سجل له حقل وضعية."""
+    if not r.etat:
+        return "", True
+    v = str(l.get(r.etat) or "") or r.defaut_etat
+    return v, bool(v) and v != r.defaut_etat
+
+
 def lire(conn: sqlite3.Connection, cle: str, lid: int) -> dict:
     l = next((x for x in lister(conn, cle) if x["id"] == lid), None)
     if l is None:
@@ -414,7 +434,7 @@ def _gen_liste(conn, dossier, r: Registre, doc: Doc, lignes, ligne, filtre, cibl
 def _gen_fiche(conn, dossier, r: Registre, doc: Doc, lignes, ligne, filtre, cible) -> Path:
     from idara.services.soutien import _signature
     d = _document(conn, dossier, doc.titre)
-    _tableau_fiche(d, r, ligne)
+    _tableau_fiche(d, r, ligne, r.internes)
     _signature(d, conn)
     return _sauver(d, dossier, r, doc.titre)
 

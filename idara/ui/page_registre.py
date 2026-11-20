@@ -113,7 +113,8 @@ class VueRegistre(QWidget):
         h.addWidget(self.recherche, 1)
         v.addLayout(h)
         self.colonnes = [ch for ch in self.r.champs if ch.colonne]
-        self.table = tableau([ch.libelle for ch in self.colonnes],
+        self.couleur = couleur
+        self.table = tableau([ch.libelle for ch in self.colonnes] + ([""] if self.r.dossier else []),
                              etirer=min(1, len(self.colonnes) - 1))
         self.table.setMinimumHeight(240)
         self.table.itemSelectionChanged.connect(self._selection)
@@ -234,12 +235,30 @@ class VueRegistre(QWidget):
         self.afficher()
 
     def afficher(self) -> None:
+        from PySide6.QtGui import QBrush, QColor
+        from idara.ui.vitrine import ajuster_colonne_actions, boutons_ligne, vider_colonne_widgets
         self.lignes = rg.lister(self.f.conn, self.r.cle, self.filtre.currentData(), self.recherche.text())
         self.table.blockSignals(True)
+        n_col = len(self.colonnes)
+        if self.r.dossier:
+            vider_colonne_widgets(self.table, n_col)
         self.table.setRowCount(len(self.lignes))
         for i, l in enumerate(self.lignes):
             for j, ch in enumerate(self.colonnes):
-                self.table.setItem(i, j, cellule(rg.afficher(ch, l.get(ch.cle)), l["id"]))
+                it = cellule(rg.afficher(ch, l.get(ch.cle)), l["id"])
+                if ch.cle == self.r.etat:   # الوضعية ملونة (طلب المدير 2026-11-20)
+                    texte, fait = rg.etat(self.r, l)
+                    it.setText(("✔ " if fait else "⏳ ") + texte)
+                    it.setForeground(QBrush(QColor("#2E7D32" if fait else "#E65100")))
+                    f = it.font()
+                    f.setBold(True)
+                    it.setFont(f)
+                self.table.setItem(i, j, it)
+            if self.r.dossier:
+                self.table.setCellWidget(i, n_col, boutons_ligne(
+                    [("الاطلاع على الملف", "#1565C0", "apercu", lambda _=False, k=l["id"]: self.ouvrir_dossier(k))]))
+        if self.r.dossier:
+            ajuster_colonne_actions(self.table, n_col)
         self.table.blockSignals(False)
         total = rg.compter(self.f.conn, self.r.cle)
         self.nb.setText(f"المعروض: {len(self.lignes)} من {total}")
@@ -271,6 +290,68 @@ class VueRegistre(QWidget):
             self.fiche.definir_titre(f"تعديل: {self.r.titre}")
             self.fiche.ouvrir()
         return self.fiche
+
+    def ouvrir_dossier(self, lid: int):
+        """الملف الكامل لسطر (كل حقوله، ووضعيته، ووثائقه) في نافذة منبثقة للاطلاع (طلب المدير 2026-11-20)."""
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        self.charger(lid)
+        l = rg.lire(self.f.conn, self.r.cle, lid)
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(6, 6, 6, 6)
+        v.setSpacing(10)
+        texte, fait = rg.etat(self.r, l)
+        if self.r.etat:
+            e = QLabel(("✔ " if fait else "⏳ ") + texte)
+            e.setStyleSheet(f"background: {'#2E7D32' if fait else '#E65100'}; color: white; border-radius: 12px; "
+                            "padding: 6px 16px; font-weight: 700; font-size: 12pt;")
+            he = QHBoxLayout()
+            he.addWidget(e)
+            he.addStretch()
+            v.addLayout(he)
+        g = QGridLayout()
+        g.setHorizontalSpacing(14)
+        g.setVerticalSpacing(6)
+        k = 0
+        self.dossier_valeurs: dict[str, str] = {}
+        for ch in self.r.champs:
+            val = rg.afficher(ch, l.get(ch.cle)) if ch.type != "long" else str(l.get(ch.cle) or "")
+            if ch.cle == self.r.etat:
+                continue
+            a = QLabel(ch.libelle)
+            a.setStyleSheet(f"font-weight: 700; color: {self.couleur};")
+            b = QLabel(val or "غير مُدخل")
+            b.setWordWrap(True)
+            b.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            if not val:
+                b.setStyleSheet("color: #9E9E9E; font-style: italic;")
+            self.dossier_valeurs[ch.cle] = val
+            g.addWidget(a, k, 0, Qt.AlignTop)
+            g.addWidget(b, k, 1)
+            k += 1
+        g.setColumnStretch(1, 1)
+        v.addLayout(g)
+        h = QHBoxLayout()
+        b = bouton_couleur("تعديل / تحيين الوضعية", self.couleur, "modifier")
+        b.clicked.connect(lambda: (self.fiche_dossier.hide(), self.ouvrir(lid)))
+        h.addWidget(b)
+        for d in self.r.docs:
+            if d.portee == "ligne":
+                bd = bouton_couleur(d.titre, "#6A1B9A", "document")
+                bd.clicked.connect(lambda _=False, c=d.cle: self.generer(c))
+                h.addWidget(bd)
+        h.addStretch()
+        v.addLayout(h)
+        v.addStretch()
+        titre = f"ملف: {self.r.titre}"
+        sous = " · ".join(x for x in (str(l.get("eleve") or ""), rg.afficher(self.r.champs[0], l.get(self.r.champs[0].cle)))
+                          if x)
+        if getattr(self, "fiche_dossier", None) is not None:
+            self.fiche_dossier.hide()
+            self.fiche_dossier.deleteLater()
+        self.fiche_dossier = FenetreFiche(self, titre, sous, w, largeur=760)
+        self.fiche_dossier.ouvrir()
+        return self.fiche_dossier
 
     def nouveau(self) -> None:
         self.lid = None

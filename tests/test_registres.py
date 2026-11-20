@@ -127,3 +127,21 @@ def test_demandes_et_fiche_personnelle(base, dossier):  # noqa: F811
     assert "منسق الفريق" in c and "تشكيل فريق قيادة" in t
     _, t = _lire(rg.generer(base, dossier, "equipe", "pv_validation"))
     assert "صادق المجلس" in t
+
+
+def test_accidents_vaziyat_al_irsal(base, dossier):  # noqa: F811
+    """طلب المدير 2026-11-20: وضعية ملف الحادثة (أُرسل أم لا) ولا تُطبع في التصريح."""
+    r = rg.registre("accidents")
+    assert r.dossier and r.etat == "envoi"
+    nom, classe = rg.eleves(base)[0]
+    lid = rg.enregistrer(base, "accidents", {"date": "2026-11-12", "eleve": nom, "classe": classe,
+                                             "description": "التواء في الكاحل"})
+    l = rg.lire(base, "accidents", lid)
+    assert rg.etat(r, l) == ("لم يُرسل بعد", False)
+    l |= {"envoi": "أُرسل إلى المديرية الإقليمية", "date_envoi": "2026-11-13", "reference": "ر/77"}
+    rg.enregistrer(base, "accidents", l, lid)
+    assert rg.etat(r, rg.lire(base, "accidents", lid)) == ("أُرسل إلى المديرية الإقليمية", True)
+    c, _ = _lire(rg.generer(base, dossier, "accidents", "declaration", lid))
+    assert "التواء في الكاحل" in c and "ر/77" not in c and "وضعية ملف الحادثة" not in c
+    c, _ = _lire(rg.generer(base, dossier, "accidents", "registre"))
+    assert "أُرسل إلى المديرية الإقليمية" in c

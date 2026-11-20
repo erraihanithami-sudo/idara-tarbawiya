@@ -802,9 +802,11 @@ def test_page_comportement_et_exclus(app, config_tmp, monkeypatch):
     p.recherche.setText("يوسف")
     selectionner(p.liste, 0)
     assert p.b_save.isEnabled() and "يوسف" in p.titre.text()
+    assert p.ouvrir_nouvelle().isVisible() and "يوسف" in p.fiche.entete.sous.text()   # نافذة منبثقة (2026-11-20)
     assert p.enregistrer(False) is None and "إجبارية" in p.message.text()
     p.nature.setEditText("شغب في القسم")
-    assert p.enregistrer(False) is not None and p.obs.rowCount() == 1
+    assert p.enregistrer(False) is not None and p.obs.rowCount() == 1 and not p.fiche.isVisible()
+    p.ouvrir_nouvelle()
     p.nature.setEditText("عنف لفظي")
     assert p.enregistrer(True) is not None and len(ouverts) == 1
     assert "استدعاء" in p.obs.item(0, 2).text()
@@ -2527,6 +2529,16 @@ def test_rihab_et_registres(app, config_tmp, monkeypatch):
     lid = v.enregistrer()
     assert lid and v.table.rowCount() == 1 and v.lid == lid and v.b_suppr.isEnabled()
     assert v.generer("declaration") is not None and len(ouverts) == 1
+    # الإضافة من نافذة منبثقة، والوضعية ملونة، وملف الحادثة كاملاً (طلب المدير 2026-11-20)
+    assert v.fiche is not None and v.ouvrir_nouveau().isVisible()
+    v.fiche.hide()
+    col = len(v.colonnes)
+    assert "لم يُرسل بعد" in v.table.item(0, col - 1).text() and v.table.cellWidget(0, col) is not None
+    fd = v.ouvrir_dossier(lid)
+    assert fd.isVisible() and v.dossier_valeurs["description"] == "سقوط في الساحة"
+    fd.hide()
+    v.remplir({"envoi": "أُرسل إلى المديرية الإقليمية", "date_envoi": "2026-11-12"})
+    assert v.enregistrer() == lid and "✔" in v.table.item(0, col - 1).text()
     v.nouveau()
     assert v.lid is None and not v.b_suppr.isEnabled() and v.generer("declaration") is None
     selectionner(v.table, 0)

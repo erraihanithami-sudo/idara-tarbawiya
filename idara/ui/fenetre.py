@@ -798,8 +798,8 @@ class FenetrePrincipale(QMainWindow):
         self.page_transport, self.page_emplois = PageTransport(self), PageEmplois(self)
         cs = icones.COULEURS
         self.page_sante = PageRegistres(
-            self, "الصحة والسلامة المدرسية", "سجل الحوادث المدرسية والتصريح بكل حادثة. اختر سطراً من الجدول "
-            "لتعديله أو لتوليد تصريحه.", ["accidents"], cs["التلاميذ"])
+            self, "الصحة والسلامة المدرسية", "أضف الحادثة من نافذة منبثقة، وتابع وضعية ملف كل حادثة (هل "
+            "أُرسل؟)، واطلع على ملفها كاملاً من الزر أمامها.", ["accidents"], cs["التلاميذ"], fenetres=True)
         self.page_demandes = PageRegistres(
             self, "طلبات الموظفين والورقة الشخصية", "الطلبات التي لا يغطيها ملف «الرخص»، والورقة الشخصية لكل "
             "موظف(ة). صياغة الطلبات عامة: راجعها في Word قبل التوقيع.", ["demandes"], cs["الموارد البشرية"])
