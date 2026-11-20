@@ -207,3 +207,39 @@ def test_statut_exclu(base):
     assert p["date_sortie"] == "2026-12-01"
     el.changer_statut(base, eid, "inscrit")
     assert el.fiche(base, eid)["statut"] == "inscrit"
+
+
+def test_ancien_modele_excel(base, tmp_path):
+    """طلب المدير 2026-11-20: نموذج إكسل للتلاميذ ما قبل مسار، يُصدَّر ويُعبَّأ ويُستورد."""
+    import openpyxl
+    an.enregistrer(base, _ancien(tuteur="محمد القديم", nationalite="مغربية", adresse="حي النصر",
+                                 motif_sortie="انتقال إلى مؤسسة أخرى"))
+    ch, n = an.exporter_excel(base, tmp_path / "نموذج.xlsx")
+    assert n == 1
+    wb = openpyxl.load_workbook(ch)
+    ws = wb.worksheets[0]
+    assert ws.sheet_view.rightToLeft and [c.value for c in ws[1]][:3] == [
+        "رقم التلميذ في السجل العام *", "النسب *", "الاسم *"]
+    assert [c.value for c in ws[2]] == [8173, "القديم", "فيصل", "ذكر", "1985", "الخميسات", "محمد القديم", "مغربية",
+                                        "حي النصر", "15/10/1992", "30/06/1998", "الخامس", "انتقال إلى مؤسسة أخرى"]
+    ws.append([8200, "الأول", "سعاد", "أنثى", "03/04/1986", "تيفلت", "أحمد الأول", "مغربية", "دوار", "16/09/1993",
+               "30/06/1999", "6", "نهاية المرحلة الابتدائية"])
+    ws.append([8201, "الثاني", "", "ذكر", "1987", "تيفلت", "", "", "", "16/09/1993", "30/06/1999", "الرابع", ""])
+    ws.append([8202, "الثالث", "عمر", "غريب", "1987", "تيفلت", "", "", "", "16/09/1993", "30/06/1999", "الرابع", ""])
+    ws.append([None] * 13)
+    ws["F2"] = "الرماني"
+    wb.save(ch)
+    r = an.importer_excel(base, ch)
+    assert (r.ajoutes, r.modifies) == (1, 1) and [n for n, _ in r.erreurs] == [4, 5]
+    assert "إجبارية" in r.erreurs[0][1] and "غريب" in r.erreurs[1][1] and "السطر 4" in r.resume()
+    s = an.lire(base, an.par_numero(base, "8200").id)
+    assert (s.sexe, s.date_naissance, s.dernier_niveau, s.tuteur, s.motif_sortie) == (
+        "F", "1986-04-03", "السادس", "أحمد الأول", "نهاية المرحلة الابتدائية")
+    assert an.lire(base, an.par_numero(base, "8173").id).lieu_ar == "الرماني"
+    vide, k = an.exporter_excel(base, tmp_path / "فارغ.xlsx", avec_eleves=False)
+    assert k == 0
+    with pytest.raises(an.ErreurAncien, match="أعمدة إجبارية"):
+        wb2 = openpyxl.Workbook()
+        wb2.active.append(["عمود"])
+        wb2.save(tmp_path / "خطأ.xlsx")
+        an.importer_excel(base, tmp_path / "خطأ.xlsx")

@@ -333,7 +333,7 @@ def test_page_eleves_recherche_et_documents(app, config_tmp, monkeypatch):
     f.close()
 
 
-def test_page_anciens_tous_champs(app, config_tmp, monkeypatch):
+def test_page_anciens_tous_champs(app, config_tmp, monkeypatch, tmp_path):
     from idara.services import bureautique
     ouverts = []
     monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
@@ -342,7 +342,7 @@ def test_page_anciens_tous_champs(app, config_tmp, monkeypatch):
     p = f.page_anciens
     assert p.resultats.rowCount() == 0
     assert p.ouvrir_certificat(None) is None and "اختر التلميذ" in p.message.text()
-    assert p.ouvrir_nouveau().isVisible() and p.fiche.windowTitle() == "تلميذ قديم جديد"   # نافذة منبثقة 2026-11-20
+    assert p.ouvrir_nouveau().isVisible() and p.fiche.windowTitle() == "إضافة تلميذ (ما قبل مسار)"   # نافذة منبثقة
     p.c_num.setText("8173")
     p.c_nom.setText("القديم")
     p.c_prenom.setText("فيصل")
@@ -365,13 +365,23 @@ def test_page_anciens_tous_champs(app, config_tmp, monkeypatch):
     p.resultats.cellWidget(0, 4).findChildren(__import__("PySide6.QtWidgets", fromlist=["x"]).QPushButton)[0].click()
     assert p.fiche.isVisible() and p.fiche.windowTitle() == "شهادة مدرسية" and p.c_nom.text() == "القديم"
     p.fiche.hide()
+    # نموذج الإكسل: تصدير ثم استيراد (طلب المدير 2026-11-20)
+    import openpyxl
+    ch = p.exporter(tmp_path / "نموذج.xlsx")
+    assert ch.exists() and "1 تلميذاً" in p.message.text()
+    wb = openpyxl.load_workbook(ch)
+    wb.worksheets[0].append([9001, "المستورد", "سعيد", "ذكر", "1990", "تيفلت", "", "مغربية", "", "16/09/1996",
+                             "30/06/2002", "السادس", ""])
+    wb.save(ch)
+    r = p.importer(ch)
+    assert r.ajoutes == 1 and r.modifies == 1 and p.resultats.rowCount() == 2 and "أُضيف 1" in p.message.text()
     p.nouveau()
     assert p.c_num.text() == "" and p.eleve_id is None
     p.recherche.setText("8173")
     assert p.resultats.rowCount() == 1
     __import__("idara.ui.saisie", fromlist=["x"]).selectionner(p.resultats, 0)
     assert p.c_lieu.text() == "الخميسات" and p.c_niveau.currentText() == "الخامس"
-    assert p._reimprimer(0, 0) is not None and len(ouverts) == 2
+    assert p._reimprimer(0, 0) is not None and len(ouverts) == 3   # الشهادة + نموذج الإكسل + إعادة الطبع
     # لا يختلط بتلاميذ مسار
     f.aller_a("التلاميذ")
     f.page_eleves.recherche.setText("فيصل")

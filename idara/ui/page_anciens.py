@@ -37,7 +37,7 @@ class PageAnciens(QWidget):
         # طلب المدير 2026-11-20: إضافة تلميذ أو شهادة مدرسية من نافذة منبثقة؛ الصفحة الثابتة للائحة
         from idara.ui.vitrine import FenetreFiche, bouton_couleur
         hb = QHBoxLayout()
-        self.b_ajouter = bouton_couleur("تلميذ قديم جديد", "#1565C0", "ajouter",
+        self.b_ajouter = bouton_couleur("إضافة تلميذ (ما قبل مسار)", "#1565C0", "ajouter",
                                         "إدخال تلميذ درس قبل مسار ثم توليد شهادته المدرسية")
         self.b_ajouter.clicked.connect(lambda: self.ouvrir_nouveau())
         self.b_certificat = bouton_couleur("شهادة مدرسية للتلميذ المحدد", "#2E7D32", "document",
@@ -46,6 +46,15 @@ class PageAnciens(QWidget):
         hb.addWidget(self.b_ajouter)
         hb.addWidget(self.b_certificat)
         hb.addStretch()
+        # نموذج الإكسل (طلب المدير 2026-11-20)
+        self.b_exporter = bouton_couleur("تصدير نموذج الإكسل", "#1E6B66", "exporter",
+                                         "نموذج يُعبَّأ بأسماء التلاميذ ما قبل مسار ومعلوماتهم (مع المسجلين حالياً)")
+        self.b_exporter.clicked.connect(lambda: self.exporter())
+        self.b_importer = bouton_couleur("استيراد من الإكسل", "#B07A16", "importer",
+                                         "يضيف التلاميذ الجدد ويحدّث الموجودين برقم السجل العام")
+        self.b_importer.clicked.connect(lambda: self.importer())
+        hb.addWidget(self.b_exporter)
+        hb.addWidget(self.b_importer)
         racine.addLayout(hb)
         corps = QHBoxLayout()
         corps.setSpacing(20)
@@ -109,11 +118,18 @@ class PageAnciens(QWidget):
         nl.addWidget(self.c_naissance)
         nl.addWidget(self.c_approx)
         nl.addStretch()
+        self.c_tuteur, self.c_nationalite, self.c_adresse = champ(), champ("مثال: مغربية"), champ()
+        self.c_motif = QComboBox()
+        self.c_motif.setEditable(True)
+        self.c_motif.addItems(an.MOTIFS_SORTIE)
+        self.c_motif.setCurrentIndex(-1)
         champs = [("رقم التسجيل في السجل العام *", self.c_num), ("رقم دفتر السجل (اختياري)", self.c_cahier),
                   ("النسب *", self.c_nom), ("الاسم *", self.c_prenom),
                   ("النوع *", sexe), ("مكان الازدياد *", self.c_lieu),
                   ("تاريخ الازدياد * (يوم/شهر/سنة)", naiss), ("آخر قسم درس به *", self.c_niveau),
-                  ("تاريخ الالتحاق *", self.c_entree), ("تاريخ الانقطاع *", self.c_sortie)]
+                  ("تاريخ الالتحاق *", self.c_entree), ("تاريخ الانقطاع *", self.c_sortie),
+                  ("اسم ولي الأمر", self.c_tuteur), ("الجنسية", self.c_nationalite),
+                  ("العنوان", self.c_adresse), ("سبب الانقطاع", self.c_motif)]
         for i, (lib, w) in enumerate(champs):
             g.addWidget(etiquette(lib, w), (i // 2) * 2, i % 2)
             g.addWidget(w, (i // 2) * 2 + 1, i % 2)
@@ -161,7 +177,7 @@ class PageAnciens(QWidget):
         aide = QLabel("نقرة مزدوجة على سطر لإعادة طباعة الشهادة بنفس بياناتها.")
         aide.setObjectName("etiquette")
         fv.addWidget(aide)
-        self.fiche = FenetreFiche(self, "تلميذ قديم جديد", "", c2, largeur=920)
+        self.fiche = FenetreFiche(self, "إضافة تلميذ (ما قبل مسار)", "", c2, largeur=920)
         self.chercher("")
 
     # ---------- البحث ----------
@@ -189,20 +205,57 @@ class PageAnciens(QWidget):
                 ("تعديل", "#1565C0", "modifier", lambda _=False, k=r["id"]: self.ouvrir_certificat(k, False))]))
         ajuster_colonne_actions(self.resultats, 4)
 
+    def exporter(self, chemin=None):
+        from pathlib import Path
+
+        from PySide6.QtWidgets import QFileDialog
+        if chemin is None:
+            nom = "نموذج التلاميذ ما قبل مسار.xlsx"
+            f, _ = QFileDialog.getSaveFileName(self, "تصدير نموذج الإكسل", str(Path.home() / nom), "Excel (*.xlsx)")
+            if not f:
+                return None
+            chemin = Path(f)
+        try:
+            p, n = an.exporter_excel(self.f.conn, chemin)
+        except OSError as e:
+            self._msg(f"تعذر حفظ الملف: {e}", True)
+            return None
+        self._msg(f"صُدّر النموذج ({n} تلميذاً مسجلاً): \u2066{p.name}\u2069. عبّئه ثم استورده.")
+        try:
+            bureautique.ouvrir(p)
+        except Exception:  # noqa: BLE001 — الفتح اختياري
+            pass
+        return p
+
+    def importer(self, chemin=None):
+        from PySide6.QtWidgets import QFileDialog
+        if chemin is None:
+            chemin, _ = QFileDialog.getOpenFileName(self, "استيراد التلاميذ ما قبل مسار", "", "Excel (*.xlsx)")
+            if not chemin:
+                return None
+        try:
+            r = an.importer_excel(self.f.conn, chemin)
+        except an.ErreurAncien as e:
+            self._msg(str(e), True)
+            return None
+        self.chercher(self.recherche.text())
+        self._msg(r.resume(), bool(r.erreurs))
+        return r
+
     def _msg(self, texte: str, erreur: bool = False) -> None:
         message(self.message, texte, erreur)
         message(self.m_fiche, texte, erreur)
 
     def ouvrir_nouveau(self):
         self.nouveau()
-        self.fiche.definir_titre("تلميذ قديم جديد", "أدخل بياناته كما في السجل العام، ثم متسلم "
+        self.fiche.definir_titre("إضافة تلميذ (ما قبل مسار)", "أدخل بياناته كما في السجل العام، ثم متسلم "
                                                                       "الشهادة إن أردت توليدها الآن.")
         self.fiche.ouvrir()
         return self.fiche
 
     def ouvrir_certificat(self, eleve_id: int | None, certificat: bool = True):
         if eleve_id is None:
-            self._msg("اختر التلميذ من اللائحة أولاً، أو أضف تلميذاً قديماً جديداً.", True)
+            self._msg("اختر التلميذ من اللائحة أولاً، أو أضف تلميذاً (ما قبل مسار).", True)
             return None
         self.afficher(eleve_id)
         a = an.lire(self.f.conn, eleve_id)
@@ -224,8 +277,11 @@ class PageAnciens(QWidget):
         self.resultats.clearSelection()
         self.titre.setText("تلميذ جديد")
         for c in (self.c_num, self.c_cahier, self.c_nom, self.c_prenom, self.c_lieu, self.c_naissance,
-                  self.c_entree, self.c_sortie, self.c_dest, self.c_cin):
+                  self.c_entree, self.c_sortie, self.c_dest, self.c_cin, self.c_tuteur, self.c_nationalite,
+                  self.c_adresse):
             c.clear()
+        self.c_motif.setCurrentIndex(-1)
+        self.c_motif.setEditText("")
         self.c_approx.setChecked(False)
         self.c_niveau.setCurrentIndex(-1)
         self.c_niveau.setEditText("")
@@ -252,6 +308,10 @@ class PageAnciens(QWidget):
         self.c_entree.definir(a.date_entree)
         self.c_sortie.definir(a.date_sortie)
         self.c_niveau.setEditText(a.dernier_niveau)
+        self.c_tuteur.setText(a.tuteur)
+        self.c_nationalite.setText(a.nationalite)
+        self.c_adresse.setText(a.adresse)
+        self.c_motif.setEditText(a.motif_sortie)
         (self.r_f if a.sexe == "F" else self.r_m).setChecked(True)
         self.c_dest.clear()
         self.c_cin.clear()
@@ -279,7 +339,9 @@ class PageAnciens(QWidget):
                          prenom_ar=self.c_prenom.text(), sexe=sexe,
                          date_naissance_approx=self.c_approx.isChecked(), lieu_ar=self.c_lieu.text(),
                          dernier_niveau=self.c_niveau.currentText(),
-                         num_cahier_registre=self.c_cahier.text().strip(), id=self.eleve_id, **dates)
+                         num_cahier_registre=self.c_cahier.text().strip(), id=self.eleve_id,
+                         tuteur=self.c_tuteur.text(), nationalite=self.c_nationalite.text(),
+                         adresse=self.c_adresse.text(), motif_sortie=self.c_motif.currentText(), **dates)
 
     def enregistrer(self) -> int | None:
         try:
