@@ -17,10 +17,19 @@ def test_palettes_completes():
     assert all(set(p) == cles for p in PALETTES.values()) and set(NOMS_THEMES) == set(PALETTES)
 
 
-def test_rihab_par_defaut():
+def test_layali_par_defaut():
+    """طلب المدير 2026-11-20: مظهر صفحة التواصل (الليلي والذهبي) مظهراً عاماً؛ رحاب والمغربي باقيان للاختيار."""
+    from idara.ui.palettes import THEME_DEFAUT
+    assert THEME_DEFAUT == "layali" and list(NOMS_THEMES)[0] == "layali"
+    p = PALETTES["layali"]
+    assert p["LUXE"] and p["HERO_FOND"] == "#0B1C2C" and p["HERO_FOND2"] == "#1F3B57" and p["NAV_MOTIF"] == "#C9A04A"
+    assert not any(PALETTES[n]["LUXE"] for n in PALETTES if n != "layali")
+
+
+def test_rihab_disponible():
     """هوية «الشامل في الإدارة التربوية بالمغرب» (اختيار المدير 2026-11-13)، والمغربي يبقى متاحاً."""
     from idara.ui.palettes import THEME_DEFAUT
-    assert THEME_DEFAUT == "rihab" and PALETTES["rihab"]["POLICE_TITRE"] == "El Messiri"
+    assert THEME_DEFAUT != "rihab" and PALETTES["rihab"]["POLICE_TITRE"] == "El Messiri"
     assert PALETTES["rihab"]["NAV_FOND"] == "#2E3192" and PALETTES["maghribi"]["POLICE_TITRE"] == "Amiri"
 
 

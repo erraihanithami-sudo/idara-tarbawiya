@@ -13,7 +13,7 @@ PALETTES = {
         NAV_SOMBRE=False, NAV_MOTIF="#0B7A6F", BADGE_FOND="#E4E2DD", BADGE_TEXTE="#1F2A44",
         RECHERCHE_FOND="#FFFFFF", RECHERCHE_TEXTE="#1F2A44",
         NAV_TEXTE_ACTIF="#1F2A44", ENTETE_FOND="#F6F5F1", ENTETE_TEXTE="#1F2A44", FOCUS="#0B7A6F",
-        TITRE_SOULIGNE="", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="IBM Plex Sans Arabic"),
+        LUXE=False, TITRE_SOULIGNE="", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="IBM Plex Sans Arabic"),
     "marine": dict(
         HERO_FOND="#0B1F4D", HERO_FOND2="#1A3F8F", HERO_TEXTE="#FFFFFF", HERO_TEXTE2="#D3DEF5",
         MARINE="#0F1E3D", SARCELLE="#0E9688", MENTHE="#5EE6D3", VIOLET="#7C3AED", BLEU="#2563EB",
@@ -25,7 +25,7 @@ PALETTES = {
         NAV_SOMBRE=True, NAV_MOTIF="#8FB0F0", BADGE_FOND="#2C4A8C", BADGE_TEXTE="#FFFFFF",
         RECHERCHE_FOND="#1A3570", RECHERCHE_TEXTE="#FFFFFF",
         NAV_TEXTE_ACTIF="#FFFFFF", ENTETE_FOND="#EAF1FB", ENTETE_TEXTE="#0F1E3D", FOCUS="#1D4ED8",
-        TITRE_SOULIGNE="", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="IBM Plex Sans Arabic"),
+        LUXE=False, TITRE_SOULIGNE="", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="IBM Plex Sans Arabic"),
     "violet": dict(
         HERO_FOND="#8E1457", HERO_FOND2="#5E1A7E", HERO_TEXTE="#FFFFFF", HERO_TEXTE2="#F6DDEB",
         MARINE="#3B0A45", SARCELLE="#0E9688", MENTHE="#5EE6D3", VIOLET="#7C3AED", BLEU="#2563EB",
@@ -37,7 +37,7 @@ PALETTES = {
         NAV_SOMBRE=True, NAV_MOTIF="#F6B7D6", BADGE_FOND="#6E1E5E", BADGE_TEXTE="#FFFFFF",
         RECHERCHE_FOND="#7A1858", RECHERCHE_TEXTE="#FFFFFF",
         NAV_TEXTE_ACTIF="#FFFFFF", ENTETE_FOND="#FBEFF5", ENTETE_TEXTE="#3B0A45", FOCUS="#7B2CBF",
-        TITRE_SOULIGNE="", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="IBM Plex Sans Arabic"),
+        LUXE=False, TITRE_SOULIGNE="", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="IBM Plex Sans Arabic"),
     # المغربي: أخضر الزليج والذهبي على خلفية عاجية (نفس هوية تطبيق مصلحة التعمير، 2026-11-12)
     "maghribi": dict(
         HERO_FOND="#0E4634", HERO_FOND2="#07251B", HERO_TEXTE="#FFFFFF", HERO_TEXTE2="#E8D49C",
@@ -50,7 +50,7 @@ PALETTES = {
         NAV_SOMBRE=True, NAV_MOTIF="#C9A44C", BADGE_FOND="#C9A44C", BADGE_TEXTE="#0B3B2C",
         RECHERCHE_FOND="#164F3C", RECHERCHE_TEXTE="#FFFFFF",
         NAV_TEXTE_ACTIF="#0B3B2C", ENTETE_FOND="#0B3B2C", ENTETE_TEXTE="#FFFFFF", FOCUS="#C9A44C",
-        TITRE_SOULIGNE="#C9A44C", POLICE="Tajawal", POLICE_TITRE="Amiri"),
+        LUXE=False, TITRE_SOULIGNE="#C9A44C", POLICE="Tajawal", POLICE_TITRE="Amiri"),
     # رحاب: هوية «الشامل في الإدارة التربوية بالمغرب» (اختيار المدير 2026-11-13): أزرق ماجوريل والأصفر الليموني
     "rihab": dict(
         HERO_FOND="#2E3192", HERO_FOND2="#3B3FB6", HERO_TEXTE="#FFFFFF", HERO_TEXTE2="#F2C14E",
@@ -63,11 +63,25 @@ PALETTES = {
         NAV_SOMBRE=True, NAV_MOTIF="#6E72D8", BADGE_FOND="#F2C14E", BADGE_TEXTE="#1B1B3A",
         RECHERCHE_FOND="#3B3FB6", RECHERCHE_TEXTE="#FFFFFF",
         NAV_TEXTE_ACTIF="#1B1B3A", ENTETE_FOND="#2E3192", ENTETE_TEXTE="#FFFFFF", FOCUS="#3B3FB6",
-        TITRE_SOULIGNE="#F2C14E", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="El Messiri"),
+        LUXE=False, TITRE_SOULIGNE="#F2C14E", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="El Messiri"),
+    # الليلي والذهبي (طلب المدير 2026-11-20): مظهر صفحة «التواصل مع صاحب البرنامج» معمماً على كل الصفحات —
+    # تدرج ليلي، إطار ذهبي مزدوج، نجوم زليج ذهبية، وعناوين ذهبية.
+    "layali": dict(
+        HERO_FOND="#0B1C2C", HERO_FOND2="#1F3B57", HERO_TEXTE="#FFFFFF", HERO_TEXTE2="#F3D27A",
+        MARINE="#0B1C2C", SARCELLE="#1E6B66", MENTHE="#F3D27A", VIOLET="#6B4FA0", BLEU="#2C5378",
+        ROSE="#B5462F", ORANGE="#B07A16", VERT="#1F3B57", VERT_FONCE="#0B1C2C", VERT_CLAIR="#F6EDD3",
+        ROUGE="#B5462F", ROUGE_TEXTE="#8E3422", ROUGE_CLAIR="#FBEAE5", PLATRE="#F7F4EC", BLANC="#FFFFFF",
+        ENCRE="#14202E", GRIS="#4E5A68", LIGNE="#E6DCC6", BORDURE_CHAMP="#8C7A52", BORDURE_CARTE="#E0D2AE",
+        NAV_FOND="#0B1C2C", NAV_FOND2="#1F3B57", NAV_TEXTE="#F3EBD6", NAV_TEXTE2="#C9D3DF",
+        NAV_ACTIF="#F3D27A", NAV_ACCENT="#C9A04A", NAV_SURVOL="#1A3550", NAV_BORD="#0B1C2C",
+        NAV_SOMBRE=True, NAV_MOTIF="#C9A04A", BADGE_FOND="#C9A04A", BADGE_TEXTE="#0B1C2C",
+        RECHERCHE_FOND="#183048", RECHERCHE_TEXTE="#FFFFFF",
+        NAV_TEXTE_ACTIF="#0B1C2C", ENTETE_FOND="#0B1C2C", ENTETE_TEXTE="#FFFFFF", FOCUS="#C9A04A",
+        LUXE=True, TITRE_SOULIGNE="#C9A04A", POLICE="IBM Plex Sans Arabic", POLICE_TITRE="El Messiri"),
 }
-NOMS_THEMES = {"rihab": "رحاب (أزرق ماجوريل والأصفر)", "maghribi": "المغربي (الأخضر والذهبي)", "classique": "الأصلي (فاتح)", "marine": "الكحلي والذهبي",
+NOMS_THEMES = {"layali": "الليلي والذهبي (مظهر صفحة التواصل)", "rihab": "رحاب (أزرق ماجوريل والأصفر)", "maghribi": "المغربي (الأخضر والذهبي)", "classique": "الأصلي (فاتح)", "marine": "الكحلي والذهبي",
                "violet": "البنفسجي والوردي"}
-THEME_DEFAUT = "rihab"
+THEME_DEFAUT = "layali"
 
 
 def luminance(c: str) -> float:

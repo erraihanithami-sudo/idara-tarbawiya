@@ -269,6 +269,11 @@ class Hero(QFrame):
     def paintEvent(self, ev):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
+        if theme.LUXE:   # الليلي والذهبي (2026-11-20)
+            from idara.ui.zellige import peindre_luxe
+            peindre_luxe(p, QRectF(self.rect()).adjusted(1, 1, -1, -1), 22)
+            p.end()
+            return
         c = QColor(self.couleur)
         g = QLinearGradient(self.width(), 0, 0, self.height())
         g.setColorAt(0, c.darker(165))

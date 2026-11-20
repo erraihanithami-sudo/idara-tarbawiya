@@ -132,3 +132,32 @@ class LogoMarque(QWidget):
             else:
                 p.drawPolygon(QPolygonF([QPointF(x * k, y * k) for x, y in g]))
         p.end()
+
+
+def peindre_luxe(p: QPainter, r, rayon: float = 20, grandes: bool = True) -> None:
+    """خلفية «الليلي والذهبي» (مظهر صفحة التواصل، طلب المدير 2026-11-20): تدرج ليلي، إطار ذهبي داخلي، ونجوم
+    زليج ذهبية في الجهة اليسرى. r مستطيل QRectF؛ الرسام يُترك بلا قصّ."""
+    from PySide6.QtCore import QRectF
+    from PySide6.QtGui import QLinearGradient, QPainterPath
+    r = QRectF(r)
+    g = QLinearGradient(r.topRight(), r.bottomLeft())
+    g.setColorAt(0, QColor("#0B1C2C"))
+    g.setColorAt(1, QColor("#1F3B57"))
+    ch = QPainterPath()
+    ch.addRoundedRect(r, rayon, rayon)
+    p.fillPath(ch, g)
+    p.save()
+    p.setClipPath(ch)
+    h = r.height()
+    if grandes:
+        etoiles = ((r.left() + 0.42 * h, r.center().y(), 0.27 * h), (r.left() + 0.88 * h, r.top() + 0.2 * h, 0.11 * h),
+                   (r.left() + 1.12 * h, r.bottom() - 0.2 * h, 0.07 * h))
+    else:
+        etoiles = ((r.left() + 0.5 * h, r.center().y(), 0.3 * h),)
+    for x, y, s in etoiles:
+        dessiner_etoile(p, x, y, s, "#C9A04A", pleine=False)
+    p.restore()
+    m = max(5.0, min(8.0, h / 18))
+    p.setPen(QPen(QColor("#C9A04A"), 1.6))
+    p.setBrush(Qt.NoBrush)
+    p.drawRoundedRect(r.adjusted(m, m, -m, -m), max(4.0, rayon - m + 2), max(4.0, rayon - m + 2))

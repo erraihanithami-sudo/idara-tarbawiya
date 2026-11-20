@@ -78,6 +78,11 @@ class EnTete(QFrame):
         from idara.ui.zellige import dessiner_etoile
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
+        if theme.LUXE:   # الليلي والذهبي: مظهر صفحة التواصل على كل الصفحات (2026-11-20)
+            from idara.ui.zellige import peindre_luxe
+            peindre_luxe(p, QRectF(self.rect()).adjusted(1, 1, -1, -1), 20)
+            p.end()
+            return
         g = QLinearGradient(self.width(), 0, 0, self.height())
         if self.section:
             c = QColor(icones.COULEURS.get(self.section, theme.VERT))

@@ -1818,7 +1818,7 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     # المظهر: يُطبَّق ويُحفظ، والشريط الجانبي يُعاد بناؤه
     f.aller_a("إعداد المؤسسة")
     c = f.page_etab.choix_theme
-    assert c.count() == 5 and c.itemData(0) == "rihab"
+    assert c.count() == 6 and c.itemData(0) == "layali"
     from PySide6.QtWidgets import QLabel
 
     from idara import marque
@@ -1839,6 +1839,8 @@ def test_themes_recherche_guide_statistiques(app, config_tmp):
     c.setCurrentIndex(c.findData("rihab"))
     assert theme.THEME_ACTUEL == "rihab" and theme.NAV_FOND == "#2E3192" and "#4B50C8" in f.styleSheet() + \
         theme.FEUILLE_STYLE
+    c.setCurrentIndex(c.findData("layali"))   # مظهر صفحة التواصل معمماً (2026-11-20)
+    assert theme.THEME_ACTUEL == "layali" and theme.LUXE and "#F3D27A" in theme.FEUILLE_STYLE
     # الدليل
     f.aller_a("دليل الاستخدام")
     g = f.page_guide

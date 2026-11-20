@@ -396,7 +396,7 @@ def main(sortie: Path) -> None:
     f.aller_a("الامتحان")
     photo(f, "46_examen")
     # المظاهر والصفحات الجديدة (اقتراح المدير 2026-11-06)
-    for nom in ("marine", "violet", "classique", "maghribi"):
+    for nom in ("marine", "violet", "classique", "maghribi", "rihab"):
         f.appliquer_theme(nom)
         f.aller_a("لوحة القيادة")
         photo(f, f"50_theme_{nom}_tableau")
@@ -404,6 +404,8 @@ def main(sortie: Path) -> None:
         photo(f, f"51_theme_{nom}_statistiques")
         f.aller_a("دليل الاستخدام")
         photo(f, f"52_theme_{nom}_guide")
+    from idara.ui import theme as _th
+    f.appliquer_theme(_th.THEME_DEFAUT)   # بقية اللقطات بالمظهر العام (الليلي والذهبي، 2026-11-20)
     # السنوات الدراسية (طلب المدير 2026-11-12)
     d_an = f.gerer_annees()
     d_an.nouvelle("2025/2026", confirmer=False)

@@ -50,6 +50,11 @@ def creer_application(argv=None) -> QApplication:
     app.setApplicationName(NOM_APPLICATION)
     app.setLayoutDirection(Qt.RightToLeft)
     cfg = config_srv.lire_config()
+    if not cfg.get("theme_layali_applique"):
+        # «الليلي والذهبي» يُفعَّل مرة واحدة عند التحديث (طلب المدير 2026-11-20)، ثم يبقى اختيار المظهر حراً
+        config_srv.ecrire_config(theme=theme.THEME_DEFAUT, theme_maghribi_applique=True, theme_rihab_applique=True,
+                                 theme_layali_applique=True)
+        cfg = config_srv.lire_config()
     if not cfg.get("theme_rihab_applique"):
         # هوية «رحاب» تُفعَّل مرة واحدة عند التحديث (اختيار المدير 2026-11-13)، ثم يبقى اختيار المظهر حراً
         config_srv.ecrire_config(theme=theme.THEME_DEFAUT, theme_maghribi_applique=True, theme_rihab_applique=True)

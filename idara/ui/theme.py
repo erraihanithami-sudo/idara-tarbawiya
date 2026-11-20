@@ -175,6 +175,8 @@ QScrollArea#defilPilules > QWidget#qt_scrollarea_viewport {{ background: transpa
 _EXTRAS = {
     "maghribi": {"degrade": "#1E6B4A", "alterne": "#FBF8F1", "bord_entete": "#164B39", "pastille": "#E8D49C",
                  "ascenseur": "#D8CCB2"},
+    "layali": {"degrade": "#2C5378", "alterne": "#FBF8F0", "bord_entete": "#1F3B57", "pastille": "#C9A04A",
+               "ascenseur": "#D9CBA8", "taille_titre": "20pt"},
     "rihab": {"degrade": "#4B50C8", "alterne": "#F8F7FC", "bord_entete": "#24277F", "pastille": "#F2C14E",
               "ascenseur": "#C9CBE8", "taille_titre": "20pt"},
 }
@@ -216,6 +218,26 @@ QScrollBar::handle:vertical {{ background: {x['ascenseur']}; border-radius: 5px;
 QScrollBar::handle:vertical:hover {{ background: {TITRE_SOULIGNE}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QToolTip {{ background: {VERT_FONCE}; color: #FFFFFF; border: 1px solid {TITRE_SOULIGNE}; padding: 5px; }}
+""" + feuille_luxe()
+
+
+def feuille_luxe() -> str:
+    """الليلي والذهبي (2026-11-20): عناوين الرؤوس ذهبية، وخط ذهبي أعلى البطاقات، ورؤوس الجداول ليلية بخط ذهبي."""
+    if not LUXE:
+        return ""
+    return f"""
+#heroTitre {{ color: #F3D27A; }}
+#heroSous {{ color: #E8EEF5; }}
+#heroPuce {{ background: rgba(201, 160, 74, 60); color: #F3D27A; border: 1px solid #C9A04A; }}
+#carte {{ border-top: 3px solid {DORE}; }}
+#barreLaterale {{ border-left: 2px solid {DORE}; }}
+#carteAction {{ border-top: 3px solid {DORE}; }}
+#carteAction:hover {{ background: #FFF8E7; border-color: {DORE}; }}
+QHeaderView::section {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1F3B57, stop:1 #0B1C2C);
+    border-bottom: 2px solid {DORE}; }}
+QPushButton#principal {{ border: 1px solid {DORE}; }}
+#etape {{ border: 2px solid {DORE}; }}
+#etapeTitre {{ color: #F3D27A; }}
 """
 
 
