@@ -248,7 +248,7 @@ class VueRegistre(QWidget):
                 it = cellule(rg.afficher(ch, l.get(ch.cle)), l["id"])
                 if ch.cle == self.r.etat:   # الوضعية ملونة (طلب المدير 2026-11-20)
                     texte, fait = rg.etat(self.r, l)
-                    it.setText(("✔ " if fait else "⏳ ") + texte)
+                    it.setText(("✔ " if fait else "● ") + texte)
                     it.setForeground(QBrush(QColor("#2E7D32" if fait else "#E65100")))
                     f = it.font()
                     f.setBold(True)
@@ -302,7 +302,7 @@ class VueRegistre(QWidget):
         v.setSpacing(10)
         texte, fait = rg.etat(self.r, l)
         if self.r.etat:
-            e = QLabel(("✔ " if fait else "⏳ ") + texte)
+            e = QLabel(("✔ " if fait else "● ") + texte)
             e.setStyleSheet(f"background: {'#2E7D32' if fait else '#E65100'}; color: white; border-radius: 12px; "
                             "padding: 6px 16px; font-weight: 700; font-size: 12pt;")
             he = QHBoxLayout()
@@ -323,6 +323,7 @@ class VueRegistre(QWidget):
             b = QLabel(val or "غير مُدخل")
             b.setWordWrap(True)
             b.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            b.setAlignment(Qt.AlignAbsolute | Qt.AlignRight | Qt.AlignVCenter)   # التواريخ والرموز في صف النص
             if not val:
                 b.setStyleSheet("color: #9E9E9E; font-style: italic;")
             self.dossier_valeurs[ch.cle] = val
