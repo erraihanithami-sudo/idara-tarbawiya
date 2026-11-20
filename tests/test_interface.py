@@ -1043,7 +1043,8 @@ def test_page_achats_bon_de_commande(app, config_tmp, monkeypatch):
     assert pa.recu_equipement(dict(date_don="2025-11-03", donateur="شركة وهمية", description="حاسوب"))
     f.aller_a("الصرف")
     p = f.page_achats
-    assert f.page_courante() == "الصرف" and p.zone.isHidden()
+    assert f.page_courante() == "جمعية دعم مدرسة النجاح" and p.zone.isHidden() and pa.onglets[1].isChecked()
+    assert not p.isHidden() and pa.w_finance.isHidden() and p.parent() is pa   # الصرف ضمن الجمعية (2026-11-20)
     rub = p.rubrique.itemData(p.rubrique.findText("معدات معلوماتية", Qt.MatchContains))
     aid = p.nouveau(dict(mode="bon_commande", objet="اقتناء طابعات", rubrique_id=rub, service_type=""))
     assert aid and not p.zone.isHidden() and p.boutons_docs["pv_service"].isHidden()

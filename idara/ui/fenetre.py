@@ -38,7 +38,6 @@ from idara.ui.page_mouvements import PageMouvements
 from idara.ui.page_comportement import PageComportement
 from idara.ui.page_conseils import PageConseils
 from idara.ui.page_associations import PageAssociations
-from idara.ui.page_achats import PageAchats
 from idara.ui.page_conseils_etab import PageConseilsEtab
 from idara.ui.page_pedagogie import PagePerformance, PageRiyada, PageTarl, PageVieScolaire
 from idara.ui.page_tanzim import PageTanzim
@@ -544,7 +543,7 @@ SECTIONS = [
                          ("الإعلام والتواصل", "الإعلام والتواصل")]),
     ("التدبير المالي والمادي", [("التسجيلات", "تدبير التسجيلات"), ("الجرد", "الجرد"),
                                 ("جمعية دعم مدرسة النجاح", "جمعية دعم مدرسة النجاح"),
-                                ("الصرف", "الصرف: سند الطلب والاتفاقية"), ("الجمعية الرياضية", "الجمعية الرياضية"),
+                                ("الجمعية الرياضية", "الجمعية الرياضية"),
                                 ("جمعية تنمية التعاون المدرسي", "جمعية تنمية التعاون المدرسي"),
                                 ("البنية المادية", "البنية المادية"), ("السكنيات", "تدبير السكنيات"),
                                 ("الوثائق القانونية للجمعيات", "الوثائق القانونية للجمعيات")]),
@@ -685,7 +684,7 @@ MOTS_CLES = {"ملفات الأساتذة": "طلب إرسال ملف إداري
              "الامتحان": "امتحان موحد إشهادي سادس",
              "التلاميذ": "تلميذ بحث شهادة مدرسية وثائق", "الاستيراد من مسار": "مسار لوائح استيراد",
              "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "تتبع الغياب": "غياب متغيبون نسبة", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
-             "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون", "مجالس الأقسام": "مجلس قسم محضر مداولات نتائج نقط نهاية الأسدوس",
+             "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك صرف سند الطلب اتفاقية عروض أثمان ممون فاتورة", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون", "مجالس الأقسام": "مجلس قسم محضر مداولات نتائج نقط نهاية الأسدوس",
              "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص",
              "الدعم التربوي": "دعم متعثرين تعثر معالجة سجل",
              "مشروع المؤسسة": "مشروع مؤشرات عمليات خطة العمل مسار حصيلة",
@@ -754,7 +753,8 @@ class FenetrePrincipale(QMainWindow):
         self.page_comportement = PageComportement(self)
         self.page_conseils = PageConseils(self)
         self.page_asso = PageAssociations(self)
-        self.page_achats = PageAchats(self)
+        self.page_asso.choisir_onglet(0)
+        self.page_achats = self.page_asso.achats   # الصرف داخل صفحة الجمعية (طلب المدير 2026-11-20)
         self.page_conseils_etab = PageConseilsEtab(self)
         self.page_perf = PagePerformance(self)
         self.page_tarl = PageTarl(self)
@@ -828,7 +828,7 @@ class FenetrePrincipale(QMainWindow):
                       "لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves, "بطاقة التلميذ": self.page_fiche_eleve, "ملفات الأساتذة": self.page_dossier_prof,
                       "التلاميذ القدامى": self.page_anciens,
                       "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
-                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "الصرف": self.page_achats, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "نتائج الريادة": self.page_resultats_pionniere, "تواصل الريادة": self.page_comm_pionniere, "مؤشرات الريادة": self.page_ind_pionniere, "مفكرة المدير": self.page_memo, "السكنيات": self.page_logements, "التواصل": self.page_contact, "روابط مهمة": self.page_liens, "التنظيم التربوي": self.page_tanzim,
+                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "نتائج الريادة": self.page_resultats_pionniere, "تواصل الريادة": self.page_comm_pionniere, "مؤشرات الريادة": self.page_ind_pionniere, "مفكرة المدير": self.page_memo, "السكنيات": self.page_logements, "التواصل": self.page_contact, "روابط مهمة": self.page_liens, "التنظيم التربوي": self.page_tanzim,
                       "الامتحان": self.page_examen, "الاستيراد من مسار": self.page_import,
                       "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
                       "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,
@@ -1182,6 +1182,10 @@ class FenetrePrincipale(QMainWindow):
 
     def aller_a(self, nom: str) -> None:
         """يفتح صفحة باسمها، أو قسماً رئيسياً باسمه (أول فرع مبرمج فيه)."""
+        if nom == "الصرف":   # صار تبويباً في صفحة جمعية دعم مدرسة النجاح (2026-11-20)
+            self.aller_a("جمعية دعم مدرسة النجاح")
+            self.page_asso.choisir_onglet(1)
+            return
         if nom not in self.emplacement:
             titres = [t for t, _ in SECTIONS]
             if nom not in titres:

@@ -242,6 +242,26 @@ class PageAssociations(QWidget):
         self.message.setWordWrap(True)
         self.message.hide()
         racine.addWidget(self.message)
+        # طلب المدير 2026-11-20: الصرف (سند الطلب والاتفاقية) ضمن جمعية دعم مدرسة النجاح
+        self.onglets: list[QPushButton] = []
+        ho = QHBoxLayout()
+        ho.setSpacing(8)
+        for k, lib in enumerate(("المداخيل والمصاريف والسجلات", "الصرف: سند الطلب والاتفاقية")):
+            b = QPushButton(lib)
+            b.setObjectName("pilule")
+            b.setCheckable(True)
+            b.setCursor(Qt.PointingHandCursor)
+            b.clicked.connect(lambda _=False, k=k: self.choisir_onglet(k))
+            self.onglets.append(b)
+            ho.addWidget(b)
+        ho.addStretch()
+        racine.addLayout(ho)
+        self._racine_page = racine
+        self.w_finance = QWidget()
+        racine.addWidget(self.w_finance)
+        racine = QVBoxLayout(self.w_finance)
+        racine.setContentsMargins(0, 0, 0, 0)
+        racine.setSpacing(16)
 
         # ---- السنة المالية والأرصدة ----
         c, cv = carte()
@@ -476,7 +496,25 @@ class PageAssociations(QWidget):
 
     # ---------- chargement ----------
 
+    def choisir_onglet(self, k: int) -> None:
+        """0: المداخيل والمصاريف؛ 1: الصرف (سند الطلب والاتفاقية)."""
+        if not hasattr(self, "achats"):
+            from idara.ui.page_achats import PageAchats
+            self.achats = PageAchats(self.f, integre=True)
+            self._racine_page.insertWidget(self._racine_page.indexOf(self.w_finance) + 1, self.achats)
+        for i, b in enumerate(self.onglets):
+            b.setChecked(i == k)
+        self.w_finance.setVisible(k == 0)
+        self.achats.setVisible(k == 1)
+        self.onglet = k
+        if k == 1:
+            self.achats.rafraichir()
+
     def rafraichir(self) -> None:
+        if not hasattr(self, "onglet"):
+            self.choisir_onglet(0)
+        elif self.onglet == 1:
+            self.achats.rafraichir()
         self._alertes_report = asso.synchroniser(self.f.conn, TYPE)
         courant = self.eid
         self.exercice.blockSignals(True)

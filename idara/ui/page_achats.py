@@ -148,17 +148,24 @@ class DialogueFournisseur(QDialog):
 
 
 class PageAchats(QWidget):
-    def __init__(self, fenetre):
+    def __init__(self, fenetre, integre: bool = False):
         super().__init__()
         self.f = fenetre
         self.eid: int | None = None
         self.aid: int | None = None
         racine = QVBoxLayout(self)
-        racine.setContentsMargins(40, 32, 40, 32)
+        racine.setContentsMargins(*((0, 0, 0, 0) if integre else (40, 32, 40, 32)))
         racine.setSpacing(16)
-        racine.addWidget(entete("الصرف: سند الطلب والاتفاقية",
-                                "مراحل الدليل المسطري: الحاجة، طلب عروض الأثمان (3 على الأقل)، لجنة الدراسة واختيار "
-                                "العرض، سند الطلب أو الاتفاقية، التسليم، الفاتورة، ثم الأداء بالشيك أو التحويل."))
+        if integre:   # داخل صفحة جمعية دعم مدرسة النجاح (2026-11-20): سطر تعريفي بدل الرأس
+            t = QLabel("مراحل الدليل المسطري: الحاجة، طلب عروض الأثمان (3 على الأقل)، لجنة الدراسة واختيار العرض، "
+                       "سند الطلب أو الاتفاقية، التسليم، الفاتورة، ثم الأداء بالشيك أو التحويل.")
+            t.setObjectName("sousTitre")
+            t.setWordWrap(True)
+            racine.addWidget(t)
+        else:
+            racine.addWidget(entete("الصرف: سند الطلب والاتفاقية",
+                                    "مراحل الدليل المسطري: الحاجة، طلب عروض الأثمان (3 على الأقل)، لجنة الدراسة واختيار "
+                                    "العرض، سند الطلب أو الاتفاقية، التسليم، الفاتورة، ثم الأداء بالشيك أو التحويل."))
         self.message = QLabel()
         self.message.setWordWrap(True)
         self.message.hide()
