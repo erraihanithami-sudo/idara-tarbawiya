@@ -154,7 +154,7 @@ def test_navigation_deroulante(app, config_tmp):
     assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص", "المحاضر",
                                          "طلبات الموظفين والورقة الشخصية", "أعوان الحراسة والنظافة",
                                          "طلب ملف أستاذ وإرساله"]
-    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "مفكرة المدير", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
+    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "مفكرة المدير", "روابط المنصات المهمة", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
                                          "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة",
                                          "السبورة المرجعية"]
     assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
@@ -1253,6 +1253,20 @@ def test_mofakkira_et_contact(app, config_tmp, monkeypatch):
     assert c.ouverts[0] == "https://wa.me/212666949280" and c.ouverts[1].startswith("mailto:erraihani.thami@gmail.com")
     c.copier(pc.EMAIL)
     assert "نُسخ" in c.l_copie.text()
+    # روابط مهمة (طلب المدير 2026-11-20): أربع منصات، دون إظهار الروابط
+    from PySide6.QtWidgets import QLabel
+    from idara.ui import page_liens as pl
+    f.aller_a("روابط مهمة")
+    lp = f.page_liens
+    assert f.page_courante() == "روابط مهمة" and list(lp.cartes) == ["massar", "masir", "tabligh", "sise"]
+    textes = " ".join(l.text() for l in lp.findChildren(QLabel)) + " ".join(
+        c.bouton.text() + c.bouton.toolTip() for c in lp.cartes.values())
+    assert "http" not in textes and "men.gov.ma" not in textes
+    lp.cartes["massar"].bouton.click()
+    lp.cartes["sise"].bouton.click()
+    assert lp.ouverts == [pl.PLATEFORMES[0].url, pl.PLATEFORMES[3].url] and "أوسايز" in lp.l_etat.text()
+    assert lp.ouverts[0] == "https://idprovider.men.gov.ma/?RedirectUrl=https://massar.men.gov.ma"
+    assert pl.PLATEFORMES[1].url == "https://masirhnew.men.gov.ma/"
     f.close()
 
 

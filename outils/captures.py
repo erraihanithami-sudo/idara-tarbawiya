@@ -602,6 +602,8 @@ def main(sortie: Path) -> None:
         f.page_memo.fiche.hide()
         f.aller_a("التواصل")
         photo(f, "84_contact")
+        f.aller_a("روابط مهمة")
+        photo(f, "84b_liens")
         f.aller_a("استعمالات الزمن")
         photo(f, "85_emplois")
         f.page_emplois.mode.setCurrentIndex(1)
