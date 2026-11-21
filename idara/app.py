@@ -101,6 +101,15 @@ def verification_installation() -> int:
         e = ecran_demarrage()
         assert e is not None, "شاشة التحميل"
         e.close()
+        # كل وحدات الواجهة مرفقة في النسخة المبنية (بلاغ 2026-11-21: «No module named idara.ui.page_memo»)
+        import pkgutil
+
+        import idara.ui as _ui
+        noms = [m.name for m in pkgutil.iter_modules(_ui.__path__)]
+        assert "page_memo" in noms and "page_liens" in noms, "وحدات الواجهة غير مرفقة"
+        import importlib
+        for n in noms:
+            importlib.import_module(f"idara.ui.{n}")
         police = QApplication.instance().font().family()
         rapport.write_text(f"VERIFICATION_OK police={police}\n", encoding="utf-8")
         return 0

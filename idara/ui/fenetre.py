@@ -771,11 +771,15 @@ class FenetrePrincipale(QMainWindow):
         def registres(titre, sous, cles, couleur, **kw):
             return lambda: PageRegistres(self, titre, sous, cles, couleur, **kw)
 
+        # استيراد صريح (لا importlib) حتى يضمّ PyInstaller الوحدات في النسخة المثبتة (بلاغ المدير 2026-11-21)
+        from idara.ui import (page_contact, page_dossier_prof, page_fiche_eleve, page_liens, page_logements,
+                              page_memo, page_pionniere)
+        modules = {"page_contact": page_contact, "page_dossier_prof": page_dossier_prof,
+                   "page_fiche_eleve": page_fiche_eleve, "page_liens": page_liens, "page_logements": page_logements,
+                   "page_memo": page_memo, "page_pionniere": page_pionniere}
+
         def importer(module, classe):
-            def fab():
-                import importlib
-                return getattr(importlib.import_module(f"idara.ui.{module}"), classe)(self)
-            return fab
+            return lambda: getattr(modules[module], classe)(self)
 
         def achats():
             return self.page_asso.achats   # الصرف داخل صفحة الجمعية (طلب المدير 2026-11-20)
