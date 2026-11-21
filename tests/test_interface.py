@@ -611,9 +611,18 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     cid = p.enregistrer()
     assert cid is not None, p.message.text()
     assert p.zone_docs.isEnabled() and p.liste.rowCount() == 1
-    for b in (p.b_demande, p.b_recu, p.b_remp):
-        b.click()
-        assert p.message.objectName() == "info", p.message.text()
+    # 2026-11-21: الجهة المرسل إليها تُختار من هيكلة المديرية عند صياغة المراسلة
+    p.b_demande.click()
+    assert p.fiche_dest.isVisible() and p.destination.valeur() == ("مصلحة تدبير الموارد البشرية", "مكتب الرخص")
+    assert p.confirmer_destination() is not None and p.message.objectName() == "info", p.message.text()
+    p.b_recu.click()
+    assert p.message.objectName() == "info", p.message.text()
+    p.b_remp.click()
+    assert p.destination.valeur() == ("مصلحة تدبير الموارد البشرية", "مكتب تسيير مؤسسات التعليم الابتدائي")
+    p.destination.definir("", "مكتب الضبط")
+    assert p.destination.valeur() == ("", "مكتب الضبط")
+    assert p.confirmer_destination() is not None and p.message.objectName() == "info", p.message.text()
+    assert cg.destination_defaut(f.conn, "remplacement") == ("", "مكتب الضبط")
     assert len(ouverts) == 3 and p.docs.rowCount() == 3
     assert p.bordereau(cg.pieces_proposees(f.conn, cg.lire(f.conn, cid)), "ملف رخصة") is not None
     assert [r["numero"] for r in cg.sortants(f.conn)] == [2, 1]
@@ -654,7 +663,7 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     s.retirer_service(s.blocs_services[-1])
     vide = s.ajouter_service()
     s.retirer_service(vide)
-    s.aff["bureau_etablissements"].setCurrentText("مكتب الحياة المدرسية")
+    assert not hasattr(s, "aff")   # لا مصلحة ولا مكاتب معيّنة مسبقاً (2026-11-21)
     assert s.enregistrer_structure(), s.message_structure.text()
     assert not d.isVisible() and "حُفظت هيكلة" in s.message.text()   # تُغلق بعد الحفظ
     d = s.ouvrir_structure()
@@ -662,9 +671,6 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     assert len(st) == 6 and st[0]["service"] == "مصلحة الشؤون التربوية والرياضية"
     assert "مكتب الحياة المدرسية" in st[0]["bureaux"] and "مكتب الإحصاء والدراسات" in st[2]["bureaux"]
     assert "مكتب الإحصاء والدراسات" not in st[1]["bureaux"] and "الكتابة الخاصة" not in cg.bureaux_independants(f.conn)
-    assert cg.parametres(f.conn)["bureau_etablissements"] == "مكتب الحياة المدرسية"
-    s.aff["bureau_conges"].setCurrentText("مكتب غير موجود")
-    assert not s.enregistrer_structure() and "غير موجود" in s.message_structure.text()
     s.retablir_structure()
     assert len(s.blocs_services) == 7 and "أعيدت الهيكلة" in s.message_structure.text()
     assert cg.structure_direction(f.conn) == cg.structure_defaut()
@@ -681,7 +687,8 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     p.avis.setText("موافق")
     p.mesures.setText("توزيع التلاميذ")
     n = len(ouverts)
-    assert p.enregistrer_et_demande() is not None and len(ouverts) == n + 1, p.message.text()
+    assert p.enregistrer_et_demande() is not None and p.fiche_dest.isVisible()
+    assert p.confirmer_destination() is not None and len(ouverts) == n + 1, p.message.text()
     assert p.zone_docs.isEnabled() and p.aide_docs.isHidden()
     p.fiche.hide()
     selectionner(p.liste, next(i for i in range(p.liste.rowCount()) if p.liste.item(i, 0).data(Qt.UserRole) == cid))

@@ -66,6 +66,61 @@ def _boutons(dialogue: QDialog, ok: str) -> QDialogButtonBox:
     return b
 
 
+class ChoixDestination(QWidget):
+    """الجهة المرسل إليها من هيكلة المديرية (طلب المدير 2026-11-21): المصلحة ثم مكتبها (أو المصلحة نفسها)،
+    أو مكتب ملحق بالمدير الإقليمي."""
+
+    INDEP = "ملحقة بالمدير الإقليمي"
+
+    def __init__(self, conn, usage: str = "bordereau", parent=None):
+        super().__init__(parent)
+        self.conn = conn
+        h = QHBoxLayout(self)
+        h.setContentsMargins(0, 0, 0, 0)
+        self.service = QComboBox(self)
+        self.bureau = QComboBox(self)
+        self.service.setMinimumWidth(260)
+        self.bureau.setMinimumWidth(260)
+        h.addWidget(QLabel("المصلحة", self))
+        h.addWidget(self.service, 1)
+        h.addWidget(QLabel("المكتب", self))
+        h.addWidget(self.bureau, 1)
+        self.structure = cg.structure_direction(conn)
+        self.independants = cg.bureaux_independants(conn)
+        for x in self.structure:
+            self.service.addItem(x["service"], x["service"])
+        if self.independants:
+            self.service.addItem(self.INDEP, "")
+        self.service.currentIndexChanged.connect(lambda _: self._bureaux())
+        self.definir(*cg.destination_defaut(conn, usage))
+
+    def _bureaux(self) -> None:
+        sv = self.service.currentData()
+        self.bureau.clear()
+        if sv == "":
+            for b in self.independants:
+                self.bureau.addItem(b, b)
+            return
+        self.bureau.addItem("— المصلحة نفسها —", "")
+        for x in self.structure:
+            if x["service"] == sv:
+                for b in x["bureaux"]:
+                    self.bureau.addItem(b, b)
+
+    def definir(self, service: str, bureau: str) -> None:
+        k = self.service.findData(service if service or not self.independants else "")
+        if k < 0 and bureau:   # مكتب يُعرف بمصلحته من الهيكلة
+            sv = cg.service_de(self.conn, bureau)
+            k = self.service.findData(sv) if sv is not None else -1
+        self.service.setCurrentIndex(max(0, k))
+        self._bureaux()
+        j = self.bureau.findData(bureau)
+        self.bureau.setCurrentIndex(max(0, j))
+
+    def valeur(self) -> tuple[str, str]:
+        return self.service.currentData() or "", self.bureau.currentData() or ""
+
+
 class DialogueBordereau(QDialog):
     """ورقة إرسال: الوثائق وعدد نسخها، تُسجل في الصادر برقم جديد."""
 
@@ -80,21 +135,15 @@ class DialogueBordereau(QDialog):
         self.objet.setText(objet)
         self.le = ChampDate()
         self.le.definir(date.today().isoformat())
-        self.bureau = QComboBox()
-        # مكاتب هيكلة المديرية (طلب المدير 2026-11-19)؛ المكتبان المعيَّنان يحملان مفتاح إعدادهما
+        # الجهة المرسل إليها تُختار من هيكلة المديرية عند صياغة المراسلة (طلب المدير 2026-11-21)
         conn = getattr(parent, "f", parent).conn   # الصفحة أو النافذة الرئيسية
-        par = cg.parametres(conn)
-        cles = {par["bureau_conges"]: "bureau_conges", par["bureau_etablissements"]: "bureau_etablissements"}
-        for sv, bu in cg.bureaux_direction(conn):
-            self.bureau.addItem(bu, cles.get(bu, bu))   # اسم المكتب وحده دون المصلحة بين قوسين (2026-11-21)
-            self.bureau.setItemData(self.bureau.count() - 1, sv, Qt.ToolTipRole)
-        for k in ("bureau_conges", "bureau_etablissements"):
-            if self.bureau.findData(k) < 0:
-                self.bureau.addItem(par[k], k)
-        self.bureau.setCurrentIndex(max(0, self.bureau.findData(bureau)))
+        self.destination = ChoixDestination(conn, "bordereau", self)
+        if bureau and bureau != "bureau_conges" and not isinstance(bureau, (tuple, list)):
+            nom = cg.parametres(conn).get(bureau, bureau)
+            self.destination.definir(cg.service_de(conn, nom) or "", nom)
         f.addRow("الموضوع (لسجل الصادر)", self.objet)
         f.addRow("التاريخ", self.le)
-        f.addRow("المكتب", self.bureau)
+        f.addRow("الجهة المرسل إليها", self.destination)
         v.addLayout(f)
         v.addWidget(QLabel("الوثائق المرسلة (8 على الأكثر):"))
         self.table = QTableWidget(0, 2)
@@ -262,11 +311,11 @@ class PageConges(QWidget):
         self.l_doc_sel.setStyleSheet("font-weight: 700; background: transparent;")
         bd.addWidget(self.l_doc_sel, 0, 0, 1, 3)
         self.p_demande = bouton_couleur("طلب الرخصة", DOCS_COULEURS["demande"], "document")
-        self.p_demande.clicked.connect(lambda: self._generer(cg.generer_demande))
+        self.p_demande.clicked.connect(lambda: self.choisir_destination("demande"))
         self.p_recu = bouton_couleur("إيصال الشهادة الطبية", DOCS_COULEURS["recu"], "valider")
         self.p_recu.clicked.connect(lambda: self._generer(cg.generer_recu))
         self.p_remp = bouton_couleur("طلب تعويض", DOCS_COULEURS["remp"], "personnes")
-        self.p_remp.clicked.connect(lambda: self._generer(cg.generer_remplacement))
+        self.p_remp.clicked.connect(lambda: self.choisir_destination("remplacement"))
         self.p_bord = bouton_couleur("ورقة الإرسال", DOCS_COULEURS["bord"], "envoyer")
         self.p_bord.clicked.connect(self.dialogue_bordereau)
         self.p_reprise = bouton_couleur("محضر الاستئناف", DOCS_COULEURS["reprise"], "retour")
@@ -382,11 +431,11 @@ class PageConges(QWidget):
         g.setContentsMargins(0, 0, 0, 0)
         g.setSpacing(10)
         self.b_demande = bouton_couleur("طلب الرخصة (يُسجل في الصادر)", DOCS_COULEURS["demande"], "document")
-        self.b_demande.clicked.connect(lambda: self._generer(cg.generer_demande))
+        self.b_demande.clicked.connect(lambda: self.choisir_destination("demande"))
         self.b_recu = bouton_couleur("إيصال الشهادة الطبية", DOCS_COULEURS["recu"], "valider")
         self.b_recu.clicked.connect(lambda: self._generer(cg.generer_recu))
         self.b_remp = bouton_couleur("طلب تعويض", DOCS_COULEURS["remp"], "personnes")
-        self.b_remp.clicked.connect(lambda: self._generer(cg.generer_remplacement))
+        self.b_remp.clicked.connect(lambda: self.choisir_destination("remplacement"))
         self.b_bord = bouton_couleur("ورقة الإرسال", DOCS_COULEURS["bord"], "envoyer")
         self.b_bord.clicked.connect(self.dialogue_bordereau)
         self.b_reprise = bouton_couleur("محضر استئناف العمل", DOCS_COULEURS["reprise"], "retour")
@@ -563,7 +612,7 @@ class PageConges(QWidget):
         """يحفظ ملف الرخصة ثم يولد طلبها مباشرة (طلب المدير 2026-11-18)."""
         if self.enregistrer() is None:
             return None
-        return self._generer(cg.generer_demande)
+        return self.choisir_destination("demande")
 
     def _msg(self, texte: str, erreur: bool = False) -> None:
         message(self.message, texte, erreur)
@@ -765,6 +814,42 @@ class PageConges(QWidget):
         self._ouvrir(doc)
         return doc
 
+    def choisir_destination(self, usage: str):
+        """قبل صياغة المراسلة: نافذة منبثقة لاختيار الجهة المرسل إليها من هيكلة المديرية (طلب المدير 2026-11-21).
+        تُقترح آخر جهة اختيرت لهذا النوع من المراسلات."""
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        if self.cid is None:
+            self._msg("اختر رخصة أولاً.", True)
+            return None
+        w = QWidget()
+        v = QVBoxLayout(w)
+        self.destination = ChoixDestination(self.f.conn, usage, w)
+        v.addWidget(self.destination)
+        h = QHBoxLayout()
+        b = bouton_couleur("صياغة المراسلة", "#2E7D32", "document")
+        b.clicked.connect(lambda: self.confirmer_destination())
+        h.addWidget(b)
+        a = bouton_couleur("إلغاء", "#546E7A", "annuler")
+        a.clicked.connect(lambda: self.fiche_dest.hide())
+        h.addWidget(a)
+        h.addStretch()
+        v.addLayout(h)
+        if getattr(self, "fiche_dest", None) is not None:
+            self.fiche_dest.hide()
+            self.fiche_dest.deleteLater()
+        titre = {"demande": "طلب رخصة", "remplacement": "طلب تعويض"}.get(usage, "مراسلة")
+        self.fiche_dest = FenetreFiche(self, f"الجهة المرسل إليها: {titre}",
+                                       "اختر المصلحة ثم المكتب من هيكلة المديرية الإقليمية.", w, largeur=760)
+        self.usage_dest = usage
+        self.fiche_dest.ouvrir()
+        return self.fiche_dest
+
+    def confirmer_destination(self):
+        dest = self.destination.valeur()
+        f = cg.generer_demande if self.usage_dest == "demande" else cg.generer_remplacement
+        self.fiche_dest.hide()
+        return self._generer(lambda conn, dossier, cid: f(conn, dossier, cid, destination=dest))
+
     def dialogue_bordereau(self) -> None:
         c = cg.lire(self.f.conn, self.cid)
         p = rh.lire(self.f.conn, c.personnel_id)
@@ -775,7 +860,7 @@ class PageConges(QWidget):
             except ValueError:
                 self._msg("التاريخ غير صحيح.", True)
                 return
-            self.bordereau(d.pieces(), d.objet.text(), le, d.bureau.currentData())
+            self.bordereau(d.pieces(), d.objet.text(), le, d.destination.valeur())
 
     def bordereau(self, pieces, objet: str, le: str | None = None, bureau: str = "bureau_conges"):
         try:
@@ -881,8 +966,8 @@ class PageSortants(QWidget):
         w = QWidget()
         v = QVBoxLayout(w)
         aide = QLabel("أضف المصلحة ثم المكاتب التابعة لها، ثم انتقل إلى مصلحة أخرى وهكذا. المكاتب التي لا تتبع أي "
-                      "مصلحة تُضاف في الإطار الأخير. ثم حدد المصلحة والمكتبين اللذين تُوجَّه إليهما الرخص "
-                      "وأوراق الإرسال.")
+                      "مصلحة تُضاف في الإطار الأخير. وعند صياغة أي مراسلة تُختار الجهة المرسل إليها من هذه "
+                      "الهيكلة.")
         aide.setObjectName("etiquette")
         aide.setWordWrap(True)
         v.addWidget(aide)
@@ -908,13 +993,6 @@ class PageSortants(QWidget):
         b.clicked.connect(lambda: self.retablir_structure())
         h.addWidget(b)
         v.addLayout(h)
-        f = QFormLayout()
-        self.aff = {k: QComboBox() for k in ("service_rh", "bureau_conges", "bureau_etablissements")}
-        for k, cb in self.aff.items():
-            cb.setEditable(True)
-            f.addRow({"service_rh": "المصلحة المختصة بالرخص", "bureau_conges": "مكتب طلبات الرخص",
-                      "bureau_etablissements": "مكتب أوراق الإرسال"}[k], cb)
-        v.addLayout(f)
         h = QHBoxLayout()
         b = bouton_couleur("حفظ الهيكلة", "#2E7D32", "enregistrer")
         b.clicked.connect(lambda: self.enregistrer_structure())
@@ -968,13 +1046,6 @@ class PageSortants(QWidget):
         for b in cg.bureaux_independants(self.f.conn):
             self.bloc_independant.ajouter_bureau(b)
         self._placer_blocs()
-        par = cg.parametres(self.f.conn)
-        indep = cg.bureaux_independants(self.f.conn)
-        for k, cb in self.aff.items():
-            cb.clear()
-            cb.addItems([x["service"] for x in st] if k == "service_rh"
-                        else [b for x in st for b in x["bureaux"]] + indep)
-            cb.setCurrentText(par[k])
         self.message_structure.hide()
         self.fiche_structure.ouvrir()
         return self.fiche_structure
@@ -982,8 +1053,7 @@ class PageSortants(QWidget):
     def enregistrer_structure(self) -> bool:
         services = [(b.nom.text(), b.bureaux()) for b in self.blocs_services]
         try:
-            cg.enregistrer_structure(self.f.conn, services, self.bloc_independant.bureaux(),
-                                     {k: cb.currentText() for k, cb in self.aff.items()})
+            cg.enregistrer_structure(self.f.conn, services, self.bloc_independant.bureaux())
         except cg.ErreurConge as e:
             message(self.message_structure, str(e), True)
             return False
@@ -998,9 +1068,8 @@ class PageSortants(QWidget):
         from idara.ui.vitrine import FenetreFiche, bouton_couleur
         w = QWidget()
         v = QVBoxLayout(w)
-        par = cg.parametres(self.f.conn)
         self.organigramme = Organigramme(cg.structure_direction(self.f.conn), cg.bureaux_independants(self.f.conn),
-                                         {par["bureau_conges"], par["bureau_etablissements"]}, 1100)
+                                         set(), 1100)
         defil = QScrollArea()
         defil.setWidgetResizable(True)   # المبيان بعرض النافذة كيفما كان حجم الشاشة
         defil.setFrameShape(QFrame.NoFrame)
@@ -1008,9 +1077,6 @@ class PageSortants(QWidget):
         defil.setMinimumHeight(min(640, self.organigramme.height() + 20))
         defil.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         v.addWidget(defil, 1)
-        cle = QLabel("الإطار الأخضر: المكتبان اللذان تُوجَّه إليهما الرخص وأوراق الإرسال.")
-        cle.setObjectName("etiquette")
-        v.addWidget(cle)
         h = QHBoxLayout()
         b = bouton_couleur("تعديل الهيكلة", "#1565C0", "modifier", "تغيير الأسماء، إضافة مكتب أو نقله أو حذفه")
         b.clicked.connect(lambda: (self.fiche_organigramme.hide(), self.ouvrir_structure()))
@@ -1058,7 +1124,7 @@ class PageSortants(QWidget):
         if d.exec() == QDialog.Accepted:
             try:
                 doc = cg.generer_bordereau(self.f.conn, self.f.dossier, d.pieces(), d.objet.text(),
-                                           d.le.iso() or None, bureau=d.bureau.currentData())
+                                           d.le.iso() or None, bureau=d.destination.valeur())
             except (cg.ErreurConge, dc.ErreurDocument, ValueError) as e:
                 message(self.message, str(e), True)
                 return

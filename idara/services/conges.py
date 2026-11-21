@@ -575,8 +575,51 @@ def _type(conn, c: Conge) -> str:
     return conn.execute("SELECT libelle_ar FROM type_conge WHERE id=?", (c.type_conge_id,)).fetchone()[0]
 
 
+# ---------- الجهة المرسل إليها (طلب المدير 2026-11-21): تُختار عند صياغة المراسلة من هيكلة المديرية ----------
+USAGES_DEST = {"demande": "bureau_conges", "remplacement": "bureau_etablissements", "bordereau": "bureau_conges"}
+
+
+def service_de(conn, bureau: str) -> str | None:
+    """المصلحة التي يتبع لها المكتب في الهيكلة ("" للمكتب الملحق بالمدير، None إن لم يوجد)."""
+    return next((sv for sv, bu in bureaux_direction(conn) if bu == bureau), None)
+
+
+def destination_defaut(conn, usage: str) -> tuple[str, str]:
+    """(المصلحة، المكتب) آخر جهة اختيرت لهذا النوع من المراسلات، وإلا المكتب المعتاد (الرخص أو تسيير المؤسسات)."""
+    from idara.services import fiches
+    d = (fiches.lire(conn, "destinations") or {}).get(usage)
+    if d:
+        return d[0], d[1]
+    bu = parametres(conn)[USAGES_DEST.get(usage, "bureau_conges")]
+    sv = service_de(conn, bu)
+    return (sv if sv is not None else parametres(conn)["service_rh"]), bu
+
+
+def memoriser_destination(conn, usage: str, service: str, bureau: str) -> None:
+    from idara.services import fiches
+    d = fiches.lire(conn, "destinations") or {}
+    d[usage] = [" ".join((service or "").split()), " ".join((bureau or "").split())]
+    fiches.ecrire(conn, "destinations", d)
+
+
+def _appliquer_destination(conn, v: dict, usage: str, destination) -> None:
+    """destination: (المصلحة، المكتب)، أو اسم مكتب، أو مفتاح إعداد، أو None (الافتراضي). المكتب قد يكون فارغاً
+    (المراسلة إلى المصلحة نفسها)، والمصلحة فارغة للمكتب الملحق بالمدير."""
+    if destination is None:
+        sv, bu = destination_defaut(conn, usage)
+    elif isinstance(destination, (tuple, list)):
+        sv, bu = destination[0] or "", destination[1] or ""
+    else:
+        bu = v.get(destination) or destination
+        sv = service_de(conn, bu)
+        sv = sv if sv is not None else v.get("dest_service", "")
+    if not sv and not bu:
+        raise ErreurConge("اختر الجهة المرسل إليها: مصلحة أو مكتباً من هيكلة المديرية.")
+    v["dest_service"], v["dest_bureau"] = sv, bu
+
+
 def valeurs_demande(conn, c: Conge, numero: str, historique: list | None = None,
-                    p: rh.Personnel | None = None) -> dict[str, str]:
+                    p: rh.Personnel | None = None, destination=None) -> dict[str, str]:
     p = p or rh.lire(conn, c.personnel_id)
     if not (c.adresse_conge or "").strip():   # افتراضياً: عنوان الموظف في ملفه (قرار المدير 2026-11-09)
         c.adresse_conge = p.adresse
@@ -605,6 +648,7 @@ def valeurs_demande(conn, c: Conge, numero: str, historique: list | None = None,
               "adresse_conge": c.adresse_conge, "pieces": c.pieces or "—", "avis": c.avis_directeur,
               "mesures": c.mesures_prises, "numero": _isoler(numero), "date_enregistrement": tx.date_ar(c.date_demande),
               "type_conge": t})
+    _appliquer_destination(conn, v, "demande", destination)
     return v
 
 
@@ -633,7 +677,8 @@ def depose_par_lui_meme(c: Conge, p: rh.Personnel) -> bool:
         bool(n(c.certificat_remis_par))
 
 
-def valeurs_remplacement(conn, c: Conge, le: str | None = None, p: rh.Personnel | None = None) -> dict[str, str]:
+def valeurs_remplacement(conn, c: Conge, le: str | None = None, p: rh.Personnel | None = None,
+                         destination=None) -> dict[str, str]:
     p = p or rh.lire(conn, c.personnel_id)
     if p.categorie not in ("enseignant", "educatrice"):
         raise ErreurConge("طلب التعويض خاص بالأساتذة والمربين.")
@@ -642,11 +687,12 @@ def valeurs_remplacement(conn, c: Conge, le: str | None = None, p: rh.Personnel 
     v.update(_personnel_valeurs(conn, p, ("ppr", "matiere")))
     v.update({"date_redaction": tx.date_ar(le or c.date_demande), "dest_bureau": v["bureau_etablissements"],
               "type_conge": t, "duree": tx.duree_jours_ar(c.duree_jours), "du": tx.date_ar(c.date_debut)})
+    _appliquer_destination(conn, v, "remplacement", destination)
     return v
 
 
 def valeurs_bordereau(conn, pieces: list[tuple[str, int]], numero: str, le: str,
-                      bureau: str = "bureau_conges") -> dict[str, str]:
+                      bureau="bureau_conges") -> dict[str, str]:
     pieces = [(" ".join(d.split()), n) for d, n in pieces if d and d.strip()]
     if not pieces:
         raise ErreurConge("أضف وثيقة واحدة على الأقل لورقة الإرسال.")
@@ -656,12 +702,9 @@ def valeurs_bordereau(conn, pieces: list[tuple[str, int]], numero: str, le: str,
         raise ErreurConge("عدد النسخ يبدأ من 1.")
     v = _communs(conn)
     # رقم الإرسال يُترك فارغاً ويكتبه المدير بيده (قرار المدير 2026-11-09)
-    v.update({"date_redaction": tx.date_ar(le), "numero": "", "date_enregistrement": tx.date_ar(le),
-              "dest_bureau": v.get(bureau) or bureau})   # مفتاح إعداد أو اسم مكتب من هيكلة المديرية
-    # المصلحة هي التي يتبع لها المكتب المختار؛ المكتب غير التابع لأي مصلحة يُكتب وحده (2026-11-21)
-    service = next((sv for sv, bu in bureaux_direction(conn) if bu == v["dest_bureau"]), None)
-    if service is not None:
-        v["dest_service"] = service
+    v.update({"date_redaction": tx.date_ar(le), "numero": "", "date_enregistrement": tx.date_ar(le)})
+    # الجهة: (مصلحة، مكتب) مختارة من الهيكلة، أو مفتاح إعداد/اسم مكتب؛ المكتب الملحق بالمدير يُكتب وحده
+    _appliquer_destination(conn, v, "bordereau", bureau)
     for i in range(1, 9):
         if i <= len(pieces):
             v[f"piece_{i}"], v[f"nb_{i}"] = pieces[i - 1][0], f"*{int(pieces[i - 1][1]):02d}"
@@ -693,9 +736,11 @@ def _numero_demande(conn, c: Conge) -> str:
     return enregistrer_sortant(conn, objet, c.date_demande, conge_id=c.id)[1]
 
 
-def generer_demande(conn, dossier: DossierDonnees, conge_id: int) -> dc.DocumentGenere:
+def generer_demande(conn, dossier: DossierDonnees, conge_id: int, destination=None) -> dc.DocumentGenere:
     c = lire(conn, conge_id)
-    v = valeurs_demande(conn, c, "؟")  # التحقق قبل حجز رقم في سجل الصادر
+    v = valeurs_demande(conn, c, "؟", destination=destination)  # التحقق قبل حجز رقم في سجل الصادر
+    if isinstance(destination, (tuple, list)):
+        memoriser_destination(conn, "demande", *destination)
     v["numero"] = _isoler(_numero_demande(conn, c))
     return dc.generer(conn, dossier, "demande_conge", v, libelle=f"{v['objet']} {v['nom_complet']}",
                       personnel_id=c.personnel_id, conge_id=c.id)
@@ -708,9 +753,12 @@ def generer_recu(conn, dossier: DossierDonnees, conge_id: int) -> dc.DocumentGen
                       personnel_id=c.personnel_id, conge_id=c.id)
 
 
-def generer_remplacement(conn, dossier: DossierDonnees, conge_id: int, le: str | None = None) -> dc.DocumentGenere:
+def generer_remplacement(conn, dossier: DossierDonnees, conge_id: int, le: str | None = None,
+                         destination=None) -> dc.DocumentGenere:
     c = lire(conn, conge_id)
-    v = valeurs_remplacement(conn, c, le)
+    v = valeurs_remplacement(conn, c, le, destination=destination)
+    if isinstance(destination, (tuple, list)):
+        memoriser_destination(conn, "remplacement", *destination)
     with conn:
         conn.execute("UPDATE conge SET demande_remplacement=1 WHERE id=?", (c.id,))
     return dc.generer(conn, dossier, "demande_remplacement", v, libelle=f"طلب تعويض {v['nom_complet']}",
@@ -719,10 +767,12 @@ def generer_remplacement(conn, dossier: DossierDonnees, conge_id: int, le: str |
 
 def generer_bordereau(conn, dossier: DossierDonnees, pieces: list[tuple[str, int]], objet: str,
                       le: str | None = None, conge_id: int | None = None,
-                      bureau: str = "bureau_conges") -> dc.DocumentGenere:
+                      bureau="bureau_conges") -> dc.DocumentGenere:
     """ورقة إرسال: تُسجل في الصادر برقم جديد."""
     le = le or date.today().isoformat()
     valeurs_bordereau(conn, pieces, "؟", le, bureau)  # تحقق قبل حجز الرقم
+    if isinstance(bureau, (tuple, list)):
+        memoriser_destination(conn, "bordereau", *bureau)
     cid, num = enregistrer_sortant(conn, f"ورقة إرسال: {objet}", le, conge_id=conge_id)
     with conn:
         conn.executemany("INSERT INTO piece_bordereau(courrier_id, designation, nb_exemplaires) VALUES (?,?,?)",

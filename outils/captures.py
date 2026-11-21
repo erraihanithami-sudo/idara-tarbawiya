@@ -207,6 +207,8 @@ def main(sortie: Path) -> None:
     pc.deposant_cin.setText("CD1")
     pc.enregistrer()
     pc.b_demande.click()
+    photo(pc.fiche_dest, "25a_conge_destination")
+    pc.confirmer_destination()
     photo(pc.fiche, "25_conge_fiche")
     photo(pc.fiche.findChild(__import__("PySide6.QtWidgets", fromlist=["x"]).QScrollArea).widget(),
           "26_conge_fiche_complete")
