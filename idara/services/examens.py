@@ -205,6 +205,30 @@ def repartir_aleatoire(conn, eid: int, graine: int | None = None) -> int:
     return len(ids)
 
 
+def annuler_repartition(conn, eid: int) -> int:
+    """طلب المدير 2026-11-21: إلغاء التوزيع العشوائي — يعود المترشحون إلى الترتيب حسب القسم ثم الاسم، ويُعاد
+    ترقيمهم من الرقم الأول وتوزيعهم على القاعات حسب طاقتها (كما عند تحضير اللائحة)."""
+    ex = conn.execute("SELECT * FROM examen WHERE id=?", (eid,)).fetchone()
+    if ex is None:
+        raise ErreurExamen("الامتحان غير موجود.")
+    if ex["type"] != "local":
+        raise ErreurExamen("إلغاء التوزيع للامتحان المحلي فقط: لائحة المديرية تبقى بأرقامها وقاعاتها.")
+    ids = [r[0] for r in conn.execute("SELECT id FROM examen_candidat WHERE examen_id=? "
+                                      "ORDER BY COALESCE(classe,''), nom, id", (eid,))]
+    if not ids:
+        raise ErreurExamen("لا مترشحين: حضّر اللائحة أولاً.")
+    salles_ = {r["numero"]: r["id"] for r in conn.execute("SELECT id, numero FROM examen_salle WHERE examen_id=?",
+                                                          (eid,))}
+    cap = ex["capacite"]
+    with conn:
+        for k, c in enumerate(ids):
+            conn.execute("UPDATE examen_candidat SET numero=? WHERE id=?", (-(k + 1), c))
+        for k, c in enumerate(ids):
+            conn.execute("UPDATE examen_candidat SET numero=?, salle_id=? WHERE id=?",
+                         (ex["premier_numero"] + k, salles_.get(k // cap + 1), c))
+    return len(ids)
+
+
 def supprimer_candidat(conn, eid: int, cid: int) -> None:
     """يحذف مترشحاً من اللائحة قبل توليد الوثائق (قد يكون انقطع دون أن يُسجَّل ذلك في البرنامج، طلب المدير
     2026-11-10). في المحلي يُعاد ترقيم الباقين تباعاً من الرقم الأول وتوزيعهم على القاعات حسب طاقتها؛ في الإقليمي

@@ -86,7 +86,8 @@ class DialogueBordereau(QDialog):
         par = cg.parametres(conn)
         cles = {par["bureau_conges"]: "bureau_conges", par["bureau_etablissements"]: "bureau_etablissements"}
         for sv, bu in cg.bureaux_direction(conn):
-            self.bureau.addItem(f"{bu} ({sv})" if sv else bu, cles.get(bu, bu))
+            self.bureau.addItem(bu, cles.get(bu, bu))   # اسم المكتب وحده دون المصلحة بين قوسين (2026-11-21)
+            self.bureau.setItemData(self.bureau.count() - 1, sv, Qt.ToolTipRole)
         for k in ("bureau_conges", "bureau_etablissements"):
             if self.bureau.findData(k) < 0:
                 self.bureau.addItem(par[k], k)
@@ -858,17 +859,11 @@ class PageSortants(QWidget):
         h2.addWidget(b2)
         h2.addStretch()
         from idara.ui.vitrine import bouton_couleur
-        self.b_structure = bouton_couleur("هيكلة المديرية: المصالح والمكاتب", "#1565C0", "personnes",
-                                          "تختلف من مديرية إلى أخرى: أضف مصالح مديريتك ومكاتبها")
-        self.b_structure.clicked.connect(lambda: self.ouvrir_structure())
+        # طلب المدير 2026-11-21: زر فاخر يعرض الهيكلة مبياناً، وتحته التعديل أو الإغلاق
+        self.b_structure = BoutonStructure()
+        self.b_structure.clicked.connect(lambda: self.ouvrir_organigramme())
         h2.addWidget(self.b_structure)
         v.addLayout(h2)
-        self.l_structure = QLabel()
-        self.l_structure.setWordWrap(True)
-        self.l_structure.setTextFormat(Qt.RichText)
-        self.l_structure.setStyleSheet("background: #F3F7FC; border: 1px solid #D5E3F3; border-radius: 12px; "
-                                       "padding: 10px 14px;")
-        v.addWidget(self.l_structure)
         self.table = tableau(["الرقم", "التاريخ", "الموضوع"], etirer=2)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.setMinimumHeight(420)
@@ -917,8 +912,8 @@ class PageSortants(QWidget):
         self.aff = {k: QComboBox() for k in ("service_rh", "bureau_conges", "bureau_etablissements")}
         for k, cb in self.aff.items():
             cb.setEditable(True)
-            f.addRow({"service_rh": "المصلحة المختصة بالرخص", "bureau_conges": "مكتب الرخص (طلبات الرخص)",
-                      "bureau_etablissements": "مكتب تسيير المؤسسات (أوراق الإرسال)"}[k], cb)
+            f.addRow({"service_rh": "المصلحة المختصة بالرخص", "bureau_conges": "مكتب طلبات الرخص",
+                      "bureau_etablissements": "مكتب أوراق الإرسال"}[k], cb)
         v.addLayout(f)
         h = QHBoxLayout()
         b = bouton_couleur("حفظ الهيكلة", "#2E7D32", "enregistrer")
@@ -959,7 +954,6 @@ class PageSortants(QWidget):
 
     def retablir_structure(self):
         cg.retablir_structure_defaut(self.f.conn)
-        self._afficher_structure()
         r = self.ouvrir_structure()
         message(self.message_structure, "أعيدت الهيكلة الافتراضية للمديرية الإقليمية.")
         return r
@@ -993,29 +987,48 @@ class PageSortants(QWidget):
         except cg.ErreurConge as e:
             message(self.message_structure, str(e), True)
             return False
-        self._afficher_structure()
-        self.ouvrir_structure()   # إعادة ملء قوائم الاختيار بالمصالح والمكاتب الجديدة
-        message(self.message_structure, "حُفظت هيكلة المديرية.")
+        self.fiche_structure.hide()   # تُغلق نافذة التعديل بعد الحفظ (طلب المدير 2026-11-21)
+        message(self.message, "حُفظت هيكلة المديرية الإقليمية.")
         return True
 
-    def _afficher_structure(self) -> None:
-        st = cg.structure_direction(self.f.conn)
+    def ouvrir_organigramme(self):
+        """الهيكلة مبياناً في نافذة منبثقة، وتحتها «تعديل الهيكلة» و«إغلاق»."""
+        from PySide6.QtWidgets import QScrollArea
+
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        w = QWidget()
+        v = QVBoxLayout(w)
         par = cg.parametres(self.f.conn)
-        puce = ("<span style='background:{c};color:white;border-radius:8px;padding:2px 8px;'>&nbsp;{t}&nbsp;</span>")
-        lignes = []
-        for x in st:
-            bs = " ".join(puce.format(c="#2E7D32" if b in (par["bureau_conges"], par["bureau_etablissements"])
-                                      else "#78909C", t=b) for b in x["bureaux"]) or "—"
-            lignes.append(f"<b style='color:#1565C0'>{x['service']}</b>: {bs}")
-        indep = cg.bureaux_independants(self.f.conn)
-        if indep:
-            lignes.append("<b style='color:#B07A16'>مكاتب غير تابعة لأي مصلحة</b>: " + " ".join(
-                puce.format(c="#2E7D32" if b in (par["bureau_conges"], par["bureau_etablissements"]) else "#78909C",
-                            t=b) for b in indep))
-        self.l_structure.setText("<div dir='rtl'><b>هيكلة المديرية</b><br>" + "<br>".join(lignes) + "</div>")
+        self.organigramme = Organigramme(cg.structure_direction(self.f.conn), cg.bureaux_independants(self.f.conn),
+                                         {par["bureau_conges"], par["bureau_etablissements"]})
+        defil = QScrollArea()
+        defil.setWidgetResizable(False)
+        defil.setFrameShape(QFrame.NoFrame)
+        defil.setWidget(self.organigramme)
+        defil.setMinimumHeight(min(620, self.organigramme.height() + 20))
+        v.addWidget(defil, 1)
+        cle = QLabel("الإطار الأخضر: المكتبان اللذان تُوجَّه إليهما الرخص وأوراق الإرسال.")
+        cle.setObjectName("etiquette")
+        v.addWidget(cle)
+        h = QHBoxLayout()
+        b = bouton_couleur("تعديل الهيكلة", "#1565C0", "modifier", "تغيير الأسماء، إضافة مكتب أو نقله أو حذفه")
+        b.clicked.connect(lambda: (self.fiche_organigramme.hide(), self.ouvrir_structure()))
+        h.addWidget(b)
+        f = bouton_couleur("إغلاق", "#546E7A", "annuler")
+        f.clicked.connect(lambda: self.fiche_organigramme.hide())
+        h.addWidget(f)
+        h.addStretch()
+        v.addLayout(h)
+        if getattr(self, "fiche_organigramme", None) is not None:
+            self.fiche_organigramme.hide()
+            self.fiche_organigramme.deleteLater()
+        self.fiche_organigramme = FenetreFiche(self, "هيكلة المديرية الإقليمية",
+                                               "المدير الإقليمي، والمكاتب الملحقة به، والمصالح ومكاتبها.", w,
+                                               largeur=1180)
+        self.fiche_organigramme.ouvrir()
+        return self.fiche_organigramme
 
     def rafraichir(self) -> None:
-        self._afficher_structure()
         try:
             lignes = cg.sortants(self.f.conn)
             self.prochain.setText(f"الرقم الموالي: {cg.prochain_numero(self.f.conn)}")
@@ -1163,3 +1176,157 @@ class BlocService(QFrame):
 
     def bureaux(self) -> list[str]:
         return [c.text() for c in self.champs]
+
+
+class BoutonStructure(QPushButton):
+    """زر فاخر: كبسولة ليلية بإطار ذهبي، فيها مبيان صغير (رأس وفروع) وعنوان ذهبي."""
+
+    def __init__(self):
+        super().__init__("هيكلة المديرية الإقليمية")
+        self.setObjectName("boutonStructure")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip("عرض الهيكلة مبياناً: المدير الإقليمي، المكاتب الملحقة به، والمصالح ومكاتبها")
+        self.setFixedHeight(58)
+        self.setMinimumWidth(330)
+        self.setAttribute(Qt.WA_Hover, True)
+
+    def paintEvent(self, e):   # noqa: N802
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen
+
+        from idara.ui.zellige import dessiner_etoile
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        r = QRectF(self.rect()).adjusted(2, 2, -2, -4)
+        survol = self.underMouse()
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(11, 28, 44, 70 if survol else 40))
+        p.drawRoundedRect(r.translated(0, 3), 18, 18)
+        ch = QPainterPath()
+        ch.addRoundedRect(r, 18, 18)
+        g = QLinearGradient(r.topRight(), r.bottomLeft())
+        g.setColorAt(0, QColor("#0B1C2C"))
+        g.setColorAt(1, QColor("#2C5378" if survol else "#1F3B57"))
+        p.fillPath(ch, g)
+        p.setPen(QPen(QColor("#C9A04A"), 1.6))
+        p.setBrush(Qt.NoBrush)
+        p.drawPath(ch)
+        p.setPen(QPen(QColor(201, 160, 74, 120), 0.8))
+        p.drawRoundedRect(r.adjusted(4, 4, -4, -4), 14, 14)
+        # مبيان صغير يمين الزر
+        x0, y0 = r.right() - 58, r.top() + 12
+        p.setPen(QPen(QColor("#F3D27A"), 1.6))
+        p.setBrush(QColor("#C9A04A"))
+        p.drawRoundedRect(QRectF(x0 + 13, y0, 18, 9), 2, 2)
+        p.drawLine(int(x0 + 22), int(y0 + 9), int(x0 + 22), int(y0 + 16))
+        p.drawLine(int(x0 + 4), int(y0 + 16), int(x0 + 40), int(y0 + 16))
+        for dx in (0, 18, 36):
+            p.drawLine(int(x0 + 4 + dx), int(y0 + 16), int(x0 + 4 + dx), int(y0 + 21))
+            p.drawRoundedRect(QRectF(x0 - 2 + dx, y0 + 21, 12, 9), 2, 2)
+        dessiner_etoile(p, r.left() + 26, r.center().y(), 9, "#C9A04A", pleine=False)
+        f = self.font()
+        f.setPointSizeF(12)
+        f.setBold(True)
+        p.setFont(f)
+        p.setPen(QColor("#F3D27A"))
+        p.drawText(r.adjusted(48, 0, -76, 0), Qt.AlignCenter, self.text())
+        p.end()
+
+
+class Organigramme(QWidget):
+    """مبيان الهيكلة: المدير الإقليمي في الأعلى، المكاتب الملحقة به في عمود جانبي، ثم خط يتفرع إلى المصالح
+    (من اليمين إلى اليسار) وتحت كل مصلحة مكاتبها."""
+
+    COULEURS = ("#1565C0", "#00897B", "#6A1B9A", "#C62828", "#EF6C00", "#2E7D32", "#AD1457", "#455A64")
+    LC, HB, ESP, HT = 190, 44, 14, 64   # عرض العمود، ارتفاع المكتب، المسافة، ارتفاع رأس المصلحة
+
+    def __init__(self, services: list[dict], independants: list[str], marques: set[str] | None = None):
+        super().__init__()
+        self.services, self.independants, self.marques = services, independants, marques or set()
+        n = max(1, len(services))
+        self.larg_indep = 230 if independants else 0
+        largeur = 40 + n * self.LC + (n - 1) * self.ESP + (self.larg_indep + 30 if independants else 0)
+        nb = max([len(x["bureaux"]) for x in services] + [0])
+        haut_services = 150 + self.HT + 20 + nb * (self.HB + 8)
+        haut_indep = 40 + len(independants) * (self.HB - 6 + 6)
+        self.setFixedSize(max(760, largeur), max(haut_services, haut_indep) + 30)
+
+    def _boite(self, p, r, texte, fond, bord, couleur_texte, taille=9.5, gras=False, rayon=10):
+        from PySide6.QtGui import QColor, QPen
+        p.setPen(QPen(QColor(bord), 1.4))
+        p.setBrush(QColor(fond))
+        p.drawRoundedRect(r, rayon, rayon)
+        f = self.font()
+        f.setPointSizeF(taille)
+        f.setBold(gras)
+        p.setFont(f)
+        p.setPen(QColor(couleur_texte))
+        p.drawText(r.adjusted(6, 2, -6, -2), Qt.AlignCenter | Qt.TextWordWrap, texte)
+
+    def paintEvent(self, e):   # noqa: N802
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        W = self.width()
+        zone_droite = W - 20                    # الأعمدة تبدأ من اليمين
+        zone_gauche = 20 + (self.larg_indep + 30 if self.independants else 0)
+        # المدير الإقليمي
+        cx = (zone_droite + zone_gauche) / 2
+        rd = QRectF(cx - 150, 20, 300, 62)
+        g = QLinearGradient(rd.topRight(), rd.bottomLeft())
+        g.setColorAt(0, QColor("#0B1C2C"))
+        g.setColorAt(1, QColor("#1F3B57"))
+        p.setPen(QPen(QColor("#C9A04A"), 2))
+        p.setBrush(g)
+        p.drawRoundedRect(rd, 14, 14)
+        f = self.font()
+        f.setPointSizeF(13)
+        f.setBold(True)
+        p.setFont(f)
+        p.setPen(QColor("#F3D27A"))
+        p.drawText(rd, Qt.AlignCenter, "المدير الإقليمي")
+        # المكاتب الملحقة بالمدير (يساراً)
+        if self.independants:
+            xi = 20
+            ri = QRectF(xi, 20, self.larg_indep, 34)
+            self._boite(p, ri, "ملحقة بالمدير الإقليمي", "#FFF6E2", "#C9A04A", "#8A6A1E", 9.5, True, 8)
+            p.setPen(QPen(QColor("#C9A04A"), 1.6, Qt.DashLine))
+            p.drawLine(int(ri.right()), int(ri.center().y()), int(rd.left()), int(ri.center().y()))
+            y = ri.bottom() + 8
+            for b in self.independants:
+                r = QRectF(xi + 14, y, self.larg_indep - 14, self.HB - 8)
+                p.setPen(QPen(QColor("#C9A04A"), 1.2))
+                p.drawLine(int(xi + 6), int(ri.bottom()), int(xi + 6), int(r.center().y()))
+                p.drawLine(int(xi + 6), int(r.center().y()), int(r.left()), int(r.center().y()))
+                vert = b in self.marques
+                self._boite(p, r, b, "#E8F5E9" if vert else "#FFFFFF", "#2E7D32" if vert else "#E0D2AE", "#14202E",
+                            9, False, 8)
+                y += self.HB - 2
+        # الخط الرئيسي إلى المصالح
+        n = len(self.services)
+        if not n:
+            p.end()
+            return
+        y_bus = 120
+        p.setPen(QPen(QColor("#1F3B57"), 2))
+        p.drawLine(int(cx), int(rd.bottom()), int(cx), y_bus)
+        xs = [zone_droite - k * (self.LC + self.ESP) - self.LC / 2 for k in range(n)]
+        p.drawLine(int(min(xs)), y_bus, int(max(xs)), y_bus)
+        for k, (x, sv) in enumerate(zip(xs, self.services)):
+            c = self.COULEURS[k % len(self.COULEURS)]
+            p.setPen(QPen(QColor("#1F3B57"), 2))
+            p.drawLine(int(x), y_bus, int(x), y_bus + 22)
+            rs = QRectF(x - self.LC / 2, y_bus + 22, self.LC, self.HT)
+            self._boite(p, rs, sv["service"], c, c, "#FFFFFF", 9.5, True, 12)
+            y = rs.bottom() + 12
+            for b in sv["bureaux"]:
+                r = QRectF(x - self.LC / 2, y, self.LC - 14, self.HB)   # الفروع من يمين المصلحة (العربية)
+                p.setPen(QPen(QColor(c), 1.2))
+                p.drawLine(int(rs.right() - 6), int(rs.bottom()), int(rs.right() - 6), int(r.center().y()))
+                p.drawLine(int(rs.right() - 6), int(r.center().y()), int(r.right()), int(r.center().y()))
+                vert = b in self.marques
+                fond = QColor(c).lighter(190).name() if not vert else "#E8F5E9"
+                self._boite(p, r, b, fond, "#2E7D32" if vert else c, "#14202E", 8.5, vert, 8)
+                y += self.HB + 8
+        p.end()

@@ -325,3 +325,13 @@ def test_structure_defaut_modifiable_et_retablie(base):  # noqa: F811
     assert len(st2) == 6 and "الكتابة الخاصة" not in cg.bureaux_independants(base)
     assert cg.retablir_structure_defaut(base) == cg.structure_defaut()
     assert "الكتابة الخاصة" in cg.bureaux_independants(base)
+
+
+def test_bordereau_service_du_bureau_choisi(base):  # noqa: F811
+    """2026-11-21: ورقة الإرسال تكتب مصلحة المكتب المختار، والمكتب الملحق بالمدير دون مصلحة."""
+    v = cg.valeurs_bordereau(base, [("وثيقة", 1)], "1", "2026-11-21", "مكتب الضبط")
+    assert v["dest_bureau"] == "مكتب الضبط" and v["dest_service"] == ""
+    v = cg.valeurs_bordereau(base, [("وثيقة", 1)], "1", "2026-11-21", "مكتب الشراكة")
+    assert v["dest_service"] == "مصلحة الشؤون القانونية والشراكة والتواصل"
+    v = cg.valeurs_bordereau(base, [("وثيقة", 1)], "1", "2026-11-21")
+    assert v["dest_bureau"] == "مكتب الرخص" and v["dest_service"] == "مصلحة تدبير الموارد البشرية"

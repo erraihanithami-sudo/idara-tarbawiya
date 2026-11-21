@@ -658,6 +658,10 @@ def valeurs_bordereau(conn, pieces: list[tuple[str, int]], numero: str, le: str,
     # رقم الإرسال يُترك فارغاً ويكتبه المدير بيده (قرار المدير 2026-11-09)
     v.update({"date_redaction": tx.date_ar(le), "numero": "", "date_enregistrement": tx.date_ar(le),
               "dest_bureau": v.get(bureau) or bureau})   # مفتاح إعداد أو اسم مكتب من هيكلة المديرية
+    # المصلحة هي التي يتبع لها المكتب المختار؛ المكتب غير التابع لأي مصلحة يُكتب وحده (2026-11-21)
+    service = next((sv for sv, bu in bureaux_direction(conn) if bu == v["dest_bureau"]), None)
+    if service is not None:
+        v["dest_service"] = service
     for i in range(1, 9):
         if i <= len(pieces):
             v[f"piece_{i}"], v[f"nb_{i}"] = pieces[i - 1][0], f"*{int(pieces[i - 1][1]):02d}"

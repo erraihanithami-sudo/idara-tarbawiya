@@ -215,6 +215,10 @@ class PageExamen(QWidget):
                                           "حسب طاقتها، فلا يتجاور تلاميذ القسم الواحد.")
         self.b_aleatoire.clicked.connect(lambda: self.repartir_aleatoire())
         h.addWidget(self.b_aleatoire)
+        self.b_annuler_rep = bouton_couleur("إلغاء التوزيع", "#546E7A", "annuler",
+                                            "يعيد المترشحين إلى الترتيب حسب القسم ثم الاسم، بأرقامهم وقاعاتهم الأصلية")
+        self.b_annuler_rep.clicked.connect(lambda: self.annuler_repartition())
+        h.addWidget(self.b_annuler_rep)
         h.addStretch()
         v.addLayout(h)
         self.l_cands = QLabel()
@@ -355,6 +359,7 @@ class PageExamen(QWidget):
         self.b_local.setVisible(local)
         self.b_prov.setVisible(not local)
         self.b_aleatoire.setVisible(local)
+        self.b_annuler_rep.setVisible(local)
         cs = exs.candidats(self.f.conn, self.eid)
         self.cands.setRowCount(len(cs))
         for i, c in enumerate(cs):
@@ -459,6 +464,10 @@ class PageExamen(QWidget):
     def repartir_aleatoire(self, graine: int | None = None):
         return self._faire(lambda: exs.repartir_aleatoire(self.f.conn, self.eid, graine),
                            lambda n: f"وُزّع {n} مترشحاً عشوائياً على القاعات وأعيد ترقيمهم.")
+
+    def annuler_repartition(self):
+        return self._faire(lambda: exs.annuler_repartition(self.f.conn, self.eid),
+                           lambda n: f"أُلغي التوزيع العشوائي: أُعيد ترتيب {n} مترشحاً حسب القسم ثم الاسم.")
 
     def supprimer_candidat(self, cid: int, nom: str = ""):
         return self._faire(lambda: exs.supprimer_candidat(self.f.conn, self.eid, cid),

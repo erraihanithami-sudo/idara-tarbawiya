@@ -158,3 +158,20 @@ def test_repartition_aleatoire_sur_les_salles(base):  # noqa: F811
     pro = exs.examen(base, "provincial")
     with pytest.raises(exs.ErreurExamen, match="المحلي فقط"):
         exs.repartir_aleatoire(base, pro["id"])
+
+
+
+def test_annuler_repartition_aleatoire(base):  # noqa: F811
+    """طلب المدير 2026-11-21: إلغاء التوزيع يعيد الترتيب حسب القسم ثم الاسم."""
+    ex = exs.examen(base, "local")
+    exs.modifier(base, ex["id"], ex["intitule"], ex["session"], ex["centre"], "", 501, 1)
+    with pytest.raises(exs.ErreurExamen, match="لا مترشحين"):
+        exs.annuler_repartition(base, ex["id"])
+    exs.preparer_local(base, ex["id"])
+    initial = [(c["numero"], c["code_massar"], c["salle_nom"]) for c in exs.candidats(base, ex["id"])]
+    for g in range(6):
+        exs.repartir_aleatoire(base, ex["id"], graine=g)
+    assert exs.annuler_repartition(base, ex["id"]) == len(initial)
+    assert [(c["numero"], c["code_massar"], c["salle_nom"]) for c in exs.candidats(base, ex["id"])] == initial
+    with pytest.raises(exs.ErreurExamen, match="المحلي فقط"):
+        exs.annuler_repartition(base, exs.examen(base, "provincial")["id"])

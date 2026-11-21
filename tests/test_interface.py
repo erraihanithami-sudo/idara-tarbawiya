@@ -630,7 +630,16 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     d = s.ouvrir_structure()
     # 2026-11-21: الهيكلة الافتراضية = الهيكل التنظيمي للمديرية الإقليمية (7 مصالح ومكاتب غير تابعة)
     assert d.isVisible() and len(s.blocs_services) == 7 and s.blocs_services[0].nom.text() == "مصلحة الشؤون التربوية"
-    assert len(s.bloc_independant.champs) == 7 and "مصلحة تدبير الموارد البشرية" in s.l_structure.text()
+    assert len(s.bloc_independant.champs) == 7
+    d.hide()
+    # 2026-11-21: زر فاخر يعرض الهيكلة مبياناً، وتحته «تعديل الهيكلة» و«إغلاق»
+    from idara.ui.page_conges import BoutonStructure, Organigramme
+    assert isinstance(s.b_structure, BoutonStructure) and not hasattr(s, "l_structure")
+    s.b_structure.click()
+    o = s.fiche_organigramme
+    assert o.isVisible() and isinstance(s.organigramme, Organigramme) and len(s.organigramme.services) == 7
+    assert s.organigramme.grab().width() > 1000 and "مكتب الرخص" in s.organigramme.marques
+    d = s.ouvrir_structure()
     # تغيير اسم مصلحة، إضافة مكتب، نقل مكتب إلى مصلحة أخرى، حذف مكتب ومصلحة
     s.blocs_services[0].nom.setText("مصلحة الشؤون التربوية والرياضية")
     s.blocs_services[0].ajouter_bureau("مكتب الحياة المدرسية")
@@ -645,6 +654,8 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     s.retirer_service(vide)
     s.aff["bureau_etablissements"].setCurrentText("مكتب الحياة المدرسية")
     assert s.enregistrer_structure(), s.message_structure.text()
+    assert not d.isVisible() and "حُفظت هيكلة" in s.message.text()   # تُغلق بعد الحفظ
+    d = s.ouvrir_structure()
     st = cg.structure_direction(f.conn)
     assert len(st) == 6 and st[0]["service"] == "مصلحة الشؤون التربوية والرياضية"
     assert "مكتب الحياة المدرسية" in st[0]["bureaux"] and "مكتب الإحصاء والدراسات" in st[2]["bureaux"]
@@ -1683,6 +1694,7 @@ def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
     # توزيع عشوائي على القاعات وأزرار وثائق ملونة (طلب المدير 2026-11-20)
     assert not p.b_aleatoire.isHidden() and p.repartir_aleatoire(graine=3), p.message.text()
     assert "عشوائياً" in p.message.text() and p.cands.item(0, 0).text() == "11"
+    assert not p.b_annuler_rep.isHidden() and p.annuler_repartition() and "أُلغي التوزيع" in p.message.text()
     assert all(b.objectName() == "boutonCouleur" for b in p.boutons_docs.values()) and len(p.boutons_docs) == 17
     cb = p.mats.cellWidget(0, 0)   # مقترحات المواد بترتيب المدير، مع إمكانية الكتابة (2026-11-12)
     assert [cb.itemText(i) for i in range(cb.count())] == list(exs.MATIERES_SUGGEREES) and cb.isEditable()
@@ -1703,7 +1715,7 @@ def test_page_examen_et_deliberations(app, config_tmp, monkeypatch, tmp_path):
     assert p.generer("listes") and p.generer("convocations_profs") and len(ouverts) == 2
     # الإقليمي: أرقام المديرية
     p.type.setCurrentIndex(p.type.findData("provincial"))
-    assert p.b_local.isHidden() and not p.b_prov.isHidden() and p.b_aleatoire.isHidden()
+    assert p.b_local.isHidden() and not p.b_prov.isHidden() and p.b_aleatoire.isHidden() and p.b_annuler_rep.isHidden()
     assert p.importer_provincial(_liste_direction(tmp_path / "d.xlsx")), p.message.text()
     assert p.cands.item(0, 0).text() == "7903" and "7903–7905" in p.l_cands.text()
     f.close()
