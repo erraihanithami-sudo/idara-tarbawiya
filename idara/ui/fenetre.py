@@ -751,6 +751,14 @@ class BarreLaterale(QFrame):
 
 class FenetrePrincipale(QMainWindow):
     reinitialisation = Signal(object)   # مسار النسخة المأخوذة قبل التصفير
+    progression = None   # شريط شاشة الترحيب (تضعه app.main): progression(قيمة، نص)
+
+    def _progres(self, v: float, texte: str) -> None:
+        if FenetrePrincipale.progression is not None:
+            try:
+                FenetrePrincipale.progression(v, texte)
+            except Exception:  # noqa: BLE001
+                pass
 
     def __init__(self, dossier: DossierDonnees):
         super().__init__()
@@ -869,6 +877,7 @@ class FenetrePrincipale(QMainWindow):
             "الوثائق القانونية للجمعيات": "page_asso_legal", "جدول الحراسة": "page_garde",
             "النقل المدرسي": "page_transport", "استعمالات الزمن": "page_emplois"}
         self.pages = PagesParesseuses(self)
+        self._progres(0.65, "إعداد الصفحات…")
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
         self.section_de = {}    # اسم الصفحة ← رقم القسم الرئيسي
         self.pile = QStackedWidget()
@@ -883,6 +892,7 @@ class FenetrePrincipale(QMainWindow):
                     w = page_defilante(PageAVenir(lib, *A_VENIR[nom]))
                 self.emplacement[nom] = self.pile.addWidget(w)
                 self.section_de[nom] = i
+        self._progres(0.75, "إعداد الأقسام…")
         # الرحاب: صفحة استقبال لكل قسم له أكثر من صفحة (2026-11-14). Alt+1…9 ثم Alt+0 تفتحها
         from PySide6.QtGui import QKeySequence, QShortcut
         self.rahbat, self.pile_rahba = {}, {}
@@ -906,6 +916,7 @@ class FenetrePrincipale(QMainWindow):
         self._habiller()
         self._habille = True
         self._disposition = h
+        self._progres(0.85, "الشريط الجانبي…")
         self.barre = self._barre_laterale()
         h.addWidget(self.barre)
         from idara.ui.annees_ui import BandeauArchive
@@ -919,6 +930,7 @@ class FenetrePrincipale(QMainWindow):
         dv.addWidget(self.pile, 1)
         h.addWidget(droite, 1)
         self.setCentralWidget(centre)
+        self._progres(0.93, "لوحة القيادة…")
         self.aller(0)
 
     def _habiller(self) -> None:

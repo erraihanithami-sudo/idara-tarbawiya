@@ -125,7 +125,12 @@ def main() -> int:
     sys.excepthook = _journal_erreurs
     ecran = ecran_demarrage()   # يظهر فوراً أثناء التحميل (طلب المدير 2026-11-21)
     from idara.ui.assistant import AssistantPremierLancement
+    if ecran is not None:
+        ecran.progression(0.35, "تحميل المكونات…")
     from idara.ui.fenetre import FenetrePrincipale
+    if ecran is not None:
+        ecran.progression(0.55, "فتح قاعدة المعطيات…")
+        FenetrePrincipale.progression = staticmethod(ecran.progression)
 
     fenetres = {}
 
@@ -137,14 +142,19 @@ def main() -> int:
         a.show()
 
     def ouvrir_principale(dossier: DossierDonnees) -> None:
+        nonlocal ecran
         f = FenetrePrincipale(dossier)
+        FenetrePrincipale.progression = None
         from idara.services import bureautique
         bureautique.ouvreur = f.ouvrir_document   # كل وثيقة مولَّدة تُفتح في محرر البرنامج
         f.reinitialisation.connect(ouvrir_assistant)   # بعد التصفير: مساعد الإعداد الأول
         fenetres["principale"] = f
+        if ecran is not None:
+            ecran.progression(1.0, "مرحباً بك", pas=8)
         f.showMaximized()
         if ecran is not None:
             ecran.finish(f)
+            ecran = None
         if "assistant" in fenetres:
             fenetres.pop("assistant").close()
 
@@ -154,20 +164,30 @@ def main() -> int:
     else:
         if ecran is not None:
             ecran.close()
+            ecran = None
+        FenetrePrincipale.progression = None
         ouvrir_assistant()
     return app.exec()
 
 
-def ecran_demarrage():
-    """شاشة ترحيب ليلية ذهبية تظهر لحظة الضغط على البرنامج، إلى أن تجهز النافذة الرئيسية."""
-    try:
-        from PySide6.QtCore import QRectF
-        from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
+class _Ecran:
+    """شاشة الترحيب: لوحة ليلية ذهبية، وشريط أنيق يمتلئ تدريجياً إلى أن تجهز النافذة الرئيسية
+    (طلب المدير 2026-11-21)."""
+
+    def __init__(self):
         from PySide6.QtWidgets import QSplashScreen
+        self.valeur, self.texte = 0.0, "جارٍ التحميل…"
+        self.e = QSplashScreen(self._dessiner())
+        self.e.show()
+        QApplication.processEvents()
+
+    def _dessiner(self):
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
 
         from idara import __version__, marque
         from idara.ui.zellige import dessiner_etoile
-        w, h = 560, 300
+        w, h = 600, 330
         pm = QPixmap(w, h)
         pm.fill(QColor("#0B1C2C"))
         p = QPainter(pm)
@@ -178,32 +198,76 @@ def ecran_demarrage():
         g.setColorAt(1, QColor("#1F3B57"))
         p.fillRect(r, g)
         p.setPen(QPen(QColor("#C9A04A"), 2))
+        p.setBrush(Qt.NoBrush)
         p.drawRect(r.adjusted(10, 10, -10, -10))
-        for x, y, t in ((90, 150, 70), (170, 60, 22), (200, 240, 14), (w - 60, 60, 18)):
+        for x, y, t in ((95, 140, 70), (175, 55, 22), (205, 225, 14), (w - 60, 55, 18)):
             dessiner_etoile(p, x, y, t, "#C9A04A", pleine=False)
         f = QFont(QApplication.instance().font())
         f.setPointSize(34)
         f.setBold(True)
         p.setFont(f)
         p.setPen(QColor("#F3D27A"))
-        p.drawText(QRectF(40, 60, w - 80, 90), Qt.AlignRight | Qt.AlignVCenter, marque.NOM_COURT)
+        p.drawText(QRectF(40, 50, w - 80, 90), Qt.AlignRight | Qt.AlignVCenter, marque.NOM_COURT)
         f.setPointSize(13)
         f.setBold(False)
         p.setFont(f)
         p.setPen(QColor("#E8EEF5"))
-        p.drawText(QRectF(40, 150, w - 80, 40), Qt.AlignRight | Qt.AlignVCenter, "في الإدارة التربوية بالمغرب")
+        p.drawText(QRectF(40, 135, w - 80, 40), Qt.AlignRight | Qt.AlignVCenter, "في الإدارة التربوية بالمغرب")
+        # الشريط: مجرى ليلي بخيط ذهبي، يمتلئ بتدرج ذهبي ولمعة، ونجمة صغيرة على رأسه
+        bar = QRectF(48, 238, w - 96, 14)
+        ch = QPainterPath()
+        ch.addRoundedRect(bar, 7, 7)
+        p.fillPath(ch, QColor(255, 255, 255, 28))
+        p.setPen(QPen(QColor(201, 160, 74, 170), 1))
+        p.drawPath(ch)
+        v = max(0.0, min(1.0, self.valeur))
+        if v > 0:
+            lw = max(14.0, bar.width() * v)
+            plein = QRectF(bar.right() - lw, bar.top(), lw, bar.height())   # يمتلئ من اليمين (العربية)
+            gg = QLinearGradient(plein.topRight(), plein.topLeft())
+            gg.setColorAt(0, QColor("#B8862E"))
+            gg.setColorAt(1, QColor("#F3D27A"))
+            cp = QPainterPath()
+            cp.addRoundedRect(plein, 7, 7)
+            p.fillPath(cp, gg)
+            lu = QPainterPath()
+            lu.addRoundedRect(QRectF(plein.left() + 3, plein.top() + 2, plein.width() - 6, 4), 2, 2)
+            p.fillPath(lu, QColor(255, 255, 255, 90))
+            dessiner_etoile(p, plein.left(), bar.center().y(), 9, "#FFF3C4", pleine=True)
         f.setPointSize(10)
         p.setFont(f)
         p.setPen(QColor("#C9D3DF"))
-        p.drawText(QRectF(40, 220, w - 80, 40), Qt.AlignRight | Qt.AlignVCenter, f"جارٍ التحميل…   {__version__}")
+        p.drawText(QRectF(48, 258, w - 96, 30), Qt.AlignRight | Qt.AlignVCenter, self.texte)
+        p.drawText(QRectF(48, 258, w - 96, 30), Qt.AlignLeft | Qt.AlignVCenter, f"{int(v * 100)}%   {__version__}")
         p.end()
-        e = QSplashScreen(pm)
-        e.show()
-        QApplication.processEvents()
+        return pm
+
+    def progression(self, valeur: float, texte: str | None = None, pas: int = 6) -> None:
+        """يتقدم الشريط بلطف نحو القيمة (بضع خطوات مرسومة) دون أن يرجع إلى الخلف."""
+        import time
+        depart = self.valeur
+        cible = max(depart, valeur)
+        if texte:
+            self.texte = texte
+        for k in range(1, pas + 1):
+            self.valeur = depart + (cible - depart) * k / pas
+            self.e.setPixmap(self._dessiner())
+            QApplication.processEvents()
+            if pas > 1:
+                time.sleep(0.012)
+
+    def finish(self, w) -> None:
+        self.e.finish(w)
+
+    def close(self) -> None:
+        self.e.close()
+
+
+def ecran_demarrage():
+    """شاشة ترحيب ليلية ذهبية بشريط تقدم، تظهر لحظة الضغط على البرنامج إلى أن تجهز النافذة الرئيسية."""
+    try:
+        e = _Ecran()
+        e.progression(0.08, "تحميل الواجهة…", pas=2)
         return e
     except Exception:  # noqa: BLE001 — الشاشة اختيارية
         return None
-
-
-if __name__ == "__main__":
-    sys.exit(main())
