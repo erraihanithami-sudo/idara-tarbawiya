@@ -90,7 +90,7 @@ def _entete(p: QPainter, r: QRectF, u: float, d: dict, ident: dict) -> QRectF:
     texte(p, QRectF(r.left() + 60 * u, r.top() + 50 * u, r.width() - 120 * u, 50 * u),
           f"الموسم الدراسي {ident.get('annee', '')}", 26 * u, GRIS_CLAIR, align=Qt.AlignLeft | Qt.AlignVCenter)
     dessiner_etoile(p, r.right() - 90 * u, r.top() + 155 * u, 22 * u, DORE, pleine=True)
-    texte(p, QRectF(r.left() + 60 * u, r.top() + 120 * u, r.width() - 190 * u, 70 * u), d["titre"], 56 * u, BLANC,
+    texte(p, QRectF(r.left() + 60 * u, r.top() + 120 * u, r.width() - 215 * u, 70 * u), d["titre"], 56 * u, BLANC,
           True)
     p.setPen(QPen(QColor(DORE), 2 * u))
     p.drawLine(QPointF(r.right() - 60 * u, r.top() + 205 * u), QPointF(r.right() - 560 * u, r.top() + 205 * u))
