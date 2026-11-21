@@ -109,6 +109,23 @@ def actualiser_tout(fenetre) -> None:
         fenetre._rafraichir(nom)
 
 
+def installer_page(fenetre, nom: str, page) -> None:
+    """بطاقة التفريغ لصفحة واحدة عند بنائها (الصفحات تُبنى عند أول فتح، 2026-11-21)."""
+    cles = PAGES_VIDAGE.get(nom)
+    lay = page.layout() if page is not None else None
+    if not cles or lay is None:
+        return
+    zone = getattr(page, "message", None)
+    if not isinstance(zone, QLabel):
+        zone = fenetre.page_etab.message
+    w = carte_page(fenetre, cles, zone)
+    n = lay.count()
+    if n and lay.itemAt(n - 1).spacerItem() is not None:
+        lay.insertWidget(n - 1, w)
+    else:
+        lay.addWidget(w)
+
+
 def installer(fenetre) -> None:
     """يضيف بطاقة التفريغ في أسفل كل صفحة معنية (قبل الفراغ الأخير)."""
     for nom, cles in PAGES_VIDAGE.items():

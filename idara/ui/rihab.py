@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import sqlite3
 
-from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QLinearGradient, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import (QButtonGroup, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QButtonGroup, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QPushButton,
+                               QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
 from idara.ui import icones, theme
 from idara.ui.zellige import dessiner_etoile
@@ -305,7 +305,7 @@ def compteur(fenetre, page: str) -> str:
     from idara.services import annee as annee_srv
     from idara.services import registres as rg
     conn = fenetre.conn
-    reg = getattr(fenetre.pages.get(page), "cles_registres", None)
+    reg = getattr(fenetre, "cles_pages", {}).get(page)
     if reg:
         n = sum(rg.compter(conn, k) for k in reg)
         return f"{n} سجلاً" if n else ""
@@ -373,6 +373,67 @@ def picto_page(page: str, lib: str = "") -> str:
     return next((n for mot, n in _MOTS_PICTOS if mot in t), "document")
 
 
+class FluxLayout(QLayout):
+    """تخطيط ينساب من اليمين إلى اليسار ويلتف إلى سطر جديد عند امتلاء العرض."""
+
+    def __init__(self, parent=None, h_espace: int = 8, v_espace: int = 6):
+        super().__init__(parent)
+        self._items = []
+        self.h, self.v = h_espace, v_espace
+        self.setContentsMargins(0, 2, 0, 2)
+
+    def addItem(self, item):   # noqa: N802
+        self._items.append(item)
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, i):   # noqa: N802
+        return self._items[i] if 0 <= i < len(self._items) else None
+
+    def takeAt(self, i):   # noqa: N802
+        return self._items.pop(i) if 0 <= i < len(self._items) else None
+
+    def expandingDirections(self):   # noqa: N802
+        return Qt.Orientations(0)
+
+    def hasHeightForWidth(self):   # noqa: N802
+        return True
+
+    def heightForWidth(self, w):   # noqa: N802
+        return self._placer(QRect(0, 0, w, 0), True)
+
+    def setGeometry(self, r):   # noqa: N802
+        super().setGeometry(r)
+        self._placer(r, False)
+
+    def sizeHint(self):   # noqa: N802
+        return self.minimumSize()
+
+    def minimumSize(self):   # noqa: N802
+        s = QSize()
+        for it in self._items:
+            s = s.expandedTo(it.minimumSize())
+        m = self.contentsMargins()
+        return s + QSize(m.left() + m.right(), m.top() + m.bottom())
+
+    def _placer(self, r, essai: bool) -> int:
+        m = self.contentsMargins()
+        zone = r.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
+        rtl = (self.parentWidget() is None or self.parentWidget().layoutDirection() == Qt.RightToLeft)
+        x, y, haut = 0, zone.y(), 0
+        for it in self._items:
+            t = it.sizeHint()
+            if x and x + t.width() > zone.width():
+                x, y, haut = 0, y + haut + self.v, 0
+            if not essai:
+                gx = zone.right() - x - t.width() + 1 if rtl else zone.x() + x
+                it.setGeometry(QRect(QPoint(gx, y), t))
+            x += t.width() + self.h
+            haut = max(haut, t.height())
+        return y + haut - r.y() + m.bottom()
+
+
 class PiluleOrnee(QPushButton):
     """حبة مسار مزخرفة: كبسولة عاجية بخيط ذهبي، يمينها وسام نجمة زليج فيه أيقونة الصفحة؛ والحبة المفتوحة ليلية
     بعنوان ذهبي وإطار ذهبي مزدوج وسهم صغير نحو الصفحة. ترتفع قليلاً عند المرور."""
@@ -384,15 +445,15 @@ class PiluleOrnee(QPushButton):
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
         self.setAttribute(Qt.WA_Hover, True)
-        self.setFixedHeight(42)
+        self.setFixedHeight(40)
         f = self.font()
-        f.setPointSizeF(10.5)
+        f.setPointSizeF(10)
         f.setBold(True)
         self.setFont(f)
-        self.setMinimumWidth(self.fontMetrics().horizontalAdvance(texte) + 72)
+        self.setMinimumWidth(self.fontMetrics().horizontalAdvance(texte) + 64)
 
     def sizeHint(self):
-        return QSize(self.fontMetrics().horizontalAdvance(self.text()) + 72, 42)
+        return QSize(self.fontMetrics().horizontalAdvance(self.text()) + 64, 40)
 
     def paintEvent(self, ev):   # noqa: N802
         from idara.ui import pictos
@@ -469,7 +530,8 @@ class BandeauPage(QFrame):
         super().__init__()
         self.f, self.sections = fenetre, sections
         self.setObjectName("bandeauPage")
-        self.setFixedHeight(66)
+        self.setMinimumHeight(62)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         self.indice: int | None = None
         h = QHBoxLayout(self)
         h.setContentsMargins(24, 8, 24, 8)
@@ -484,13 +546,11 @@ class BandeauPage(QFrame):
         self.fleche = QLabel("‹")
         self.fleche.setObjectName("etiquette")
         h.addWidget(self.fleche)
-        self.zone = QScrollArea()
-        self.zone.setObjectName("defilPilules")
-        self.zone.setWidgetResizable(True)
-        self.zone.setFrameShape(QFrame.NoFrame)
-        self.zone.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.zone.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.zone.setFixedHeight(50)
+        # طلب المدير 2026-11-21: الحبوب تظهر كاملة — تلتف على سطر ثانٍ عند ضيق الشاشة بدل التمرير الأفقي
+        self.zone = QWidget()
+        self.zone.setObjectName("fondPilules")
+        self.flux = FluxLayout(self.zone, 8, 6)
+        self.zone.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         h.addWidget(self.zone, 1)
         self.pilules: dict[str, QPushButton] = {}
         self.groupe = QButtonGroup(self)
@@ -501,12 +561,11 @@ class BandeauPage(QFrame):
         self.setStyleSheet(f"QFrame#bandeauPage {{ border-bottom: 3px solid {c}; }}")
         self.b_rahba.setText("  " + titre)
         self.b_rahba.setIcon(QIcon(icones.tuile(titre, 30, sombre=False)))
-        contenu = QWidget()   # محتوى جديد في كل مرة (لا نعيد استعمال تخطيط قديم)
-        contenu.setObjectName("fondPilules")
-        hh = QHBoxLayout(contenu)
-        hh.setContentsMargins(0, 2, 0, 2)
-        hh.setSpacing(8)
-        self.groupe = QButtonGroup(contenu)
+        while self.flux.count():
+            it = self.flux.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+        self.groupe = QButtonGroup(self.zone)
         self.groupe.setExclusive(False)
         self.pilules = {}
         for page, lib in fils:
@@ -514,9 +573,8 @@ class BandeauPage(QFrame):
             b.clicked.connect(lambda _=False, page=page: self.f.aller_a(page))
             self.groupe.addButton(b)
             self.pilules[page] = b
-            hh.addWidget(b)
-        hh.addStretch()
-        self.zone.setWidget(contenu)
+            self.flux.addWidget(b)
+        self.zone.updateGeometry()
         self.fleche.setVisible(len(fils) > 1)
         self.zone.setVisible(len(fils) > 1)
         self.indice = i
@@ -526,5 +584,3 @@ class BandeauPage(QFrame):
             self._construire(i)
         for nom, b in self.pilules.items():
             b.setChecked(nom == page)
-        if page in self.pilules:
-            self.zone.ensureWidgetVisible(self.pilules[page])

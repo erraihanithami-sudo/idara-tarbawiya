@@ -1724,6 +1724,7 @@ def test_lauha_qiyada_et_boutons_suppression(app, config_tmp):
     assert t.unite == unites[-1] and t.boutons_unites[unites[-1]].isChecked()
     t.boutons_unites[None].click()
     assert t.unite is None
+    f.construire_tout()   # الصفحات تُبنى عند أول فتح (2026-11-21): نبنيها كلها لفحص أزرار الحذف
     rouges = [b for b in f.findChildren(QPushButton) if b.text().startswith("حذف")]
     assert rouges and all(b.objectName() == "danger" and not b.icon().isNull() for b in rouges)
     f.close()
@@ -2560,6 +2561,16 @@ def test_rihab_et_registres(app, config_tmp, monkeypatch):
     assert all(isinstance(b, PiluleOrnee) for b in f.bandeau_page.pilules.values())
     assert picto_page("روابط مهمة") == "ouvrir" and picto_page("تتبع الغياب") == "absent"
     assert f.bandeau_page.pilules["التحفيز والتهاني"].grab().width() > 60
+    # الحبوب كلها ظاهرة كاملة حتى في شاشة ضيقة: تلتف على سطر ثانٍ (2026-11-21)
+    f.aller_a("لوحة القيادة")
+    f.resize(1100, 760)
+    f.show()
+    app.processEvents()
+    z = f.bandeau_page.zone
+    for b in f.bandeau_page.pilules.values():
+        g = b.geometry()
+        assert g.left() >= 0 and g.right() <= z.width() and g.bottom() <= z.height(), b.text()
+    assert len({b.geometry().top() for b in f.bandeau_page.pilules.values()}) >= 2   # سطران
     f.bandeau_page.pilules["الإعلام والتواصل"].click()   # الحبوب تنقل بين صفحات القسم
     assert f.page_courante() == "الإعلام والتواصل" and not f.bandeau_page.pilules["التحفيز والتهاني"].isChecked()
     f.bandeau_page.b_rahba.click()
@@ -2884,4 +2895,25 @@ def test_editeur_apercu_et_nafidha(app, config_tmp, monkeypatch, tmp_path):
     e2.b_retour.click()
     assert fen.isVisible() and f.pile.currentIndex() != f.indice_doc
     fen.close()
+    f.close()
+
+
+def test_pages_construites_a_la_demande(app, config_tmp):
+    """طلب المدير 2026-11-21: تسريع التشغيل — لا تُبنى إلا الصفحة المفتوحة، والبقية عند أول فتح."""
+    import time
+    from idara.ui.assistant import AssistantPremierLancement
+    from idara.ui.fenetre import FenetrePrincipale
+    a = AssistantPremierLancement()
+    remplir_assistant(a, config_tmp / "الإدارة التربوية")
+    d = a.terminer()
+    t0 = time.perf_counter()
+    f = FenetrePrincipale(d)
+    duree = time.perf_counter() - t0
+    print(f"مدة بناء النافذة الرئيسية: {duree:.2f} ث")
+    assert not f.page_construite("الجرد") and not f.page_construite("الامتحان") and "الجرد" in f.pages
+    assert f.page_construite("لوحة القيادة")
+    f.aller_a("الجرد")
+    assert f.page_construite("الجرد") and f.page_courante() == "الجرد"
+    assert f.zones_pages["الجرد"].widget() is f.page_inventaire and f.page_inventaire.isVisible()
+    assert f.page_examen is f.pages["الامتحان"] and f.zones_pages["الامتحان"].widget() is f.page_examen
     f.close()

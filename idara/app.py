@@ -98,6 +98,9 @@ def verification_installation() -> int:
         Document()
         AssistantPremierLancement()
         BandeZellige()
+        e = ecran_demarrage()
+        assert e is not None, "شاشة التحميل"
+        e.close()
         police = QApplication.instance().font().family()
         rapport.write_text(f"VERIFICATION_OK police={police}\n", encoding="utf-8")
         return 0
@@ -111,6 +114,7 @@ def main() -> int:
         return verification_installation()
     app = creer_application()
     sys.excepthook = _journal_erreurs
+    ecran = ecran_demarrage()   # يظهر فوراً أثناء التحميل (طلب المدير 2026-11-21)
     from idara.ui.assistant import AssistantPremierLancement
     from idara.ui.fenetre import FenetrePrincipale
 
@@ -130,6 +134,8 @@ def main() -> int:
         f.reinitialisation.connect(ouvrir_assistant)   # بعد التصفير: مساعد الإعداد الأول
         fenetres["principale"] = f
         f.showMaximized()
+        if ecran is not None:
+            ecran.finish(f)
         if "assistant" in fenetres:
             fenetres.pop("assistant").close()
 
@@ -137,8 +143,57 @@ def main() -> int:
     if dossier:
         ouvrir_principale(dossier)
     else:
+        if ecran is not None:
+            ecran.close()
         ouvrir_assistant()
     return app.exec()
+
+
+def ecran_demarrage():
+    """شاشة ترحيب ليلية ذهبية تظهر لحظة الضغط على البرنامج، إلى أن تجهز النافذة الرئيسية."""
+    try:
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
+        from PySide6.QtWidgets import QSplashScreen
+
+        from idara import __version__, marque
+        from idara.ui.zellige import dessiner_etoile
+        w, h = 560, 300
+        pm = QPixmap(w, h)
+        pm.fill(QColor("#0B1C2C"))
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.Antialiasing)
+        r = QRectF(0, 0, w, h)
+        g = QLinearGradient(r.topRight(), r.bottomLeft())
+        g.setColorAt(0, QColor("#0B1C2C"))
+        g.setColorAt(1, QColor("#1F3B57"))
+        p.fillRect(r, g)
+        p.setPen(QPen(QColor("#C9A04A"), 2))
+        p.drawRect(r.adjusted(10, 10, -10, -10))
+        for x, y, t in ((90, 150, 70), (170, 60, 22), (200, 240, 14), (w - 60, 60, 18)):
+            dessiner_etoile(p, x, y, t, "#C9A04A", pleine=False)
+        f = QFont(QApplication.instance().font())
+        f.setPointSize(34)
+        f.setBold(True)
+        p.setFont(f)
+        p.setPen(QColor("#F3D27A"))
+        p.drawText(QRectF(40, 60, w - 80, 90), Qt.AlignRight | Qt.AlignVCenter, marque.NOM_COURT)
+        f.setPointSize(13)
+        f.setBold(False)
+        p.setFont(f)
+        p.setPen(QColor("#E8EEF5"))
+        p.drawText(QRectF(40, 150, w - 80, 40), Qt.AlignRight | Qt.AlignVCenter, "في الإدارة التربوية بالمغرب")
+        f.setPointSize(10)
+        p.setFont(f)
+        p.setPen(QColor("#C9D3DF"))
+        p.drawText(QRectF(40, 220, w - 80, 40), Qt.AlignRight | Qt.AlignVCenter, f"جارٍ التحميل…   {__version__}")
+        p.end()
+        e = QSplashScreen(pm)
+        e.show()
+        QApplication.processEvents()
+        return e
+    except Exception:  # noqa: BLE001 — الشاشة اختيارية
+        return None
 
 
 if __name__ == "__main__":

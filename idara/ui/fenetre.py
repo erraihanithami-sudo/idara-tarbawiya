@@ -577,6 +577,26 @@ A_VENIR = {
 }
 
 
+class PagesParesseuses(dict):
+    """اسم الصفحة ← الصفحة، تُبنى عند أول قراءة. «in» و len لا يبنيان شيئاً."""
+
+    def __init__(self, fenetre):
+        super().__init__({nom: None for nom in fenetre.attr_page})
+        self.f = fenetre
+
+    def __getitem__(self, nom):
+        return getattr(self.f, self.f.attr_page[nom])
+
+    def get(self, nom, defaut=None):
+        return self[nom] if nom in self.f.attr_page else defaut
+
+    def items(self):
+        return [(n, self[n]) for n in self.f.attr_page]
+
+    def values(self):
+        return [self[n] for n in self.f.attr_page]
+
+
 def _programmes(fils, pages) -> list[str]:
     return [n for n, _ in fils if n in pages]
 
@@ -744,112 +764,117 @@ class FenetrePrincipale(QMainWindow):
         h = QHBoxLayout(centre)
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(0)
-        self.tableau = PageTableauBord(self)
-        self.page_etab = PageEtablissement(self)
-        self.page_eleves = PageEleves(self)
-        self.page_anciens = PageAnciens(self)
-        self.page_import = PageImport(self)
-        self.page_mouvements = PageMouvements(self)
-        self.page_comportement = PageComportement(self)
-        self.page_conseils = PageConseils(self)
-        self.page_asso = PageAssociations(self)
-        self.page_asso.choisir_onglet(0)
-        self.page_achats = self.page_asso.achats   # الصرف داخل صفحة الجمعية (طلب المدير 2026-11-20)
-        self.page_conseils_etab = PageConseilsEtab(self)
-        self.page_perf = PagePerformance(self)
-        self.page_tarl = PageTarl(self)
-        self.page_vie = PageVieScolaire(self)
-        self.page_riyada = PageRiyada(self)
-        from idara.ui.page_pionniere import (PageCommunicationPionniere, PageIndicateursPionniere,
-                                             PageResultatsPionniere)
-        self.page_resultats_pionniere = PageResultatsPionniere(self)
-        self.page_comm_pionniere = PageCommunicationPionniere(self)
-        self.page_ind_pionniere = PageIndicateursPionniere(self)
-        from idara.ui.page_logements import PageLogements
-        self.page_logements = PageLogements(self)
-        from idara.ui.page_contact import PageContact
-        from idara.ui.page_memo import PageMemo
-        self.page_memo = PageMemo(self)
-        self.page_contact = PageContact(self)
-        from idara.ui.page_liens import PageLiens
-        self.page_liens = PageLiens(self)
-        from idara.ui.page_fiche_eleve import PageFicheEleve
-        self.page_fiche_eleve = PageFicheEleve(self)
-        from idara.ui.page_dossier_prof import PageDossierProf
-        self.page_dossier_prof = PageDossierProf(self)
-        self.page_tanzim = PageTanzim(self)
-        self.page_examen = PageExamen(self)
-        self.page_rh = PagePersonnel(self)
-        self.page_conges = PageConges(self)
-        self.page_fa = PageFa(self)
-        self.page_sortants = PageSortants(self)
-        self.page_docs = PageDocuments(self)
-        self.page_calendrier = PageCalendrier(self)
-        self.page_guide = PageGuide(self)
-        self.page_stats = PageStatistiques(self)
-        self.page_inscriptions = PageInscriptions(self)
-        self.page_absences = PageAbsences(self)
-        self.page_soutien = PageSoutien(self)
-        self.page_projet = PageProjet(self)
-        self.page_pv_rh = PagePvRh(self)
-        self.page_passation = PagePassation(self)
-        self.page_inventaire = PageInventaire(self)
-        self.page_structure = PageStructure(self)
-        self.page_parents = PageParents(self)
-        self.page_sabboura = PageSabboura(self)
-        self.page_asso_legal, self.page_garde = PageAssoLegal(self), PageGarde(self)
-        self.page_transport, self.page_emplois = PageTransport(self), PageEmplois(self)
+        # تسريع التشغيل (طلب المدير 2026-11-21): الصفحات تُبنى عند أول فتح لها لا كلها عند الإقلاع.
+        # self.page_x يبنيها عند أول طلب (__getattr__)، و self.pages قاموس كسول بأسماء الصفحات.
         cs = icones.COULEURS
-        self.page_sante = PageRegistres(
-            self, "الصحة والسلامة المدرسية", "أضف الحادثة من نافذة منبثقة، وتابع وضعية ملف كل حادثة (هل "
-            "أُرسل؟)، واطلع على ملفها كاملاً من الزر أمامها. والفحوصات الطبية للتلاميذ ونتائجها.",
-            ["accidents", "examens_medicaux"], cs["التلاميذ"], fenetres=True)
-        self.page_demandes = PageRegistres(
-            self, "طلبات الموظفين والورقة الشخصية", "الطلبات التي لا يغطيها ملف «الرخص»، والورقة الشخصية لكل "
-            "موظف(ة). صياغة الطلبات عامة: راجعها في Word قبل التوقيع.", ["demandes"], cs["الموارد البشرية"])
-        self.page_agents = PageRegistres(
-            self, "أعوان الحراسة والنظافة", "بطاقات الأعوان والشركات المشغلة، وجدول الخدمة، وتقييم الخدمة الشهري.",
-            ["agents", "suivi_agents"], cs["الموارد البشرية"])
-        self.page_cellules = PageRegistres(
-            self, "خليتا اليقظة والإنصات", "تركيبة الخليتين، اجتماعاتهما، والحالات المرصودة وما اتُّخذ فيها.",
-            ["cellule_membres", "cellule_reunions", "cellule_cas"], cs["الحياة المدرسية"], fenetres=True)
-        self.page_tahfiz = PageRegistres(
-            self, "التحفيز والتهاني", "سجّل كل تحفيز ثم اطبع شهادته المزخرفة.", ["tahfiz"], cs["الحياة المدرسية"])
-        self.page_partenariats = PageRegistres(
-            self, "الانفتاح والشراكة", "اتفاقيات الشراكة وحالتها.", ["partenariats"], cs["الحياة المدرسية"])
-        self.page_annonces = PageCommunication(self, cs["الحياة المدرسية"])
-        self.page_equipe = PageRegistres(
-            self, "فريق القيادة ومحاضر المشروع", "أعضاء فريق قيادة مشروع المؤسسة المندمج، ومحضر تشكيله، ومحضر "
-            "مصادقة مجلس التدبير.", ["equipe"], cs["مشروع المؤسسة"])
-        self.pages = {"الصحة والسلامة": self.page_sante, "طلبات الموظفين": self.page_demandes,
-                      "الأعوان": self.page_agents, "خليتا اليقظة والإنصات": self.page_cellules,
-                      "التحفيز والتهاني": self.page_tahfiz, "الانفتاح والشراكة": self.page_partenariats,
-                      "الإعلام والتواصل": self.page_annonces, "فريق القيادة": self.page_equipe,
-                      "لوحة القيادة": self.tableau, "برنامج العمل": self.page_calendrier, "التلاميذ": self.page_eleves, "بطاقة التلميذ": self.page_fiche_eleve, "ملفات الأساتذة": self.page_dossier_prof,
-                      "التلاميذ القدامى": self.page_anciens,
-                      "حركية التلاميذ": self.page_mouvements, "تتبع السلوك": self.page_comportement,
-                      "مجالس الأقسام": self.page_conseils, "جمعية دعم مدرسة النجاح": self.page_asso, "مجالس المؤسسة": self.page_conseils_etab, "أداء المؤسسة": self.page_perf, "التعلمات الأساس": self.page_tarl, "الأندية والأنشطة": self.page_vie, "الريادة": self.page_riyada, "نتائج الريادة": self.page_resultats_pionniere, "تواصل الريادة": self.page_comm_pionniere, "مؤشرات الريادة": self.page_ind_pionniere, "مفكرة المدير": self.page_memo, "السكنيات": self.page_logements, "التواصل": self.page_contact, "روابط مهمة": self.page_liens, "التنظيم التربوي": self.page_tanzim,
-                      "الامتحان": self.page_examen, "الاستيراد من مسار": self.page_import,
-                      "الموارد البشرية": self.page_rh, "الرخص": self.page_conges, "تدبير الفائض": self.page_fa,
-                      "سجل الصادر": self.page_sortants, "إعداد المؤسسة": self.page_etab, "الوثائق": self.page_docs,
-                      "دليل الاستخدام": self.page_guide, "الإحصائيات": self.page_stats,
-                      "التسجيلات": self.page_inscriptions, "تتبع الغياب": self.page_absences,
-                      "الدعم التربوي": self.page_soutien,
-                      "مشروع المؤسسة": self.page_projet, "محاضر الموارد البشرية": self.page_pv_rh,
-                      "تسليم المهام": self.page_passation, "الجرد": self.page_inventaire,
-                      "البنية المادية": self.page_structure, "أولياء الأمور": self.page_parents,
-                      "السبورة المرجعية": self.page_sabboura,
-                      "الوثائق القانونية للجمعيات": self.page_asso_legal, "جدول الحراسة": self.page_garde,
-                      "النقل المدرسي": self.page_transport, "استعمالات الزمن": self.page_emplois}
-        from idara.ui import vidage_ui
-        vidage_ui.installer(self)   # تفريغ كل مكوّن من صفحته (طلب المدير 2026-11-07)
+
+        def registres(titre, sous, cles, couleur, **kw):
+            return lambda: PageRegistres(self, titre, sous, cles, couleur, **kw)
+
+        def importer(module, classe):
+            def fab():
+                import importlib
+                return getattr(importlib.import_module(f"idara.ui.{module}"), classe)(self)
+            return fab
+
+        def achats():
+            return self.page_asso.achats   # الصرف داخل صفحة الجمعية (طلب المدير 2026-11-20)
+
+        def asso():
+            p = PageAssociations(self)
+            p.choisir_onglet(0)
+            return p
+
+        self._fabriques = {
+            "tableau": lambda: PageTableauBord(self), "page_etab": lambda: PageEtablissement(self),
+            "page_eleves": lambda: PageEleves(self), "page_anciens": lambda: PageAnciens(self),
+            "page_import": lambda: PageImport(self), "page_mouvements": lambda: PageMouvements(self),
+            "page_comportement": lambda: PageComportement(self), "page_conseils": lambda: PageConseils(self),
+            "page_asso": asso, "page_achats": achats, "page_conseils_etab": lambda: PageConseilsEtab(self),
+            "page_perf": lambda: PagePerformance(self), "page_tarl": lambda: PageTarl(self),
+            "page_vie": lambda: PageVieScolaire(self), "page_riyada": lambda: PageRiyada(self),
+            "page_resultats_pionniere": importer("page_pionniere", "PageResultatsPionniere"),
+            "page_comm_pionniere": importer("page_pionniere", "PageCommunicationPionniere"),
+            "page_ind_pionniere": importer("page_pionniere", "PageIndicateursPionniere"),
+            "page_logements": importer("page_logements", "PageLogements"),
+            "page_memo": importer("page_memo", "PageMemo"), "page_contact": importer("page_contact", "PageContact"),
+            "page_liens": importer("page_liens", "PageLiens"),
+            "page_fiche_eleve": importer("page_fiche_eleve", "PageFicheEleve"),
+            "page_dossier_prof": importer("page_dossier_prof", "PageDossierProf"),
+            "page_tanzim": lambda: PageTanzim(self), "page_examen": lambda: PageExamen(self),
+            "page_rh": lambda: PagePersonnel(self), "page_conges": lambda: PageConges(self),
+            "page_fa": lambda: PageFa(self), "page_sortants": lambda: PageSortants(self),
+            "page_docs": lambda: PageDocuments(self), "page_calendrier": lambda: PageCalendrier(self),
+            "page_guide": lambda: PageGuide(self), "page_stats": lambda: PageStatistiques(self),
+            "page_inscriptions": lambda: PageInscriptions(self), "page_absences": lambda: PageAbsences(self),
+            "page_soutien": lambda: PageSoutien(self), "page_projet": lambda: PageProjet(self),
+            "page_pv_rh": lambda: PagePvRh(self), "page_passation": lambda: PagePassation(self),
+            "page_inventaire": lambda: PageInventaire(self), "page_structure": lambda: PageStructure(self),
+            "page_parents": lambda: PageParents(self), "page_sabboura": lambda: PageSabboura(self),
+            "page_asso_legal": lambda: PageAssoLegal(self), "page_garde": lambda: PageGarde(self),
+            "page_transport": lambda: PageTransport(self), "page_emplois": lambda: PageEmplois(self),
+            "page_sante": registres(
+                "الصحة والسلامة المدرسية", "أضف الحادثة من نافذة منبثقة، وتابع وضعية ملف كل حادثة (هل "
+                "أُرسل؟)، واطلع على ملفها كاملاً من الزر أمامها. والفحوصات الطبية للتلاميذ ونتائجها.",
+                ["accidents", "examens_medicaux"], cs["التلاميذ"], fenetres=True),
+            "page_demandes": registres(
+                "طلبات الموظفين والورقة الشخصية", "الطلبات التي لا يغطيها ملف «الرخص»، والورقة الشخصية لكل "
+                "موظف(ة). صياغة الطلبات عامة: راجعها في Word قبل التوقيع.", ["demandes"], cs["الموارد البشرية"]),
+            "page_agents": registres(
+                "أعوان الحراسة والنظافة", "بطاقات الأعوان والشركات المشغلة، وجدول الخدمة، وتقييم الخدمة الشهري.",
+                ["agents", "suivi_agents"], cs["الموارد البشرية"]),
+            "page_cellules": registres(
+                "خليتا اليقظة والإنصات", "تركيبة الخليتين، اجتماعاتهما، والحالات المرصودة وما اتُّخذ فيها.",
+                ["cellule_membres", "cellule_reunions", "cellule_cas"], cs["الحياة المدرسية"], fenetres=True),
+            "page_tahfiz": registres(
+                "التحفيز والتهاني", "سجّل كل تحفيز ثم اطبع شهادته المزخرفة.", ["tahfiz"], cs["الحياة المدرسية"]),
+            "page_partenariats": registres(
+                "الانفتاح والشراكة", "اتفاقيات الشراكة وحالتها.", ["partenariats"], cs["الحياة المدرسية"]),
+            "page_annonces": lambda: PageCommunication(self, cs["الحياة المدرسية"]),
+            "page_equipe": registres(
+                "فريق القيادة ومحاضر المشروع", "أعضاء فريق قيادة مشروع المؤسسة المندمج، ومحضر تشكيله، ومحضر "
+                "مصادقة مجلس التدبير.", ["equipe"], cs["مشروع المؤسسة"]),
+        }
+        # سجلات كل صفحة سجلات (لعدّادات الرحاب دون بناء الصفحة)
+        self.cles_pages = {"الصحة والسلامة": ["accidents", "examens_medicaux"], "طلبات الموظفين": ["demandes"],
+                           "الأعوان": ["agents", "suivi_agents"],
+                           "خليتا اليقظة والإنصات": ["cellule_membres", "cellule_reunions", "cellule_cas"],
+                           "التحفيز والتهاني": ["tahfiz"], "الانفتاح والشراكة": ["partenariats"],
+                           "فريق القيادة": ["equipe"]}
+        self.attr_page = {
+            "الصحة والسلامة": "page_sante", "طلبات الموظفين": "page_demandes", "الأعوان": "page_agents",
+            "خليتا اليقظة والإنصات": "page_cellules", "التحفيز والتهاني": "page_tahfiz",
+            "الانفتاح والشراكة": "page_partenariats", "الإعلام والتواصل": "page_annonces",
+            "فريق القيادة": "page_equipe", "لوحة القيادة": "tableau", "برنامج العمل": "page_calendrier",
+            "التلاميذ": "page_eleves", "بطاقة التلميذ": "page_fiche_eleve", "ملفات الأساتذة": "page_dossier_prof",
+            "التلاميذ القدامى": "page_anciens", "حركية التلاميذ": "page_mouvements",
+            "تتبع السلوك": "page_comportement", "مجالس الأقسام": "page_conseils",
+            "جمعية دعم مدرسة النجاح": "page_asso", "مجالس المؤسسة": "page_conseils_etab",
+            "أداء المؤسسة": "page_perf", "التعلمات الأساس": "page_tarl", "الأندية والأنشطة": "page_vie",
+            "الريادة": "page_riyada", "نتائج الريادة": "page_resultats_pionniere",
+            "تواصل الريادة": "page_comm_pionniere", "مؤشرات الريادة": "page_ind_pionniere",
+            "مفكرة المدير": "page_memo", "السكنيات": "page_logements", "التواصل": "page_contact",
+            "روابط مهمة": "page_liens", "التنظيم التربوي": "page_tanzim", "الامتحان": "page_examen",
+            "الاستيراد من مسار": "page_import", "الموارد البشرية": "page_rh", "الرخص": "page_conges",
+            "تدبير الفائض": "page_fa", "سجل الصادر": "page_sortants", "إعداد المؤسسة": "page_etab",
+            "الوثائق": "page_docs", "دليل الاستخدام": "page_guide", "الإحصائيات": "page_stats",
+            "التسجيلات": "page_inscriptions", "تتبع الغياب": "page_absences", "الدعم التربوي": "page_soutien",
+            "مشروع المؤسسة": "page_projet", "محاضر الموارد البشرية": "page_pv_rh",
+            "تسليم المهام": "page_passation", "الجرد": "page_inventaire", "البنية المادية": "page_structure",
+            "أولياء الأمور": "page_parents", "السبورة المرجعية": "page_sabboura",
+            "الوثائق القانونية للجمعيات": "page_asso_legal", "جدول الحراسة": "page_garde",
+            "النقل المدرسي": "page_transport", "استعمالات الزمن": "page_emplois"}
+        self.pages = PagesParesseuses(self)
         self.emplacement = {}   # اسم الصفحة ← رقمها في الكومة
         self.section_de = {}    # اسم الصفحة ← رقم القسم الرئيسي
         self.pile = QStackedWidget()
+        self.zones_pages: dict[str, QScrollArea] = {}
         for i, (titre, fils) in enumerate(SECTIONS):
             for nom, lib in fils:
                 if nom in self.pages:
-                    w = page_defilante(self.pages[nom])
+                    deja = self.page_construite(nom)
+                    w = page_defilante(self.pages[nom] if deja else QWidget())   # تُبنى عند أول فتح
+                    self.zones_pages[nom] = w
                 else:
                     w = page_defilante(PageAVenir(lib, *A_VENIR[nom]))
                 self.emplacement[nom] = self.pile.addWidget(w)
@@ -875,6 +900,7 @@ class FenetrePrincipale(QMainWindow):
         self.bandeau_page = BandeauPage(self, SECTIONS)
         self._boutons_suppression()
         self._habiller()
+        self._habille = True
         self._disposition = h
         self.barre = self._barre_laterale()
         h.addWidget(self.barre)
@@ -900,12 +926,69 @@ class FenetrePrincipale(QMainWindow):
         if app is not None and getattr(app, "_decorateur", None) is None:
             app._decorateur = pictos.Decorateur(app)
             app.installEventFilter(app._decorateur)
-        section_de = {nom: titre for titre, fils in SECTIONS for nom, _ in fils}
-        for nom, page in self.pages.items():
-            for e in page.findChildren(EnTete):
-                e.definir_section(section_de.get(nom))
+        for nom, attr in self.attr_page.items():
+            page = self.__dict__.get(attr)
+            if page is not None:
+                self._habiller_page(nom, page)
         for b in self.findChildren(QPushButton):
             pictos.decorer(b)
+
+    def _habiller_page(self, nom: str, page) -> None:
+        from idara.ui import pictos
+        from idara.ui.composants import EnTete
+        section = next((titre for titre, fils in SECTIONS if any(n == nom for n, _ in fils)), None)
+        for e in page.findChildren(EnTete):
+            e.definir_section(section)
+        for b in page.findChildren(QPushButton):
+            if b.text().strip().startswith("حذف"):
+                b.setObjectName("danger")
+                b.setIcon(icones.corbeille())
+                b.style().unpolish(b)
+                b.style().polish(b)
+            pictos.decorer(b)
+
+    def __getattr__(self, nom: str):
+        """بناء الصفحة عند أول طلب لها (self.page_x)، ثم وضعها في مكانها من الكومة."""
+        fabriques = self.__dict__.get("_fabriques")
+        if not fabriques or nom not in fabriques:
+            raise AttributeError(nom)
+        en_cours = self.__dict__.setdefault("_en_construction", set())
+        if nom in en_cours:
+            raise RuntimeError(f"بناء الصفحة {nom} يطلب نفسه")
+        en_cours.add(nom)
+        try:
+            page = fabriques[nom]()
+        finally:
+            en_cours.discard(nom)
+        object.__setattr__(self, nom, page)
+        self._installer_page(nom, page)
+        return page
+
+    def _installer_page(self, attr: str, page) -> None:
+        zones = self.__dict__.get("zones_pages")
+        for nom, a in self.attr_page.items():
+            if a != attr:
+                continue
+            from idara.ui import vidage_ui
+            vidage_ui.installer_page(self, nom, page)
+            if zones is not None and nom in zones:
+                z = zones[nom]
+                ancien = z.takeWidget()
+                page.setObjectName("fond")
+                page.setAttribute(Qt.WA_StyledBackground, True)
+                z.setWidget(page)
+                if ancien is not None:
+                    ancien.deleteLater()
+            if "_habille" in self.__dict__:
+                self._habiller_page(nom, page)
+
+    def page_construite(self, nom: str) -> bool:
+        return self.attr_page.get(nom, "") in self.__dict__
+
+    def construire_tout(self) -> None:
+        """يبني كل الصفحات (للاختبارات واللقطات)."""
+        for attr in set(self.attr_page.values()):
+            getattr(self, attr)
 
     def _boutons_suppression(self) -> None:
         """أزرار الحذف بالأحمر مع علامة الحذف (اقتراح المدير 2026-11-03)."""
@@ -1198,6 +1281,7 @@ class FenetrePrincipale(QMainWindow):
         self.boutons_pages[nom].setChecked(True)
         for k, b in enumerate(self.boutons):
             b.marquer(k == i)
+        self.pages.get(nom)   # تُبنى قبل ظهورها
         self.pile.setCurrentIndex(self.emplacement[nom])
         self.bandeau_page.afficher(i, nom)
         self._rafraichir(nom)
