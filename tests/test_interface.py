@@ -154,7 +154,7 @@ def test_navigation_deroulante(app, config_tmp):
     assert [l for _, l in SECTIONS[2][1]] == ["معلومات الأطر", "تدبير الفائض", "الرخص", "المحاضر",
                                          "طلبات الموظفين والورقة الشخصية", "أعوان الحراسة والنظافة",
                                          "طلب ملف أستاذ وإرساله"]
-    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "مفكرة المدير", "روابط المنصات المهمة", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
+    assert [l for _, l in SECTIONS[0][1]] == ["لوحة القيادة", "مفكرة المدير", "روابط المنصات المهمة", "شاشة العرض", "إحصائيات المؤسسة", "برنامج العمل السنوي والتذكيرات",
                                          "الأداء العام للمؤسسة", "تتبع الغياب", "مجالس المؤسسة",
                                          "السبورة المرجعية"]
     assert f.page_courante() == "لوحة القيادة" and f.est_ouvert(0)
@@ -2971,3 +2971,49 @@ def test_ecran_demarrage_barre(app):
     e.progression(0.3)
     assert abs(e.valeur - 0.6) < 1e-9
     e.close()
+
+
+def test_page_ecran_affichage(app, config_tmp, tmp_path, monkeypatch):
+    """طلب المدير 2026-11-21: شاشة العرض — اختيار الشرائح وترتيبها ومدتها، المعاينة، العرض بملء الشاشة، التصدير."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtCore import QEvent
+    from idara.services import ecran as ec
+    from idara.services import bureautique
+    monkeypatch.setattr(bureautique, "ouvrir_externe", lambda *a: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("شاشة العرض")
+    p = f.page_ecran
+    assert f.page_courante() == "شاشة العرض" and list(p.lignes) == [c for c, *_ in ec.CATALOGUE]
+    assert p.diapos and p.diapos[0]["cle"] == "couverture" and "الشريحة 1 من" in p.l_position.text()
+    assert p.apercu.grab().width() >= 480
+    p.lignes["niveaux"]["case"].setChecked(False)
+    assert "niveaux" not in ec.reglages(f.conn)["actives"] and all(d["cle"] != "niveaux" for d in p.diapos)
+    p.lignes["couverture"]["duree"].setCurrentIndex(p.lignes["couverture"]["duree"].findData(20))
+    assert ec.reglages(f.conn)["durees"]["couverture"] == 20
+    p.deplacer("couverture", 1)
+    assert ec.reglages(f.conn)["ordre"][:2] == ["niveaux", "couverture"] and list(p.lignes)[1] == "couverture"
+    p.c_bandeau.setText("أهلاً وسهلاً")
+    p.enregistrer()
+    assert ec.reglages(f.conn)["bandeau"] == "أهلاً وسهلاً" and p.bandeau() == "أهلاً وسهلاً"
+    p.voir(1)
+    p.voir(-1)
+    w = p.lancer()
+    assert w is not None and w.isVisible() and w.diapos and w.bandeau == "أهلاً وسهلاً"
+    w.resize(960, 540)
+    app.processEvents()
+    assert w.grab().width() > 0
+    i0 = w.indice
+    app.sendEvent(w, QKeyEvent(QEvent.KeyPress, Qt.Key_Left, Qt.NoModifier))
+    assert w.indice == (i0 + 1) % len(w.diapos)
+    app.sendEvent(w, QKeyEvent(QEvent.KeyPress, Qt.Key_Space, Qt.NoModifier))
+    assert w.pause
+    app.sendEvent(w, QKeyEvent(QEvent.KeyPress, Qt.Key_Escape, Qt.NoModifier))
+    app.processEvents()
+    pdf = p.exporter_pdf(tmp_path / "عرض.pdf")
+    assert pdf.exists() and pdf.stat().st_size > 10000 and "صُدّر العرض PDF" in p.message.text()
+    imgs = p.exporter_images(tmp_path / "usb")
+    assert len(imgs) == len(p.diapos) and imgs[0].name.startswith("01 - ")
+    from PySide6.QtGui import QImage
+    assert QImage(str(imgs[0])).size().width() == 1920
+    f.close()

@@ -515,7 +515,7 @@ class PageAVenir(QWidget):
 # حتى لا تضيع وظائفهما.
 SECTIONS = [
     ("القيادة والتدبير", [("لوحة القيادة", "لوحة القيادة"), ("مفكرة المدير", "مفكرة المدير"),
-                          ("روابط مهمة", "روابط المنصات المهمة"),
+                          ("روابط مهمة", "روابط المنصات المهمة"), ("شاشة العرض", "شاشة العرض"),
                           ("الإحصائيات", "إحصائيات المؤسسة"),
                           ("برنامج العمل", "برنامج العمل السنوي والتذكيرات"),
                           ("أداء المؤسسة", "الأداء العام للمؤسسة"),
@@ -780,9 +780,9 @@ class FenetrePrincipale(QMainWindow):
             return lambda: PageRegistres(self, titre, sous, cles, couleur, **kw)
 
         # استيراد صريح (لا importlib) حتى يضمّ PyInstaller الوحدات في النسخة المثبتة (بلاغ المدير 2026-11-21)
-        from idara.ui import (page_contact, page_dossier_prof, page_fiche_eleve, page_liens, page_logements,
-                              page_memo, page_pionniere)
-        modules = {"page_contact": page_contact, "page_dossier_prof": page_dossier_prof,
+        from idara.ui import (page_contact, page_dossier_prof, page_ecran, page_fiche_eleve, page_liens,
+                              page_logements, page_memo, page_pionniere)
+        modules = {"page_contact": page_contact, "page_dossier_prof": page_dossier_prof, "page_ecran": page_ecran,
                    "page_fiche_eleve": page_fiche_eleve, "page_liens": page_liens, "page_logements": page_logements,
                    "page_memo": page_memo, "page_pionniere": page_pionniere}
 
@@ -811,6 +811,7 @@ class FenetrePrincipale(QMainWindow):
             "page_logements": importer("page_logements", "PageLogements"),
             "page_memo": importer("page_memo", "PageMemo"), "page_contact": importer("page_contact", "PageContact"),
             "page_liens": importer("page_liens", "PageLiens"),
+            "page_ecran": importer("page_ecran", "PageEcran"),
             "page_fiche_eleve": importer("page_fiche_eleve", "PageFicheEleve"),
             "page_dossier_prof": importer("page_dossier_prof", "PageDossierProf"),
             "page_tanzim": lambda: PageTanzim(self), "page_examen": lambda: PageExamen(self),
@@ -866,7 +867,7 @@ class FenetrePrincipale(QMainWindow):
             "الريادة": "page_riyada", "نتائج الريادة": "page_resultats_pionniere",
             "تواصل الريادة": "page_comm_pionniere", "مؤشرات الريادة": "page_ind_pionniere",
             "مفكرة المدير": "page_memo", "السكنيات": "page_logements", "التواصل": "page_contact",
-            "روابط مهمة": "page_liens", "التنظيم التربوي": "page_tanzim", "الامتحان": "page_examen",
+            "روابط مهمة": "page_liens", "شاشة العرض": "page_ecran", "التنظيم التربوي": "page_tanzim", "الامتحان": "page_examen",
             "الاستيراد من مسار": "page_import", "الموارد البشرية": "page_rh", "الرخص": "page_conges",
             "تدبير الفائض": "page_fa", "سجل الصادر": "page_sortants", "إعداد المؤسسة": "page_etab",
             "الوثائق": "page_docs", "دليل الاستخدام": "page_guide", "الإحصائيات": "page_stats",

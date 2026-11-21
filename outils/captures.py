@@ -606,6 +606,16 @@ def main(sortie: Path) -> None:
         photo(f, "84_contact")
         f.aller_a("روابط مهمة")
         photo(f, "84b_liens")
+        try:   # شاشة العرض (2026-11-21): الصفحة، وكل شريحة بدقة التلفاز
+            f.aller_a("شاشة العرض")
+            photo(f, "84c_ecran_page")
+            from idara.services import ecran as _ec
+            from idara.ui import ecran_affichage as _ea
+            for _k, _d in enumerate(_ec.diaporama(f.conn, avec_vides=True), start=1):
+                _ea.image(_d, _ec.identite(f.conn), 1280, 720, _ec.bandeau_defaut(f.conn)).save(
+                    str(sortie / f"84d_ecran_{_k}_{_d['cle']}.png"))
+        except Exception as e:  # noqa: BLE001
+            print("capture ecran:", e)
         f.aller_a("استعمالات الزمن")
         photo(f, "85_emplois")
         f.page_emplois.mode.setCurrentIndex(1)
