@@ -9,7 +9,7 @@ from pathlib import Path
 from PySide6.QtCore import QRectF, QSize, Qt
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QSizePolicy, QVBoxLayout, QWidget)
+                               QLineEdit, QSizePolicy, QToolButton, QVBoxLayout, QWidget)
 
 from idara.services import ecran as ec
 from idara.ui import ecran_affichage as ea
@@ -154,10 +154,13 @@ class PageEcran(QWidget):
                 k = du.count() - 1
             du.setCurrentIndex(k)
             du.currentIndexChanged.connect(lambda _: self.enregistrer())
-            haut = QPushButton("▲", self)
-            bas = QPushButton("▼", self)
+            haut = QToolButton(self)
+            bas = QToolButton(self)
+            haut.setArrowType(Qt.UpArrow)
+            bas.setArrowType(Qt.DownArrow)
+            haut.setToolTip("تقديم الشريحة")
+            bas.setToolTip("تأخير الشريحة")
             for b in (haut, bas):
-                b.setObjectName("puce")
                 b.setFixedSize(36, 32)
                 b.setCursor(Qt.PointingHandCursor)
             haut.clicked.connect(lambda _=False, c=cle: self.deplacer(c, -1))

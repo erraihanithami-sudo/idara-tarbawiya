@@ -65,7 +65,7 @@ def identite(conn: sqlite3.Connection) -> dict:
 
 def bandeau_defaut(conn: sqlite3.Connection) -> str:
     i = identite(conn)
-    return f"مرحباً بكم في {i['nom']}  ✦  مدرسة الجودة والإنصاف  ✦  الموسم الدراسي {i['annee']}"
+    return f"مرحباً بكم في {i['nom']}   ·   مدرسة الجودة والإنصاف   ·   الموسم الدراسي {i['annee']}"
 
 
 def diapositive(conn: sqlite3.Connection, cle: str, le: date | None = None) -> dict:

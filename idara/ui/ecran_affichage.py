@@ -39,7 +39,7 @@ def texte(p: QPainter, r: QRectF, t: str, taille: float, couleur: str = BLANC, g
             fm = QFontMetricsF(f)
     p.setFont(f)
     p.setPen(QColor(couleur))
-    o = QTextOption(align)
+    o = QTextOption(align | Qt.AlignAbsolute)   # المواضع بصرية (يمين = يمين الشاشة)
     o.setTextDirection(Qt.RightToLeft)
     o.setWrapMode(QTextOption.NoWrap if ajuster else QTextOption.WordWrap)
     p.drawText(r, t, o)
@@ -76,6 +76,7 @@ def _carte(p: QPainter, r: QRectF, u: float, accent: str = DORE) -> None:
     ch.addRoundedRect(r, 26 * u, 26 * u)
     p.fillPath(ch, QColor(255, 255, 255, 22))
     p.setPen(QPen(QColor(255, 255, 255, 50), 1.5 * u))
+    p.setBrush(Qt.NoBrush)
     p.drawPath(ch)
     bar = QPainterPath()
     bar.addRoundedRect(QRectF(r.left() + 30 * u, r.top(), r.width() - 60 * u, 6 * u), 3 * u, 3 * u)
@@ -198,11 +199,11 @@ def peindre(p: QPainter, r: QRectF, d: dict, ident: dict, le: datetime | None = 
               f"الموسم الدراسي {ident.get('annee', '')}  ·  مؤسستنا بالأرقام", 36 * u, GRIS_CLAIR, False,
               Qt.AlignCenter)
         zone = QRectF(r.left() + 90 * u, r.top() + 430 * u, r.width() - 180 * u, 470 * u)
-        _tuiles(p, zone, u, [(_nombre(d.get("eleves")), "تلميذة وتلميذاً", DORE_CLAIR,
-                              f"{d.get('filles', 0)} إناث · {d.get('garcons', 0)} ذكور"),
-                             (_nombre(d.get("filles")), "تلميذة", ROSE, ""),
-                             (_nombre(d.get("classes")), "قسماً", BLEU, ""),
-                             (_nombre(d.get("personnel")), "إطاراً تربوياً وإدارياً", VERT, "")])
+        _tuiles(p, zone, u, [(_nombre(d.get("eleves")), "تلميذة وتلميذاً", DORE_CLAIR, "مجموع المتمدرسين"),
+                             (_nombre(d.get("garcons")), "ذكور", BLEU, ""),
+                             (_nombre(d.get("filles")), "إناث", ROSE, ""),
+                             (_nombre(d.get("classes")), "قسماً", VIOLET, ""),
+                             (_nombre(d.get("personnel")), "إطاراً", VERT, "تربوياً وإدارياً")])
     else:
         zone = _entete(p, r, u, d, ident)
         if d.get("vide"):
@@ -260,7 +261,7 @@ def peindre_bandeau(p: QPainter, r: QRectF, u: float, t: str, decalage: float) -
     p.setFont(f)
     p.setPen(QColor(NUIT))
     fm = QFontMetricsF(f)
-    motif = t + "   ✦   "
+    motif = t + "   ·   "
     w = max(1.0, fm.horizontalAdvance(motif))
     x = r.left() - w + (decalage % w)
     o = QTextOption(Qt.AlignVCenter | Qt.AlignLeft)
@@ -407,7 +408,7 @@ class FenetreAffichage(QWidget):
             p.setBrush(QColor(DORE_CLAIR) if k == self.indice else QColor(255, 255, 255, 70))
             p.drawEllipse(QPointF(cx, y - 24 * u), 7 * u, 7 * u)
         if self.pause:
-            texte(p, QRectF(40 * u, 40 * u, 400 * u, 50 * u), "⏸ متوقف", 30 * u, DORE_CLAIR, True,
+            texte(p, QRectF(40 * u, 40 * u, 400 * u, 50 * u), "متوقف مؤقتاً", 30 * u, DORE_CLAIR, True,
                   Qt.AlignLeft | Qt.AlignVCenter)
         p.end()
 
