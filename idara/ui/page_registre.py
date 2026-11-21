@@ -98,7 +98,7 @@ class VueRegistre(QWidget):
         # ---- الجدول
         c, v = carte("الأسطر المسجلة")
         h = QHBoxLayout()
-        self.filtre = QComboBox()
+        self.filtre = QComboBox(self)
         self.filtre.addItem("الكل", None)
         if self.r.filtre:
             for x in self.r.champ(self.r.filtre).choix:

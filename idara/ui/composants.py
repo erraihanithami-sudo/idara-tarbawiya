@@ -54,7 +54,7 @@ class EnTete(QFrame):
         self.titre.setWordWrap(True)
         v.addStretch()
         v.addWidget(self.titre)
-        self.sous = QLabel(sous_titre)
+        self.sous = QLabel(sous_titre, self)   # بأب من البداية: لا نافذة طارئة
         self.sous.setObjectName("heroSous")
         self.sous.setWordWrap(True)
         v.addWidget(self.sous)   # الإخفاء بعد الإضافة: عنصر بلا أب يُظهَر يصير نافذة طارئة (بلاغ 2026-11-21)
