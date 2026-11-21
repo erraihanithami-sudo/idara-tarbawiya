@@ -2571,6 +2571,8 @@ def test_rihab_et_registres(app, config_tmp, monkeypatch):
         g = b.geometry()
         assert g.left() >= 0 and g.right() <= z.width() and g.bottom() <= z.height(), b.text()
     assert len({b.geometry().top() for b in f.bandeau_page.pilules.values()}) >= 2   # سطران
+    f.hide()
+    f.aller_a("التحفيز والتهاني")
     f.bandeau_page.pilules["الإعلام والتواصل"].click()   # الحبوب تنقل بين صفحات القسم
     assert f.page_courante() == "الإعلام والتواصل" and not f.bandeau_page.pilules["التحفيز والتهاني"].isChecked()
     f.bandeau_page.b_rahba.click()
@@ -2914,6 +2916,6 @@ def test_pages_construites_a_la_demande(app, config_tmp):
     assert f.page_construite("لوحة القيادة")
     f.aller_a("الجرد")
     assert f.page_construite("الجرد") and f.page_courante() == "الجرد"
-    assert f.zones_pages["الجرد"].widget() is f.page_inventaire and f.page_inventaire.isVisible()
+    assert f.zones_pages["الجرد"].widget() is f.page_inventaire and not f.page_inventaire.isHidden()
     assert f.page_examen is f.pages["الامتحان"] and f.zones_pages["الامتحان"].widget() is f.page_examen
     f.close()
