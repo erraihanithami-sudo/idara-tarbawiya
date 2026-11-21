@@ -1000,12 +1000,13 @@ class PageSortants(QWidget):
         v = QVBoxLayout(w)
         par = cg.parametres(self.f.conn)
         self.organigramme = Organigramme(cg.structure_direction(self.f.conn), cg.bureaux_independants(self.f.conn),
-                                         {par["bureau_conges"], par["bureau_etablissements"]})
+                                         {par["bureau_conges"], par["bureau_etablissements"]}, 1100)
         defil = QScrollArea()
         defil.setWidgetResizable(False)
         defil.setFrameShape(QFrame.NoFrame)
         defil.setWidget(self.organigramme)
-        defil.setMinimumHeight(min(620, self.organigramme.height() + 20))
+        defil.setMinimumHeight(min(640, self.organigramme.height() + 20))
+        defil.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         v.addWidget(defil, 1)
         cle = QLabel("الإطار الأخضر: المكتبان اللذان تُوجَّه إليهما الرخص وأوراق الإرسال.")
         cle.setObjectName("etiquette")
@@ -1234,26 +1235,33 @@ class BoutonStructure(QPushButton):
 
 
 class Organigramme(QWidget):
-    """مبيان الهيكلة: المدير الإقليمي في الأعلى، المكاتب الملحقة به في عمود جانبي، ثم خط يتفرع إلى المصالح
-    (من اليمين إلى اليسار) وتحت كل مصلحة مكاتبها."""
+    """مبيان الهيكلة بعرض النافذة: المدير الإقليمي في الأعلى، تحته المكاتب الملحقة به (شرائح ذهبية)، ثم المصالح
+    في صفوف (أربع في كل صف من اليمين) وتحت كل مصلحة مكاتبها، موصولة بجذع واحد."""
 
     COULEURS = ("#1565C0", "#00897B", "#6A1B9A", "#C62828", "#EF6C00", "#2E7D32", "#AD1457", "#455A64")
-    LC, HB, ESP, HT = 190, 44, 14, 64   # عرض العمود، ارتفاع المكتب، المسافة، ارتفاع رأس المصلحة
+    HB, ESP, HT = 40, 16, 58   # ارتفاع المكتب، المسافة، ارتفاع رأس المصلحة
 
-    def __init__(self, services: list[dict], independants: list[str], marques: set[str] | None = None):
+    def __init__(self, services: list[dict], independants: list[str], marques: set[str] | None = None,
+                 largeur: int = 1100):
         super().__init__()
         self.services, self.independants, self.marques = services, independants, marques or set()
-        n = max(1, len(services))
-        self.larg_indep = 230 if independants else 0
-        largeur = 40 + n * self.LC + (n - 1) * self.ESP + (self.larg_indep + 30 if independants else 0)
-        nb = max([len(x["bureaux"]) for x in services] + [0])
-        haut_services = 150 + self.HT + 20 + nb * (self.HB + 8)
-        haut_indep = 40 + len(independants) * (self.HB - 6 + 6)
-        self.setFixedSize(max(760, largeur), max(haut_services, haut_indep) + 30)
+        self.W = max(760, largeur)
+        self.par_ligne = 4 if self.W >= 980 else 3
+        self.LC = (self.W - 40 - (self.par_ligne - 1) * self.ESP) / self.par_ligne
+        self.n_chips = 4
+        self.lc_chip = (self.W - 80 - (self.n_chips - 1) * 10) / self.n_chips
+        self.setFixedSize(self.W, int(self._disposer(None)))
 
-    def _boite(self, p, r, texte, fond, bord, couleur_texte, taille=9.5, gras=False, rayon=10):
+    @staticmethod
+    def _clair(c: str, k: float = 0.86) -> str:
+        from PySide6.QtGui import QColor
+        q = QColor(c)
+        return QColor(int(q.red() + (255 - q.red()) * k), int(q.green() + (255 - q.green()) * k),
+                      int(q.blue() + (255 - q.blue()) * k)).name()
+
+    def _boite(self, p, r, texte, fond, bord, couleur_texte, taille=9.5, gras=False, rayon=10, ep=1.3):
         from PySide6.QtGui import QColor, QPen
-        p.setPen(QPen(QColor(bord), 1.4))
+        p.setPen(QPen(QColor(bord), ep))
         p.setBrush(QColor(fond))
         p.drawRoundedRect(r, rayon, rayon)
         f = self.font()
@@ -1263,70 +1271,90 @@ class Organigramme(QWidget):
         p.setPen(QColor(couleur_texte))
         p.drawText(r.adjusted(6, 2, -6, -2), Qt.AlignCenter | Qt.TextWordWrap, texte)
 
-    def paintEvent(self, e):   # noqa: N802
+    def _disposer(self, p) -> float:
+        """يرسم (p ليس None) أو يحسب الارتفاع فقط (p None)."""
         from PySide6.QtCore import QRectF
-        from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
+        from PySide6.QtGui import QColor, QLinearGradient, QPen
+        W = self.W
+        cx = W / 2
+        rd = QRectF(cx - 160, 16, 320, 58)
+        if p is not None:
+            g = QLinearGradient(rd.topRight(), rd.bottomLeft())
+            g.setColorAt(0, QColor("#0B1C2C"))
+            g.setColorAt(1, QColor("#1F3B57"))
+            p.setPen(QPen(QColor("#C9A04A"), 2))
+            p.setBrush(g)
+            p.drawRoundedRect(rd, 14, 14)
+            f = self.font()
+            f.setPointSizeF(13)
+            f.setBold(True)
+            p.setFont(f)
+            p.setPen(QColor("#F3D27A"))
+            p.drawText(rd, Qt.AlignCenter, "المدير الإقليمي")
+        y = rd.bottom() + 18
+        # المكاتب الملحقة بالمدير: إطار ذهبي فيه شرائح
+        if self.independants:
+            nl = (len(self.independants) + self.n_chips - 1) // self.n_chips
+            cadre = QRectF(20, y, W - 40, 40 + nl * 44)
+            if p is not None:
+                p.setPen(QPen(QColor("#1F3B57"), 2))
+                p.drawLine(int(cx), int(rd.bottom()), int(cx), int(cadre.top()))
+                p.setPen(QPen(QColor("#C9A04A"), 1.4, Qt.DashLine))
+                p.setBrush(QColor("#FFF8E7"))
+                p.drawRoundedRect(cadre, 14, 14)
+                f = self.font()
+                f.setPointSizeF(10)
+                f.setBold(True)
+                p.setFont(f)
+                p.setPen(QColor("#8A6A1E"))
+                p.drawText(QRectF(cadre.left(), cadre.top() + 4, cadre.width(), 28), Qt.AlignCenter,
+                           "ملحقة بالمدير الإقليمي (غير تابعة لأي مصلحة)")
+                for k, b in enumerate(self.independants):
+                    li, co = divmod(k, self.n_chips)
+                    x = cadre.right() - 20 - (co + 1) * self.lc_chip - co * 10
+                    r = QRectF(x, cadre.top() + 36 + li * 44, self.lc_chip, 36)
+                    vert = b in self.marques
+                    self._boite(p, r, b, "#E8F5E9" if vert else "#FFFFFF", "#2E7D32" if vert else "#C9A04A",
+                                "#14202E", 9, vert, 18, 2 if vert else 1.2)
+            y = cadre.bottom() + 18
+        # المصالح في صفوف
+        n = len(self.services)
+        tronc_haut = y - (18 if self.independants else 0)
+        for debut in range(0, n, self.par_ligne):
+            ligne = self.services[debut:debut + self.par_ligne]
+            xs = [W - 20 - k * (self.LC + self.ESP) - self.LC / 2 for k in range(len(ligne))]
+            y_bus = y
+            haut_max = 0
+            if p is not None:
+                p.setPen(QPen(QColor("#1F3B57"), 2))
+                p.drawLine(int(cx), int(tronc_haut), int(cx), int(y_bus))
+                p.drawLine(int(min(xs + [cx])), int(y_bus), int(max(xs + [cx])), int(y_bus))
+            for k, (x, sv) in enumerate(zip(xs, ligne)):
+                c = self.COULEURS[(debut + k) % len(self.COULEURS)]
+                rs = QRectF(x - self.LC / 2, y_bus + 16, self.LC, self.HT)
+                yb = rs.bottom() + 10
+                if p is not None:
+                    p.setPen(QPen(QColor("#1F3B57"), 2))
+                    p.drawLine(int(x), int(y_bus), int(x), int(rs.top()))
+                    self._boite(p, rs, sv["service"], c, c, "#FFFFFF", 10, True, 12)
+                for b in sv["bureaux"]:
+                    r = QRectF(rs.left(), yb, self.LC - 16, self.HB)   # الفروع من يمين المصلحة
+                    if p is not None:
+                        p.setPen(QPen(QColor(c), 1.2))
+                        p.drawLine(int(rs.right() - 7), int(rs.bottom()), int(rs.right() - 7), int(r.center().y()))
+                        p.drawLine(int(rs.right() - 7), int(r.center().y()), int(r.right()), int(r.center().y()))
+                        vert = b in self.marques
+                        self._boite(p, r, b, "#E8F5E9" if vert else self._clair(c), "#2E7D32" if vert else c,
+                                    "#14202E", 9, vert, 8, 2 if vert else 1.1)
+                    yb += self.HB + 7
+                haut_max = max(haut_max, yb - y_bus)
+            tronc_haut = y_bus
+            y = y_bus + haut_max + 26
+        return y + 6
+
+    def paintEvent(self, e):   # noqa: N802
+        from PySide6.QtGui import QPainter
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        W = self.width()
-        zone_droite = W - 20                    # الأعمدة تبدأ من اليمين
-        zone_gauche = 20 + (self.larg_indep + 30 if self.independants else 0)
-        # المدير الإقليمي
-        cx = (zone_droite + zone_gauche) / 2
-        rd = QRectF(cx - 150, 20, 300, 62)
-        g = QLinearGradient(rd.topRight(), rd.bottomLeft())
-        g.setColorAt(0, QColor("#0B1C2C"))
-        g.setColorAt(1, QColor("#1F3B57"))
-        p.setPen(QPen(QColor("#C9A04A"), 2))
-        p.setBrush(g)
-        p.drawRoundedRect(rd, 14, 14)
-        f = self.font()
-        f.setPointSizeF(13)
-        f.setBold(True)
-        p.setFont(f)
-        p.setPen(QColor("#F3D27A"))
-        p.drawText(rd, Qt.AlignCenter, "المدير الإقليمي")
-        # المكاتب الملحقة بالمدير (يساراً)
-        if self.independants:
-            xi = 20
-            ri = QRectF(xi, 20, self.larg_indep, 34)
-            self._boite(p, ri, "ملحقة بالمدير الإقليمي", "#FFF6E2", "#C9A04A", "#8A6A1E", 9.5, True, 8)
-            p.setPen(QPen(QColor("#C9A04A"), 1.6, Qt.DashLine))
-            p.drawLine(int(ri.right()), int(ri.center().y()), int(rd.left()), int(ri.center().y()))
-            y = ri.bottom() + 8
-            for b in self.independants:
-                r = QRectF(xi + 14, y, self.larg_indep - 14, self.HB - 8)
-                p.setPen(QPen(QColor("#C9A04A"), 1.2))
-                p.drawLine(int(xi + 6), int(ri.bottom()), int(xi + 6), int(r.center().y()))
-                p.drawLine(int(xi + 6), int(r.center().y()), int(r.left()), int(r.center().y()))
-                vert = b in self.marques
-                self._boite(p, r, b, "#E8F5E9" if vert else "#FFFFFF", "#2E7D32" if vert else "#E0D2AE", "#14202E",
-                            9, False, 8)
-                y += self.HB - 2
-        # الخط الرئيسي إلى المصالح
-        n = len(self.services)
-        if not n:
-            p.end()
-            return
-        y_bus = 120
-        p.setPen(QPen(QColor("#1F3B57"), 2))
-        p.drawLine(int(cx), int(rd.bottom()), int(cx), y_bus)
-        xs = [zone_droite - k * (self.LC + self.ESP) - self.LC / 2 for k in range(n)]
-        p.drawLine(int(min(xs)), y_bus, int(max(xs)), y_bus)
-        for k, (x, sv) in enumerate(zip(xs, self.services)):
-            c = self.COULEURS[k % len(self.COULEURS)]
-            p.setPen(QPen(QColor("#1F3B57"), 2))
-            p.drawLine(int(x), y_bus, int(x), y_bus + 22)
-            rs = QRectF(x - self.LC / 2, y_bus + 22, self.LC, self.HT)
-            self._boite(p, rs, sv["service"], c, c, "#FFFFFF", 9.5, True, 12)
-            y = rs.bottom() + 12
-            for b in sv["bureaux"]:
-                r = QRectF(x - self.LC / 2, y, self.LC - 14, self.HB)   # الفروع من يمين المصلحة (العربية)
-                p.setPen(QPen(QColor(c), 1.2))
-                p.drawLine(int(rs.right() - 6), int(rs.bottom()), int(rs.right() - 6), int(r.center().y()))
-                p.drawLine(int(rs.right() - 6), int(r.center().y()), int(r.right()), int(r.center().y()))
-                vert = b in self.marques
-                fond = QColor(c).lighter(190).name() if not vert else "#E8F5E9"
-                self._boite(p, r, b, fond, "#2E7D32" if vert else c, "#14202E", 8.5, vert, 8)
-                y += self.HB + 8
+        self._disposer(p)
         p.end()

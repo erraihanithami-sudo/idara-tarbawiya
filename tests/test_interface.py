@@ -638,7 +638,7 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     s.b_structure.click()
     o = s.fiche_organigramme
     assert o.isVisible() and isinstance(s.organigramme, Organigramme) and len(s.organigramme.services) == 7
-    assert s.organigramme.grab().width() > 1000 and "مكتب الرخص" in s.organigramme.marques
+    assert s.organigramme.grab().width() == 1100 and "مكتب الرخص" in s.organigramme.marques
     d = s.ouvrir_structure()
     # تغيير اسم مصلحة، إضافة مكتب، نقل مكتب إلى مصلحة أخرى، حذف مكتب ومصلحة
     s.blocs_services[0].nom.setText("مصلحة الشؤون التربوية والرياضية")
