@@ -2919,3 +2919,41 @@ def test_pages_construites_a_la_demande(app, config_tmp):
     assert f.zones_pages["الجرد"].widget() is f.page_inventaire and not f.page_inventaire.isHidden()
     assert f.page_examen is f.pages["الامتحان"] and f.zones_pages["الامتحان"].widget() is f.page_examen
     f.close()
+
+
+def test_aucune_fenetre_parasite_au_demarrage(app, config_tmp):
+    """بلاغ المدير 2026-11-21: نوافذ صغيرة تظهر وتختفي عند تحميل البرنامج. لا نافذة مستقلة غير النافذة الرئيسية
+    أثناء بنائها وبناء صفحاتها والتنقل بينها."""
+    from PySide6.QtCore import QEvent, QObject
+    from PySide6.QtWidgets import QWidget
+    from idara.ui.assistant import AssistantPremierLancement
+    from idara.ui.fenetre import FenetrePrincipale
+    a = AssistantPremierLancement()
+    remplir_assistant(a, config_tmp / "الإدارة التربوية")
+    d = a.terminer()
+    a.close()
+    app.processEvents()
+    vues = []
+
+    class Espion(QObject):
+        def eventFilter(self, o, e):   # noqa: N802
+            if e.type() == QEvent.Show and isinstance(o, QWidget) and o.isWindow() \
+                    and type(o).__name__ not in ("FenetrePrincipale", "QSplashScreen"):
+                vues.append(f"{type(o).__module__}.{type(o).__name__} «{o.windowTitle()}» {o.width()}x{o.height()} "
+                            f"parent={type(o.parent()).__name__ if o.parent() else None}")
+            return False
+
+    esp = Espion()
+    app.installEventFilter(esp)
+    try:
+        f = FenetrePrincipale(d)
+        f.show()
+        app.processEvents()
+        for nom in f.noms_pages():
+            f.aller_a(nom)
+            app.processEvents()
+    finally:
+        app.removeEventFilter(esp)
+    print("نوافذ ظهرت:", *vues, sep="\n  ")
+    assert not vues, vues
+    f.close()
