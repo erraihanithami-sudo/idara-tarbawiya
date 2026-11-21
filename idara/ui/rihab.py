@@ -350,6 +350,118 @@ class PageRahba(QWidget):
             k.pastille("قريباً" if page not in self.f.pages else compteur(self.f, page))
 
 
+# أيقونة كل صفحة في حبوب المسار (طلب المدير 2026-11-20: مظهر جذاب ومبتكر بدل الحبوب البسيطة)
+_MOTS_PICTOS = (("روابط", "ouvrir"), ("مفكرة", "calendrier"), ("برنامج العمل", "calendrier"), ("الزمن", "calendrier"),
+                ("الحراسة", "calendrier"), ("الرخص", "calendrier"), ("لوحة القيادة", "statistiques"),
+                ("إحصائيات", "statistiques"), ("الإحصائيات", "statistiques"), ("أداء", "statistiques"),
+                ("نتائج", "statistiques"), ("مؤشرات", "statistiques"), ("استثمار", "statistiques"),
+                ("الغياب", "absent"), ("حركية", "repartir"), ("الفائض", "repartir"), ("التنظيم", "repartir"),
+                ("السلوك", "rappel"), ("الإعلام", "rappel"), ("التحفيز", "valider"), ("الامتحان", "valider"),
+                ("المراقبة", "valider"), ("الاستيراد", "importer"), ("الصادر", "envoyer"), ("المراسلات", "envoyer"),
+                ("الجرد", "maison"), ("البنية", "maison"), ("السكنيات", "maison"), ("جمعية", "personnes"),
+                ("الجمعية", "personnes"), ("مجالس", "personnes"), ("أولياء", "personnes"), ("الأطر", "personnes"),
+                ("الأعوان", "personnes"), ("فريق", "personnes"), ("التلاميذ", "personnes"), ("الأندية", "personnes"),
+                ("خليتا", "personnes"), ("الشراكة", "personnes"), ("التسجيلات", "modifier"), ("بطاقة", "apercu"),
+                ("الملفات", "ouvrir"), ("ملفات", "ouvrir"), ("الإعداد", "modifier"), ("دليل", "apercu"),
+                ("التواصل", "envoyer"), ("السبورة", "apercu"))
+
+
+def picto_page(page: str, lib: str = "") -> str:
+    if page in ICONES_PAGES:
+        return ICONES_PAGES[page]
+    t = f"{page} {lib}"
+    return next((n for mot, n in _MOTS_PICTOS if mot in t), "document")
+
+
+class PiluleOrnee(QPushButton):
+    """حبة مسار مزخرفة: كبسولة عاجية بخيط ذهبي، يمينها وسام نجمة زليج فيه أيقونة الصفحة؛ والحبة المفتوحة ليلية
+    بعنوان ذهبي وإطار ذهبي مزدوج وسهم صغير نحو الصفحة. ترتفع قليلاً عند المرور."""
+
+    def __init__(self, texte: str, picto: str, accent: str):
+        super().__init__(texte)
+        self.setObjectName("piluleOrnee")
+        self.picto, self.accent = picto, accent
+        self.setCheckable(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAttribute(Qt.WA_Hover, True)
+        self.setFixedHeight(42)
+        f = self.font()
+        f.setPointSizeF(10.5)
+        f.setBold(True)
+        self.setFont(f)
+        self.setMinimumWidth(self.fontMetrics().horizontalAdvance(texte) + 72)
+
+    def sizeHint(self):
+        return QSize(self.fontMetrics().horizontalAdvance(self.text()) + 72, 42)
+
+    def paintEvent(self, ev):   # noqa: N802
+        from idara.ui import pictos
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        actif, survol = self.isChecked(), self.underMouse()
+        dore = QColor("#C9A04A")
+        r = QRectF(self.rect()).adjusted(2, 3 if not survol or actif else 1, -2, -5 if not survol or actif else -7)
+        rayon = r.height() / 2
+        # ظل خفيف (أعمق عند المرور)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(11, 28, 44, 60 if survol or actif else 28))
+        p.drawRoundedRect(r.translated(0, 2.5), rayon, rayon)
+        ch = QPainterPath()
+        ch.addRoundedRect(r, rayon, rayon)
+        g = QLinearGradient(r.topRight(), r.bottomLeft())
+        if actif:
+            g.setColorAt(0, QColor(theme.HERO_FOND))
+            g.setColorAt(1, QColor(theme.HERO_FOND2))
+        else:
+            g.setColorAt(0, QColor("#FFFFFF"))
+            g.setColorAt(1, QColor("#FFF6E2" if survol else "#F8F2E4"))
+        p.fillPath(ch, g)
+        p.setPen(QPen(dore if (actif or survol) else QColor("#E0D2AE"), 1.4))
+        p.setBrush(Qt.NoBrush)
+        p.drawPath(ch)
+        if actif:   # إطار ذهبي داخلي رفيع
+            p.setPen(QPen(QColor(201, 160, 74, 150), 0.9))
+            p.drawRoundedRect(r.adjusted(3, 3, -3, -3), rayon - 3, rayon - 3)
+        # وسام النجمة يمين الحبة (بداية النص في العربية)
+        cx, cy = r.right() - rayon + 1, r.center().y()
+        a = rayon * 0.78
+        p.save()
+        p.translate(cx, cy)
+        etoile = QPainterPath()
+        import math
+        for k in range(16):
+            ang = math.pi / 8 * k - math.pi / 2
+            rr = a if k % 2 == 0 else a * 0.78
+            pt = QPointF(rr * math.cos(ang), rr * math.sin(ang))
+            etoile.moveTo(pt) if k == 0 else etoile.lineTo(pt)
+        etoile.closeSubpath()
+        if actif:
+            p.fillPath(etoile, dore)
+        else:
+            p.fillPath(etoile, QColor(self.accent).lighter(185) if not survol else dore)
+            p.setPen(QPen(QColor(self.accent) if not survol else dore, 1.1))
+            p.drawPath(etoile)
+        p.restore()
+        coul_ic = theme.HERO_FOND if actif or survol else self.accent
+        ic = pictos.pixmap(self.picto, coul_ic, 14)
+        p.drawPixmap(QRectF(cx - 8, cy - 8, 16, 16), ic, QRectF(ic.rect()))
+        # النص
+        p.setFont(self.font())
+        p.setPen(QColor(theme.HERO_TEXTE2 if (actif and theme.LUXE) else "#FFFFFF") if actif
+                 else QColor(theme.ENCRE))
+        zone = QRectF(r.left() + 14, r.top(), r.width() - 2 * rayon - 14, r.height())
+        p.drawText(zone, Qt.AlignCenter, self.text())
+        if actif:   # سهم ذهبي صغير نحو الصفحة
+            fl = QPainterPath()
+            m = r.center().x()
+            fl.moveTo(m - 6, r.bottom() + 0.5)
+            fl.lineTo(m + 6, r.bottom() + 0.5)
+            fl.lineTo(m, r.bottom() + 5.5)
+            fl.closeSubpath()
+            p.fillPath(fl, dore)
+        p.end()
+
+
 class BandeauPage(QFrame):
     """شريط المسار فوق الصفحات: القسم (يفتح رحبته) ثم صفحاته حبوباً."""
 
@@ -357,7 +469,7 @@ class BandeauPage(QFrame):
         super().__init__()
         self.f, self.sections = fenetre, sections
         self.setObjectName("bandeauPage")
-        self.setFixedHeight(60)
+        self.setFixedHeight(66)
         self.indice: int | None = None
         h = QHBoxLayout(self)
         h.setContentsMargins(24, 8, 24, 8)
@@ -378,7 +490,7 @@ class BandeauPage(QFrame):
         self.zone.setFrameShape(QFrame.NoFrame)
         self.zone.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.zone.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.zone.setFixedHeight(42)
+        self.zone.setFixedHeight(50)
         h.addWidget(self.zone, 1)
         self.pilules: dict[str, QPushButton] = {}
         self.groupe = QButtonGroup(self)
@@ -398,10 +510,7 @@ class BandeauPage(QFrame):
         self.groupe.setExclusive(False)
         self.pilules = {}
         for page, lib in fils:
-            b = QPushButton(lib)
-            b.setObjectName("pilule")
-            b.setCheckable(True)
-            b.setCursor(Qt.PointingHandCursor)
+            b = PiluleOrnee(lib, picto_page(page, lib), c)
             b.clicked.connect(lambda _=False, page=page: self.f.aller_a(page))
             self.groupe.addButton(b)
             self.pilules[page] = b

@@ -2556,6 +2556,10 @@ def test_rihab_et_registres(app, config_tmp, monkeypatch):
     assert f.bandeau_page.indice == i and not any(b.isChecked() for b in f.bandeau_page.pilules.values())
     r.cartes["التحفيز والتهاني"].cliquer()
     assert f.page_courante() == "التحفيز والتهاني" and f.bandeau_page.pilules["التحفيز والتهاني"].isChecked()
+    from idara.ui.rihab import PiluleOrnee, picto_page   # حبوب مزخرفة بأيقونة لكل صفحة (2026-11-20)
+    assert all(isinstance(b, PiluleOrnee) for b in f.bandeau_page.pilules.values())
+    assert picto_page("روابط مهمة") == "ouvrir" and picto_page("تتبع الغياب") == "absent"
+    assert f.bandeau_page.pilules["التحفيز والتهاني"].grab().width() > 60
     f.bandeau_page.pilules["الإعلام والتواصل"].click()   # الحبوب تنقل بين صفحات القسم
     assert f.page_courante() == "الإعلام والتواصل" and not f.bandeau_page.pilules["التحفيز والتهاني"].isChecked()
     f.bandeau_page.b_rahba.click()

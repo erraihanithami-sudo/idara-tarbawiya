@@ -168,7 +168,7 @@ QScrollArea#defilPilules > QWidget#qt_scrollarea_viewport {{ background: transpa
 #heroSous {{ color: #FFFFFF; font-size: 11pt; background: transparent; }}
 #heroPuce {{ background: rgba(255, 255, 255, 46); color: #FFFFFF; border-radius: 12px; padding: 4px 14px;
     font-weight: 600; font-size: 9.5pt; }}
-""" + feuille_maghribi() + feuille_pilules()
+""" + feuille_maghribi() + feuille_pilules() + feuille_luxe()
 
 
 # ألوان ثانوية لمظاهر العناوين المزخرفة (لا يُكتب عليها نص، فلا تدخل في اختبار التباين)
@@ -218,7 +218,7 @@ QScrollBar::handle:vertical {{ background: {x['ascenseur']}; border-radius: 5px;
 QScrollBar::handle:vertical:hover {{ background: {TITRE_SOULIGNE}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QToolTip {{ background: {VERT_FONCE}; color: #FFFFFF; border: 1px solid {TITRE_SOULIGNE}; padding: 5px; }}
-""" + feuille_luxe()
+"""
 
 
 def feuille_luxe() -> str:
@@ -238,6 +238,11 @@ QHeaderView::section {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop
 QPushButton#principal {{ border: 1px solid {DORE}; }}
 #etape {{ border: 2px solid {DORE}; }}
 #etapeTitre {{ color: #F3D27A; }}
+QPushButton#pilule {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFFFFF, stop:1 #F8F2E4);
+    border: 1px solid #E0D2AE; border-radius: 18px; color: {ENCRE}; font-weight: 700; padding: 0 18px; }}
+QPushButton#pilule:hover {{ border: 1.5px solid {DORE}; background: #FFF6E2; }}
+QPushButton#pilule:checked {{ background: qlineargradient(x1:1, y1:0, x2:0, y2:1, stop:0 #0B1C2C, stop:1 #1F3B57);
+    color: #F3D27A; border: 1.5px solid {DORE}; }}
 """
 
 
