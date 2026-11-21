@@ -179,8 +179,8 @@ class CarteAction(QFrame):
         self.l_desc = QLabel(description)
         self.l_desc.setObjectName("etiquette")
         self.l_desc.setWordWrap(True)
-        self.l_desc.setVisible(bool(description))
         v.addWidget(self.l_desc)
+        self.l_desc.setVisible(bool(description))
         self.l_pastille = QLabel()
         self.l_pastille.setObjectName("pastille")
         v.addWidget(self.l_pastille, 0, Qt.AlignRight | Qt.AlignAbsolute)
@@ -262,8 +262,8 @@ class Hero(QFrame):
         h.addLayout(v, 1)
         self.l_puce = QLabel(puce)
         self.l_puce.setObjectName("heroPuce")
-        self.l_puce.setVisible(bool(puce))
         h.addWidget(self.l_puce, 0, Qt.AlignTop)
+        self.l_puce.setVisible(bool(puce))
 
     def paintEvent(self, ev):
         p = QPainter(self)

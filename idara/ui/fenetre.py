@@ -624,18 +624,18 @@ class BoutonNav(QPushButton):
         self.l_texte.setWordWrap(True)
         self.l_badge = QLabel(str(nb) if nb > 1 else "")   # عدد الصفحات الفرعية
         self.l_badge.setObjectName("badge")
-        self.l_badge.setVisible(nb > 1)
         self.l_fleche = QLabel()
         self.l_fleche.setFixedSize(QSize(14, 14))
         if deroulant:
             self.l_fleche.setPixmap(icones.chevron(False, theme.NAV_TEXTE2))
-        self.l_fleche.setVisible(deroulant)
         for w in (self.l_icone, self.l_texte, self.l_badge, self.l_fleche):
             w.setAttribute(Qt.WA_TransparentForMouseEvents)
         h.addWidget(self.l_icone)   # في RTL أول عنصر يكون في أقصى اليمين
         h.addWidget(self.l_texte, 1)
         h.addWidget(self.l_badge)
         h.addWidget(self.l_fleche)
+        self.l_badge.setVisible(nb > 1)   # بعد الإضافة (لا نوافذ طارئة)
+        self.l_fleche.setVisible(deroulant)
         self.toggled.connect(lambda c: self.marquer(c))
         self.marquer(False)
 

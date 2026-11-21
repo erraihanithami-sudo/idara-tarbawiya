@@ -103,9 +103,9 @@ class VueRegistre(QWidget):
         if self.r.filtre:
             for x in self.r.champ(self.r.filtre).choix:
                 self.filtre.addItem(x, x)
-        self.filtre.setVisible(bool(self.r.filtre))
         self.filtre.currentIndexChanged.connect(lambda _: self.afficher())
         h.addWidget(self.filtre)
+        self.filtre.setVisible(bool(self.r.filtre))
         self.recherche = QLineEdit()
         self.recherche.setPlaceholderText("بحث في الأسطر")
         self.recherche.setClearButtonEnabled(True)

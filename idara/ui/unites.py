@@ -46,7 +46,8 @@ class BarreUnites(QWidget):
             self.boutons[u] = b
             self.h.addWidget(b)
         self.h.addStretch()
-        self.show()
+        if self.parent() is not None:   # بلا أب: show() تجعله نافذة طارئة (بلاغ 2026-11-21)
+            self.show()
 
     def choisir(self, u: str | None) -> None:
         self.unite = u
