@@ -834,6 +834,7 @@ class PageConges(QWidget):
         h.addWidget(a)
         h.addStretch()
         v.addLayout(h)
+        v.addStretch()
         if getattr(self, "fiche_dest", None) is not None:
             self.fiche_dest.hide()
             self.fiche_dest.deleteLater()

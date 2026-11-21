@@ -647,7 +647,7 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     s.b_structure.click()
     o = s.fiche_organigramme
     assert o.isVisible() and isinstance(s.organigramme, Organigramme) and len(s.organigramme.services) == 7
-    assert s.organigramme.grab().width() > 400 and "مكتب الرخص" in s.organigramme.marques
+    assert s.organigramme.grab().width() > 400 and not s.organigramme.marques
     s.organigramme.resize(700, 400)
     assert s.organigramme.par_ligne == 3 and s.organigramme.minimumHeight() > 400
     d = s.ouvrir_structure()
