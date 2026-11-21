@@ -3016,4 +3016,22 @@ def test_page_ecran_affichage(app, config_tmp, tmp_path, monkeypatch):
     assert len(imgs) == len(p.diapos) and imgs[0].name.startswith("01 - ")
     from PySide6.QtGui import QImage
     assert QImage(str(imgs[0])).size().width() == 1920
+    # الدفعة الثانية: نقاط كل شريحة، منجزات المحاور، الشعار؛ لا «مستجدات ومواعيد»
+    assert "actualites" not in p.lignes and "realisations" in p.lignes
+    fp = p.ouvrir_points("couverture")
+    assert fp.isVisible() and set(p.cases_points) == {"eleves", "garcons", "filles", "classes", "personnel"}
+    p.cases_points["personnel"].setChecked(False)
+    p.enregistrer_points()
+    assert not fp.isVisible() and ec.reglages(f.conn)["masques"]["couverture"] == ["personnel"]
+    assert [i["id"] for i in ec.diapositive(f.conn, "couverture")["items"]][-1] == "classes"
+    p.ouvrir_points("realisations")
+    p.c_realisation.setText("تتويج فريق المسرح المدرسي")
+    assert p.ajouter_realisation() is not None and len(p.cases_points) == 1
+    assert any(d["cle"] == "realisations" for d in p.diapos)
+    p.fiche_points.hide()
+    from PIL import Image
+    Image.new("RGB", (60, 40), "navy").save(tmp_path / "logo.png")
+    assert p.choisir_logo(tmp_path / "logo.png") and "أُضيف شعار" in p.message.text()
+    assert p.apercu.ident["logo"] and p.apercu.grab().width() >= 480
+    assert p.choisir_logo(retirer=True) == ""
     f.close()

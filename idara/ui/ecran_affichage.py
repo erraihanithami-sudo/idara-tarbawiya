@@ -183,70 +183,132 @@ def _vide(p, zone, u, message: str) -> None:
     texte(p, zone, message, 40 * u, GRIS_CLAIR, False, Qt.AlignCenter)
 
 
+COULEURS = {"or": DORE_CLAIR, "bleu": BLEU, "rose": ROSE, "violet": VIOLET, "vert": VERT, "orange": ORANGE,
+            "rouge": ROUGE}
+COUL_AXES = {"eleve": BLEU, "ecole": VERT, "professeur": ORANGE}
+
+
+def _logo(p: QPainter, chemin: str, r: QRectF) -> bool:
+    """شعار المؤسسة داخل المستطيل مع حفظ نسبته."""
+    if not chemin:
+        return False
+    img = QImage(chemin)
+    if img.isNull():
+        return False
+    s = img.size().scaled(int(r.width()), int(r.height()), Qt.KeepAspectRatio)
+    cible = QRectF(r.center().x() - s.width() / 2, r.center().y() - s.height() / 2, s.width(), s.height())
+    p.drawImage(cible, img)
+    return True
+
+
+def _anneaux(p, zone: QRectF, u, items) -> None:
+    couleurs = [DORE_CLAIR, VERT, BLEU, ROSE, ORANGE]
+    n = max(1, len(items))
+    rayon = min(zone.height() * 0.3, zone.width() / (n * 2.8))
+    for k, it in enumerate(items):
+        cx = zone.right() - (k + 0.5) * zone.width() / n
+        _anneau(p, QPointF(cx, zone.top() + zone.height() * 0.4), rayon, u, it.get("taux"), couleurs[k % 5],
+                it["libelle"], it.get("sous", ""))
+
+
+def _liste(p, zone: QRectF, u, lignes, maxi: int = 6) -> None:
+    """بطاقات أسطر: (نص رئيسي، نص ثانوي يساراً، لون الشريط)."""
+    lignes = lignes[:maxi]
+    if not lignes:
+        return
+    h = min(115 * u, zone.height() / len(lignes) - 16 * u)
+    for k, (t, sous, coul) in enumerate(lignes):
+        rr = QRectF(zone.left(), zone.top() + k * (h + 16 * u), zone.width(), h)
+        _carte(p, rr, u, coul)
+        dessiner_etoile(p, rr.right() - 42 * u, rr.center().y(), 13 * u, coul, pleine=True)
+        larg_sous = 420 * u if sous else 0
+        texte(p, QRectF(rr.left() + 30 * u + larg_sous, rr.top(), rr.width() - 110 * u - larg_sous, h), t, 36 * u,
+              BLANC, True)
+        if sous:
+            texte(p, QRectF(rr.left() + 30 * u, rr.top(), larg_sous - 20 * u, h), sous, 26 * u, DORE_CLAIR, False,
+                  Qt.AlignLeft | Qt.AlignVCenter)
+
+
+def _colonnes_axes(p, zone: QRectF, u, items) -> None:
+    """ثلاثة أعمدة: محور التلميذ، محور المدرسة، محور الأستاذ (من اليمين)."""
+    from idara.services.ecran import AXES
+    esp = 30 * u
+    w = (zone.width() - 2 * esp) / 3
+    for k, (axe, lib) in enumerate(AXES):
+        x = zone.right() - (k + 1) * w - k * esp
+        col = QRectF(x, zone.top(), w, zone.height())
+        coul = COUL_AXES[axe]
+        _carte(p, col, u, coul)
+        texte(p, QRectF(col.left() + 20 * u, col.top() + 24 * u, col.width() - 40 * u, 60 * u), lib, 40 * u, coul,
+              True, Qt.AlignCenter)
+        y = col.top() + 110 * u
+        for it in [i for i in items if i.get("axe") == axe][:5]:
+            dessiner_etoile(p, col.right() - 38 * u, y + 26 * u, 10 * u, DORE_CLAIR, pleine=True)
+            rr = QRectF(col.left() + 24 * u, y, col.width() - 82 * u, 104 * u)
+            texte(p, rr, it["libelle"], 28 * u, BLANC, False, Qt.AlignRight | Qt.AlignTop, ajuster=False)
+            y += 112 * u
+            if y > col.bottom() - 60 * u:
+                break
+
+
 def peindre(p: QPainter, r: QRectF, d: dict, ident: dict, le: datetime | None = None) -> None:
     """يرسم شريحة كاملة في المستطيل r (أي حجم، بنسبة 16:9 مستحسنة)."""
     p.save()
     p.setRenderHint(QPainter.Antialiasing)
     p.setRenderHint(QPainter.TextAntialiasing)
+    p.setRenderHint(QPainter.SmoothPixmapTransform)
     u = min(r.width() / LARGEUR, r.height() / HAUTEUR)
     _fond(p, r, u)
     cle = d["cle"]
+    items = d.get("items", [])
     if cle == "couverture":
-        dessiner_etoile(p, r.center().x(), r.top() + 170 * u, 60 * u, DORE, pleine=False)
+        if not _logo(p, ident.get("logo", ""), QRectF(r.center().x() - 110 * u, r.top() + 60 * u, 220 * u,
+                                                         170 * u)):
+            dessiner_etoile(p, r.center().x(), r.top() + 160 * u, 60 * u, DORE, pleine=False)
         texte(p, QRectF(r.left() + 80 * u, r.top() + 240 * u, r.width() - 160 * u, 110 * u), ident.get("nom", ""),
               84 * u, DORE_CLAIR, True, Qt.AlignCenter)
         texte(p, QRectF(r.left() + 80 * u, r.top() + 350 * u, r.width() - 160 * u, 60 * u),
               f"الموسم الدراسي {ident.get('annee', '')}  ·  مؤسستنا بالأرقام", 36 * u, GRIS_CLAIR, False,
               Qt.AlignCenter)
         zone = QRectF(r.left() + 90 * u, r.top() + 430 * u, r.width() - 180 * u, 470 * u)
-        _tuiles(p, zone, u, [(_nombre(d.get("eleves")), "تلميذة وتلميذاً", DORE_CLAIR, "مجموع المتمدرسين"),
-                             (_nombre(d.get("garcons")), "ذكور", BLEU, ""),
-                             (_nombre(d.get("filles")), "إناث", ROSE, ""),
-                             (_nombre(d.get("classes")), "قسماً", VIOLET, ""),
-                             (_nombre(d.get("personnel")), "إطاراً", VERT, "تربوياً وإدارياً")])
+        if items:
+            _tuiles(p, zone, u, [(_nombre(i["valeur"]), i["libelle"], COULEURS.get(i.get("couleur"), DORE_CLAIR),
+                                  i.get("sous", "")) for i in items])
     else:
         zone = _entete(p, r, u, d, ident)
         if d.get("vide"):
             _vide(p, zone, u, "لا معطيات بعد لهذه الشريحة.")
         elif cle == "niveaux":
-            lignes = [(n["libelle"], [n["garcons"], n["filles"]]) for n in d["niveaux"]]
-            _barres(p, zone, u, lignes, [("ذكور", BLEU), ("إناث", ROSE)])
-        elif cle == "mouvements":
-            _tuiles(p, zone, u, [(_nombre(d["arrive"]), "وافدون", VERT, "التحقوا بمؤسستنا"),
-                                 (_nombre(d["parti"]), "مغادرون", ORANGE, "انتقلوا إلى مؤسسات أخرى"),
-                                 (_nombre(d["interrompu"]), "منقطعون", ROUGE, "نتابعهم لإرجاعهم"),
-                                 (_nombre(d["exclu"]), "مفصولون", VIOLET, "")])
-        elif cle == "resultats":
-            items = ([(m["taux"], m["libelle"], m["epreuve"]) for m in d["matieres"]] if d.get("mode") == "maitrise"
-                     else [(d.get("taux"), "نسبة النجاح", d.get("source", ""))])
-            if d.get("activites") is not None:
-                items.append((d["activites"], "المستفيدون من الأنشطة", "الأندية والأنشطة"))
-            couleurs = [DORE_CLAIR, VERT, BLEU, ROSE]
-            n = len(items)
-            rayon = min(zone.height() * 0.3, zone.width() / (n * 2.8))
-            for k, (taux, lib, sous) in enumerate(items):
-                cx = zone.right() - (k + 0.5) * zone.width() / n
-                _anneau(p, QPointF(cx, zone.top() + zone.height() * 0.4), rayon, u, taux, couleurs[k % 4], lib, sous)
+            _barres(p, zone, u, [(i["libelle"], i["valeurs"]) for i in items], [("ذكور", BLEU), ("إناث", ROSE)])
         elif cle == "tarl":
-            lignes = [(n["libelle"], [n["pre"], n["post"]]) for n in d["niveaux"]]
-            _barres(p, zone, u, lignes, [("%الرائز القبلي", ORANGE), ("%الرائز البعدي", VERT)])
-        elif cle == "actualites":
-            h = min(110 * u, zone.height() / max(1, len(d["items"])) - 16 * u)
-            for k, it in enumerate(d["items"]):
-                rr = QRectF(zone.left(), zone.top() + k * (h + 16 * u), zone.width(), h)
-                _carte(p, rr, u, VERT if it["en_cours"] else DORE)
-                d1, d2 = tx.date_chiffres(it["debut"]), tx.date_chiffres(it["fin"])
-                quand = d1 if d1 == d2 else f"من {d1} إلى {d2}"
-                texte(p, QRectF(rr.left() + 320 * u, rr.top(), rr.width() - 370 * u, h), it["titre"], 38 * u, BLANC,
-                      True)
-                texte(p, QRectF(rr.left() + 30 * u, rr.top(), 300 * u, h),
-                      "جارية الآن" if it["en_cours"] else quand, 28 * u, VERT if it["en_cours"] else DORE_CLAIR,
-                      True, Qt.AlignLeft | Qt.AlignVCenter)
-    # التذييل: الساعة والتاريخ
+            _barres(p, zone, u, [(i["libelle"], i["valeurs"]) for i in items],
+                    [("%الرائز القبلي", ORANGE), ("%الرائز البعدي", VERT)])
+        elif cle in ("maitrise", "resultats"):
+            _anneaux(p, zone, u, items)
+        elif cle == "mouvements":
+            _tuiles(p, zone, u, [(_nombre(i["valeur"]), i["libelle"], COULEURS.get(i.get("couleur"), DORE_CLAIR),
+                                  i.get("sous", "")) for i in items])
+        elif cle == "projet":
+            bande = QRectF(zone.left(), zone.top(), zone.width(), 120 * u)
+            _carte(p, bande, u, DORE)
+            texte(p, QRectF(bande.left() + 420 * u, bande.top(), bande.width() - 460 * u, bande.height()),
+                  d.get("intitule", ""), 34 * u, DORE_CLAIR, True)
+            texte(p, QRectF(bande.left() + 30 * u, bande.top(), 400 * u, bande.height()),
+                  f"أُنجز {d.get('realisees', 0)} من {d.get('actives', 0)} عملية · {_pct(d.get('pct_realisees'))}",
+                  30 * u, BLANC, True, Qt.AlignLeft | Qt.AlignVCenter)
+            reste = QRectF(zone.left(), zone.top() + 145 * u, zone.width(), zone.height() - 145 * u)
+            _liste(p, reste, u, [(i["libelle"], i.get("axe", ""), VERT) for i in items], 5)
+        elif cle == "realisations":
+            _colonnes_axes(p, zone, u, items)
+        elif cle == "partenariats":
+            _liste(p, zone, u, [(f"{i['libelle']}: {i['objet']}", i.get("etat", ""), BLEU) for i in items])
+    # التذييل: الساعة والتاريخ، والشعار صغيراً في الشرائح الداخلية
     le = le or datetime.now()
     texte(p, QRectF(r.left() + 60 * u, r.bottom() - 125 * u, 600 * u, 50 * u),
           f"{le:%H:%M}  ·  {tx.date_ar(le.date().isoformat())}", 28 * u, GRIS_CLAIR, False,
           Qt.AlignLeft | Qt.AlignVCenter)
+    if cle != "couverture":
+        _logo(p, ident.get("logo", ""), QRectF(r.right() - 190 * u, r.bottom() - 190 * u, 130 * u, 100 * u))
     p.restore()
 
 

@@ -611,8 +611,16 @@ def main(sortie: Path) -> None:
             photo(f, "84c_ecran_page")
             from idara.services import ecran as _ec
             from idara.ui import ecran_affichage as _ea
+            for _axe, _t in (("eleve", "تتويج فريق القراءة إقليمياً"), ("eleve", "ارتفاع نسبة التحكم في القراءة"),
+                             ("ecole", "تجهيز قاعة متعددة الوسائط"), ("ecole", "تهيئة الساحة والمساحات الخضراء"),
+                             ("professeur", "تكوين الأساتذة في التدريس الصريح"),
+                             ("professeur", "مجتمعات الممارسة المهنية")):
+                _ec.ajouter_realisation(f.conn, _axe, _t)
+            f.page_ecran._charger_diapos()
+            photo(f.page_ecran.ouvrir_points("realisations"), "84c_ecran_points")
+            f.page_ecran.fiche_points.hide()
             for _k, _d in enumerate(_ec.diaporama(f.conn, avec_vides=True), start=1):
-                _ea.image(_d, _ec.identite(f.conn), 1280, 720, _ec.bandeau_defaut(f.conn)).save(
+                _ea.image(_d, _ec.identite(f.conn, f.dossier), 1280, 720, _ec.bandeau_defaut(f.conn)).save(
                     str(sortie / f"84d_ecran_{_k}_{_d['cle']}.png"))
         except Exception as e:  # noqa: BLE001
             print("capture ecran:", e)

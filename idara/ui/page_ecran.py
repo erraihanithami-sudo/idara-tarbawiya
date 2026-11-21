@@ -85,6 +85,9 @@ class PageEcran(QWidget):
                                        "صور 1920×1080 مرقمة بالترتيب، يعرضها التلفاز دون حاسوب")
         self.b_images.clicked.connect(lambda: self.exporter_images())
         h.addStretch()
+        self.b_logo = bouton_couleur("شعار المؤسسة", "#6A1B9A", "image", "صورة PNG أو JPG تظهر في الغلاف وأسفل الشرائح")
+        self.b_logo.clicked.connect(lambda: self.choisir_logo())
+        h.addWidget(self.b_logo)
         h.addWidget(self.b_pdf)
         h.addWidget(self.b_images)
         racine.addLayout(h)
@@ -167,11 +170,15 @@ class PageEcran(QWidget):
             bas.clicked.connect(lambda _=False, c=cle: self.deplacer(c, 1))
             haut.setEnabled(i > 0)
             bas.setEnabled(i < len(r["ordre"]) - 1)
+            bp = bouton_couleur("النقاط", "#B07A16", "valider", "اختر ما يُعرض من نقاط هذه الشريحة")
+            bp.setMinimumHeight(32)
+            bp.clicked.connect(lambda _=False, c=cle: self.ouvrir_points(c))
             self.grille.addWidget(cb, i, 0)
-            self.grille.addWidget(du, i, 1)
-            self.grille.addWidget(haut, i, 2)
-            self.grille.addWidget(bas, i, 3)
-            self.lignes[cle] = {"case": cb, "duree": du}
+            self.grille.addWidget(bp, i, 1)
+            self.grille.addWidget(du, i, 2)
+            self.grille.addWidget(haut, i, 3)
+            self.grille.addWidget(bas, i, 4)
+            self.lignes[cle] = {"case": cb, "duree": du, "points": bp}
         self.grille.setColumnStretch(0, 1)
         self.c_bandeau.blockSignals(True)
         self.c_bandeau.setText(r["bandeau"])
@@ -187,7 +194,7 @@ class PageEcran(QWidget):
                                     [c for c, l in self.lignes.items() if l["case"].isChecked()],
                                     {c: l["duree"].currentData() for c, l in self.lignes.items()},
                                     self.c_bandeau.text())
-        except ValueError as e:
+        except ec.ErreurEcran as e:
             message(self.message, str(e), True)
             return False
         self.message.hide()
@@ -207,6 +214,109 @@ class PageEcran(QWidget):
         self._construire_lignes()
         self._charger_diapos()
 
+    # ---- النقاط والمنجزات والشعار (الدفعة الثانية 2026-11-21) ----
+    def ouvrir_points(self, cle: str):
+        """نافذة منبثقة: كل نقاط الشريحة بعلامات؛ إزالة العلامة تُخفي النقطة من العرض."""
+        from idara.ui.vitrine import FenetreFiche
+        w = QWidget()
+        v = QVBoxLayout(w)
+        self.cases_points: dict[str, QCheckBox] = {}
+        if cle == "realisations":
+            v.addWidget(self._formulaire_realisation())
+        pts = ec.points(self.f.conn, cle)
+        if not pts:
+            l = QLabel("لا نقاط في هذه الشريحة بعد." + (" أضف منجزاً أعلاه." if cle == "realisations" else ""))
+            l.setObjectName("etiquette")
+            l.setWordWrap(True)
+            v.addWidget(l)
+        for pt in pts:
+            hl = QHBoxLayout()
+            c = QCheckBox(pt["libelle"], w)
+            c.setChecked(pt["affiche"])
+            self.cases_points[pt["id"]] = c
+            hl.addWidget(c, 1)
+            if cle == "realisations":
+                b = bouton_couleur("حذف", "#C62828", "annuler")
+                b.setObjectName("danger")
+                b.clicked.connect(lambda _=False, i=pt["id"]: self.supprimer_realisation(int(i)))
+                hl.addWidget(b)
+            v.addLayout(hl)
+        hb = QHBoxLayout()
+        b = bouton_couleur("حفظ الاختيار", "#2E7D32", "enregistrer")
+        b.clicked.connect(lambda: self.enregistrer_points(cle))
+        tous = bouton_couleur("تعليم الكل", "#1F3B57", "valider")
+        tous.clicked.connect(lambda: [c.setChecked(True) for c in self.cases_points.values()])
+        hb.addWidget(b)
+        hb.addWidget(tous)
+        hb.addStretch()
+        v.addLayout(hb)
+        v.addStretch()
+        if getattr(self, "fiche_points", None) is not None:
+            self.fiche_points.hide()
+            self.fiche_points.deleteLater()
+        self.fiche_points = FenetreFiche(self, f"نقاط الشريحة: {ec.TITRES[cle]}",
+                                         "علّم ما تريد عرضه وأزل العلامة عما لا تريد عرضه.", w, largeur=720)
+        self.cle_points = cle
+        self.fiche_points.ouvrir()
+        return self.fiche_points
+
+    def _formulaire_realisation(self) -> QWidget:
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 0, 0, 8)
+        self.c_axe = QComboBox(w)
+        for k, lib in ec.AXES:
+            self.c_axe.addItem(lib, k)
+        self.c_realisation = QLineEdit(w)
+        self.c_realisation.setPlaceholderText("مثال: تجهيز قاعة متعددة الوسائط")
+        self.c_realisation.setMaxLength(140)
+        b = bouton_couleur("إضافة المنجز", "#1565C0", "ajouter")
+        b.clicked.connect(lambda: self.ajouter_realisation())
+        h.addWidget(self.c_axe)
+        h.addWidget(self.c_realisation, 1)
+        h.addWidget(b)
+        return w
+
+    def ajouter_realisation(self, axe: str | None = None, texte: str | None = None):
+        axe = axe or self.c_axe.currentData()
+        texte = self.c_realisation.text() if texte is None else texte
+        try:
+            l = ec.ajouter_realisation(self.f.conn, axe, texte)
+        except ec.ErreurEcran as e:
+            message(self.message, str(e), True)
+            return None
+        self.ouvrir_points("realisations")
+        self._charger_diapos()
+        return l
+
+    def supprimer_realisation(self, rid: int) -> None:
+        ec.supprimer_realisation(self.f.conn, rid)
+        self.ouvrir_points("realisations")
+        self._charger_diapos()
+
+    def enregistrer_points(self, cle: str | None = None) -> None:
+        cle = cle or self.cle_points
+        ec.definir_masques(self.f.conn, cle, [i for i, c in self.cases_points.items() if not c.isChecked()])
+        self.fiche_points.hide()
+        self._charger_diapos()
+        message(self.message, f"حُفظت نقاط «{ec.TITRES[cle]}».")
+
+    def choisir_logo(self, chemin=None, retirer: bool = False):
+        if not retirer and chemin is None:
+            from PySide6.QtWidgets import QFileDialog
+            chemin, _ = QFileDialog.getOpenFileName(self, "شعار المؤسسة لشاشة العرض", str(Path.home()),
+                                                    "Images (*.png *.jpg *.jpeg)")
+            if not chemin:
+                return None
+        try:
+            rel = ec.definir_logo(self.f.conn, self.f.dossier, None if retirer else chemin)
+        except ec.ErreurEcran as e:
+            message(self.message, str(e), True)
+            return None
+        self._charger_diapos()
+        message(self.message, "أُضيف شعار المؤسسة إلى العرض." if rel else "أزيل الشعار من العرض.")
+        return rel
+
     # ---- المعاينة والعرض ----
     def bandeau(self) -> str:
         return self.c_bandeau.text().strip() or ec.bandeau_defaut(self.f.conn)
@@ -218,7 +328,7 @@ class PageEcran(QWidget):
     def voir(self, i: int) -> None:
         n = len(self.diapos)
         self.indice = i % n if n else 0
-        self.apercu.ident = ec.identite(self.f.conn)
+        self.apercu.ident = ec.identite(self.f.conn, self.f.dossier)
         self.apercu.bandeau = self.bandeau()
         self.apercu.d = self.diapos[self.indice] if n else None
         self.l_position.setText(f"الشريحة {self.indice + 1} من {n} · {self.diapos[self.indice]['titre']}" if n
@@ -243,7 +353,7 @@ class PageEcran(QWidget):
         k = self.c_ecran.currentData()
         ecran = e[k] if k is not None and 0 <= k < len(e) else None
         self.fenetre_affichage = ea.FenetreAffichage(self.f.conn, ec.diaporama(self.f.conn),
-                                                     ec.identite(self.f.conn), self.bandeau(), ecran)
+                                                     ec.identite(self.f.conn, self.f.dossier), self.bandeau(), ecran)
         return self.fenetre_affichage.ouvrir()
 
     def exporter_pdf(self, chemin=None):
@@ -256,7 +366,7 @@ class PageEcran(QWidget):
         if not self.diapos:
             message(self.message, "لا شرائح للتصدير.", True)
             return None
-        p = ea.exporter_pdf(self.diapos, ec.identite(self.f.conn), chemin, self.bandeau())
+        p = ea.exporter_pdf(self.diapos, ec.identite(self.f.conn, self.f.dossier), chemin, self.bandeau())
         message(self.message, f"صُدّر العرض PDF ({len(self.diapos)} شرائح): ⁦{p.name}⁩")
         try:
             from idara.services import bureautique
@@ -274,7 +384,7 @@ class PageEcran(QWidget):
         if not self.diapos:
             message(self.message, "لا شرائح للتصدير.", True)
             return None
-        fichiers = ea.exporter_images(self.diapos, ec.identite(self.f.conn), Path(dossier), self.bandeau())
+        fichiers = ea.exporter_images(self.diapos, ec.identite(self.f.conn, self.f.dossier), Path(dossier), self.bandeau())
         message(self.message, f"حُفظت {len(fichiers)} صور في المجلد «{Path(dossier).name}». ضع المفتاح في التلفاز "
                               "واختر عرض الصور التلقائي.")
         return fichiers
