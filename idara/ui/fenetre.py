@@ -960,7 +960,7 @@ class FenetrePrincipale(QMainWindow):
             page = fabriques[nom]()
         finally:
             en_cours.discard(nom)
-        object.__setattr__(self, nom, page)
+        setattr(self, nom, page)
         self._installer_page(nom, page)
         return page
 
