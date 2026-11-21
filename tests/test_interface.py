@@ -2939,8 +2939,10 @@ def test_aucune_fenetre_parasite_au_demarrage(app, config_tmp):
         def eventFilter(self, o, e):   # noqa: N802
             if e.type() == QEvent.Show and isinstance(o, QWidget) and o.isWindow() \
                     and type(o).__name__ not in ("FenetrePrincipale", "QSplashScreen"):
-                vues.append(f"{type(o).__module__}.{type(o).__name__} «{o.windowTitle()}» {o.width()}x{o.height()} "
-                            f"parent={type(o.parent()).__name__ if o.parent() else None}")
+                import traceback
+                pile = [f"{fr.filename.split('idara')[-1]}:{fr.lineno} {fr.name}" for fr in traceback.extract_stack()
+                        if "idara" in fr.filename and "test_interface" not in fr.filename][-3:]
+                vues.append(f"{type(o).__name__} {o.width()}x{o.height()} ← " + " | ".join(pile))
             return False
 
     esp = Espion()
@@ -2954,8 +2956,8 @@ def test_aucune_fenetre_parasite_au_demarrage(app, config_tmp):
             app.processEvents()
     finally:
         app.removeEventFilter(esp)
-    print("نوافذ ظهرت:", *vues, sep="\n  ")
-    assert not vues, vues
+    print("نوافذ ظهرت:", *sorted(set(vues)), sep="\n  ")
+    assert not vues, len(vues)
     f.close()
 
 
@@ -2968,5 +2970,4 @@ def test_ecran_demarrage_barre(app):
     assert abs(e.valeur - 0.6) < 1e-9 and e.texte == "تجربة"
     e.progression(0.3)
     assert abs(e.valeur - 0.6) < 1e-9
-    e.e.pixmap().save(str(__import__("pathlib").Path("captures_tmp_ecran.png")))
     e.close()
