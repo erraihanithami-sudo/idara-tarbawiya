@@ -108,7 +108,7 @@ def test_demande_complete_et_numero_unique(base, dossier):
                     "مستوى التدريس: الرابع؛ عدد التلاميذ: 28", "الموضـــــــــــوع: طلب رخصة",
                     "مدتهـا: عشرة أيام", "10 نونبر 2026", "19 نونبر 2026", "1/26-27",
                     "السيدة مديرة: مدرسة تجريبية", "رأي السيدة المديرة: أستاذة منضبطة",
-                    "مصلحة تدبير الموارد البشرية", "مكتب الرخص والتغيبات", "لا شيء",
+                    "مصلحة تدبير الموارد البشرية", "مكتب الرخص", "لا شيء",
                     "لوزارة التربية الوطنية والتعليم الأولي والرياضة بالمدينة"]:
         assert attendu in t, attendu
     assert "{{" not in t and "......" not in t
@@ -218,7 +218,7 @@ def test_reprise_apres_absence_sans_conge(base, dossier):
 
 def test_parametres_destinataire(base, dossier):
     p = cg.parametres(base)
-    assert p["destinataire"].endswith("بالمدينة") and p["bureau_conges"] == "مكتب الرخص والتغيبات"
+    assert p["destinataire"].endswith("بالمدينة") and p["bureau_conges"] == "مكتب الرخص"
     cg.definir_parametres(base, {"bureau_conges": "مكتب آخر"})
     assert cg.parametres(base)["bureau_conges"] == "مكتب آخر"
     with pytest.raises(cg.ErreurConge):
@@ -262,7 +262,12 @@ def test_rukhsat_radaa(base):
 def test_structure_direction(base):  # noqa: F811
     """طلب المدير 2026-11-19: هيكلة المديرية تختلف من مديرية إلى أخرى."""
     st = cg.structure_direction(base)
-    assert st[0]["service"] == "مصلحة تدبير الموارد البشرية" and len(st[0]["bureaux"]) == 2
+    # 2026-11-21: الهيكلة الافتراضية هي الهيكل التنظيمي للمديرية الإقليمية (7 مصالح ومكاتب مستقلة)
+    assert len(st) == 7 and st[0]["service"] == "مصلحة الشؤون التربوية"
+    rh = next(x for x in st if x["service"] == "مصلحة تدبير الموارد البشرية")
+    p = cg.parametres(base)
+    assert p["bureau_conges"] in rh["bureaux"] and p["bureau_etablissements"] in rh["bureaux"]
+    assert cg.bureaux_independants(base)[:3] == ["المفتشية الإقليمية", "وحدة الافتحاص الداخلي", "مكتب الضبط"]
     with pytest.raises(cg.ErreurConge, match="حدد المصلحة"):
         cg.enregistrer_structure_direction(base, [("", "مكتب يتيم")])
     with pytest.raises(cg.ErreurConge, match="غير موجود"):
@@ -270,7 +275,7 @@ def test_structure_direction(base):  # noqa: F811
     assert cg.structure_direction(base) == st   # لا كتابة جزئية عند الخطأ
     cg.enregistrer_structure_direction(base, [("مصلحة أ", "مكتب 1"), ("", "مكتب 2"), ("مصلحة ب", "")],
                                        {"service_rh": "مصلحة أ", "bureau_conges": "مكتب 2"})
-    assert cg.bureaux_direction(base) == [("مصلحة أ", "مكتب 1"), ("مصلحة أ", "مكتب 2")]
+    assert cg.bureaux_direction(base)[:2] == [("مصلحة أ", "مكتب 1"), ("مصلحة أ", "مكتب 2")]
     v = cg.valeurs_bordereau(base, [("وثيقة", 1)], "1", "2026-11-19", "مكتب 1")
     assert v["dest_bureau"] == "مكتب 1" and cg.valeurs_bordereau(base, [("و", 1)], "1", "2026-11-19")["dest_bureau"] == "مكتب 2"
 
@@ -300,3 +305,23 @@ def test_structure_par_service_et_bureaux_independants(base):  # noqa: F811
     assert cg.parametres(base)["bureau_etablissements"] == "مكتب الضبط"
     v = cg.valeurs_bordereau(base, [("وثيقة", 1)], "1", "2026-11-20", "bureau_etablissements")
     assert v["dest_bureau"] == "مكتب الضبط"
+
+
+
+def test_structure_defaut_modifiable_et_retablie(base):  # noqa: F811
+    """طلب المدير 2026-11-21: الهيكلة الافتراضية يعدّلها المستعمل (تسمية، إضافة، نقل، حذف) ثم يستطيع استعادتها."""
+    st = cg.structure_direction(base)
+    services = [(x["service"], list(x["bureaux"])) for x in st]
+    services[0] = ("مصلحة الشؤون التربوية والرياضية", services[0][1])          # تغيير اسم مصلحة
+    services[0][1].append("مكتب جديد")                                          # إضافة مكتب
+    services[1][1].remove("مكتب الإحصاء والدراسات")                             # نقل مكتب إلى مصلحة أخرى
+    services[2][1].append("مكتب الإحصاء والدراسات")
+    services.pop()                                                              # حذف مصلحة
+    indep = [b for b in cg.bureaux_independants(base) if b != "الكتابة الخاصة"]  # حذف مكتب مستقل
+    cg.enregistrer_structure(base, services, indep)
+    st2 = cg.structure_direction(base)
+    assert st2[0]["service"] == "مصلحة الشؤون التربوية والرياضية" and "مكتب جديد" in st2[0]["bureaux"]
+    assert "مكتب الإحصاء والدراسات" in st2[2]["bureaux"] and "مكتب الإحصاء والدراسات" not in st2[1]["bureaux"]
+    assert len(st2) == 6 and "الكتابة الخاصة" not in cg.bureaux_independants(base)
+    assert cg.retablir_structure_defaut(base) == cg.structure_defaut()
+    assert "الكتابة الخاصة" in cg.bureaux_independants(base)

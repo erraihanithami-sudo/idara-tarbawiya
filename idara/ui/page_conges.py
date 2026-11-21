@@ -908,6 +908,10 @@ class PageSortants(QWidget):
         b.clicked.connect(lambda: self.ajouter_service("", [""]))
         h.addWidget(b)
         h.addStretch()
+        b = bouton_couleur("استعادة الهيكلة الافتراضية", "#B07A16", "actualiser",
+                           "يمحو تعديلاتك ويعيد الهيكل التنظيمي للمديرية الإقليمية كما هو في البرنامج")
+        b.clicked.connect(lambda: self.retablir_structure())
+        h.addWidget(b)
         v.addLayout(h)
         f = QFormLayout()
         self.aff = {k: QComboBox() for k in ("service_rh", "bureau_conges", "bureau_etablissements")}
@@ -952,6 +956,13 @@ class PageSortants(QWidget):
             self.blocs_services.remove(bloc)
             self.l_blocs.removeWidget(bloc)
             bloc.deleteLater()
+
+    def retablir_structure(self):
+        cg.retablir_structure_defaut(self.f.conn)
+        self._afficher_structure()
+        r = self.ouvrir_structure()
+        message(self.message_structure, "أعيدت الهيكلة الافتراضية للمديرية الإقليمية.")
+        return r
 
     def ouvrir_structure(self):
         st = cg.structure_direction(self.f.conn)
@@ -1085,6 +1096,7 @@ class BlocService(QFrame):
         self.l_bureaux.setSpacing(6)
         v.addLayout(self.l_bureaux)
         self.champs: list[QLineEdit] = []
+        self._lignes: dict = {}
 
     def ajouter_bureau(self, texte: str = "", focus: bool = False) -> QLineEdit:
         w = QWidget()
@@ -1096,23 +1108,53 @@ class BlocService(QFrame):
         c = QLineEdit(texte)
         c.setPlaceholderText("اسم المكتب")
         h.addWidget(c, 1)
+        # نقل المكتب إلى مصلحة أخرى (طلب المدير 2026-11-21)
+        from PySide6.QtWidgets import QMenu, QToolButton
+        nq = QToolButton()
+        nq.setText("نقل إلى…")
+        nq.setToolTip("نقل هذا المكتب إلى مصلحة أخرى أو جعله غير تابع لأي مصلحة")
+        nq.setPopupMode(QToolButton.InstantPopup)
+        nq.setCursor(Qt.PointingHandCursor)
+        menu = QMenu(nq)
+        menu.aboutToShow.connect(lambda: self._remplir_menu(menu, c))
+        nq.setMenu(menu)
+        h.addWidget(nq)
         b = bouton("حذف")
-        b.setToolTip("حذف هذا المكتب")
+        b.setToolTip("حذف هذا المكتب نهائياً")
         b.clicked.connect(lambda: self._retirer(w, c))
         h.addWidget(b)
         self.l_bureaux.addWidget(w)
         self.champs.append(c)
+        self._lignes[c] = w
         if focus:
             c.setFocus()
         return c
 
+    def cibles(self) -> list["BlocService"]:
+        return [x for x in self.page.blocs_services + [self.page.bloc_independant] if x is not self]
+
+    def nom_cible(self) -> str:
+        return "مكاتب غير تابعة لأي مصلحة" if self.independant else (self.nom.text().strip() or "مصلحة بلا اسم")
+
+    def _remplir_menu(self, menu, c) -> None:
+        menu.clear()
+        for x in self.cibles():
+            menu.addAction(x.nom_cible(), lambda x=x: self.deplacer_bureau(c, x))
+
+    def deplacer_bureau(self, c: QLineEdit, cible: "BlocService") -> QLineEdit:
+        texte = c.text()
+        self._retirer(self._lignes.get(c), c)
+        return cible.ajouter_bureau(texte)
+
     def _retirer(self, w, c) -> None:
+        self._lignes.pop(c, None)
         if c in self.champs:
             self.champs.remove(c)
         self.l_bureaux.removeWidget(w)
         w.deleteLater()
 
     def vider(self) -> None:
+        self._lignes = {}
         while self.l_bureaux.count():
             it = self.l_bureaux.takeAt(0)
             if it.widget():

@@ -628,23 +628,33 @@ def test_page_conges_chaine_complete(app, config_tmp, monkeypatch):
     assert s.ajouter() == "3/26-27" and s.table.rowCount() == 3
     # طلب المدير 2026-11-19: هيكلة المديرية (المصالح والمكاتب) في نافذة منبثقة
     d = s.ouvrir_structure()
-    assert d.isVisible() and len(s.blocs_services) == 1 and len(s.blocs_services[0].champs) == 2
-    assert "مصلحة تدبير الموارد البشرية" in s.l_structure.text()
-    # 2026-11-20: المصلحة ومكاتبها ثم مصلحة أخرى، ومكاتب غير تابعة لأي مصلحة
-    bs = s.ajouter_service("مصلحة الشؤون التربوية", ["مكتب التخطيط"])
-    bs.ajouter_bureau("مكتب الحياة المدرسية")
-    s.bloc_independant.ajouter_bureau("مكتب الضبط")
+    # 2026-11-21: الهيكلة الافتراضية = الهيكل التنظيمي للمديرية الإقليمية (7 مصالح ومكاتب غير تابعة)
+    assert d.isVisible() and len(s.blocs_services) == 7 and s.blocs_services[0].nom.text() == "مصلحة الشؤون التربوية"
+    assert len(s.bloc_independant.champs) == 7 and "مصلحة تدبير الموارد البشرية" in s.l_structure.text()
+    # تغيير اسم مصلحة، إضافة مكتب، نقل مكتب إلى مصلحة أخرى، حذف مكتب ومصلحة
+    s.blocs_services[0].nom.setText("مصلحة الشؤون التربوية والرياضية")
+    s.blocs_services[0].ajouter_bureau("مكتب الحياة المدرسية")
+    b2 = s.blocs_services[1]
+    c_stat = next(c for c in b2.champs if c.text() == "مكتب الإحصاء والدراسات")
+    assert [x.nom_cible() for x in b2.cibles()][-1] == "مكاتب غير تابعة لأي مصلحة"
+    b2.deplacer_bureau(c_stat, s.blocs_services[2])
+    c_cp = next(c for c in s.bloc_independant.champs if c.text() == "الكتابة الخاصة")
+    s.bloc_independant._retirer(s.bloc_independant._lignes[c_cp], c_cp)
+    s.retirer_service(s.blocs_services[-1])
     vide = s.ajouter_service()
     s.retirer_service(vide)
     s.aff["bureau_etablissements"].setCurrentText("مكتب الحياة المدرسية")
     assert s.enregistrer_structure(), s.message_structure.text()
-    assert cg.structure_direction(f.conn)[1] == {"service": "مصلحة الشؤون التربوية",
-                                                 "bureaux": ["مكتب التخطيط", "مكتب الحياة المدرسية"]}
+    st = cg.structure_direction(f.conn)
+    assert len(st) == 6 and st[0]["service"] == "مصلحة الشؤون التربوية والرياضية"
+    assert "مكتب الحياة المدرسية" in st[0]["bureaux"] and "مكتب الإحصاء والدراسات" in st[2]["bureaux"]
+    assert "مكتب الإحصاء والدراسات" not in st[1]["bureaux"] and "الكتابة الخاصة" not in cg.bureaux_independants(f.conn)
     assert cg.parametres(f.conn)["bureau_etablissements"] == "مكتب الحياة المدرسية"
-    assert "مكتب التخطيط" in s.l_structure.text() and "مكتب الضبط" in s.l_structure.text()
-    assert cg.bureaux_independants(f.conn) == ["مكتب الضبط"] and len(s.blocs_services) == 2
     s.aff["bureau_conges"].setCurrentText("مكتب غير موجود")
     assert not s.enregistrer_structure() and "غير موجود" in s.message_structure.text()
+    s.retablir_structure()
+    assert len(s.blocs_services) == 7 and "أعيدت الهيكلة" in s.message_structure.text()
+    assert cg.structure_direction(f.conn) == cg.structure_defaut()
     d.hide()
     f.aller_a("الرخص")
     # طلب المدير 2026-11-18: وثائق الرخصة المحددة من الصفحة، و«حفظ وتوليد طلب الرخصة» من ملفها

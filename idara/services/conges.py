@@ -28,7 +28,7 @@ class ErreurConge(ValueError):
 PARAMETRES = {
     "destinataire": ("الجهة المرسل إليها", None),  # تُبنى من مدينة التحرير إن لم تُحدد
     "service_rh": ("المصلحة", "مصلحة تدبير الموارد البشرية"),
-    "bureau_conges": ("مكتب الرخص", "مكتب الرخص والتغيبات"),
+    "bureau_conges": ("مكتب الرخص", "مكتب الرخص"),
     "bureau_etablissements": ("مكتب تسيير المؤسسات", "مكتب تسيير مؤسسات التعليم الابتدائي"),
 }
 _MINISTERE = "السيد المدير الإقليمي لوزارة التربية الوطنية والتعليم الأولي والرياضة"
@@ -64,14 +64,51 @@ def definir_parametres(conn: sqlite3.Connection, valeurs: dict[str, str]) -> Non
 # ---------- هيكلة المديرية (طلب المدير 2026-11-19: تختلف من مديرية إلى أخرى) ----------
 # المصالح ومكاتبها كما يُدخلها المدير؛ وتُختار منها المصلحة والمكتبان اللذان تُوجَّه إليهما الرخص وأوراق الإرسال.
 
+# الهيكلة الافتراضية (الهيكل التنظيمي للمديرية الإقليمية الذي أرسله المدير 2026-11-21)؛ يعدّلها المستعمل كما يشاء
+STRUCTURE_DEFAUT = (
+    ("مصلحة الشؤون التربوية", (
+        "مكتب التعليم الخصوصي", "مكتب العمل التربوي", "مكتب الأنشطة الاجتماعية والتربوية والثقافية",
+        "مكتب الصحة المدرسية", "مكتب الرياضة المدرسية", "مركز الوسائل التعليمية والمكتبيات", "مكتب التربية الدامجة",
+        "مكتب الارتقاء بالتربية غير النظامية ومحو الأمية", "خلية تدبير منظومة الإعلام")),
+    ("مصلحة التخطيط والخريطة المدرسية", (
+        "مكتب الخريطة المدرسية ابتدائي", "مكتب الخريطة المدرسية ثانوي", "مكتب الإحصاء والدراسات")),
+    ("مصلحة تأطير المؤسسات التعليمية والتوجيه", (
+        "مكتب تأطير مؤسسات التعليم الابتدائي", "مكتب تأطير مؤسسات التعليم الثانوي",
+        "مكتب التوجيه المدرسي والمهني")),
+    ("مصلحة تدبير الموارد البشرية", (
+        "مكتب تسيير مؤسسات التعليم الابتدائي", "مكتب تسيير مؤسسات التعليم الثانوي", "مكتب شؤون الموظفين",
+        "مكتب شؤون الموظفين والشواهد الإدارية", "مكتب الرخص", "مكتب المستندات والأرشيف", "مكتب التكوين المستمر")),
+    ("مصلحة الشؤون الإدارية والمالية والبناءات والتجهيزات والممتلكات", (
+        "مكتب الدعم الاجتماعي", "مكتب المنح", "مكتب الميزانية", "مكتب الشساعة", "مكتب الأداءات",
+        "مكتب البناءات والترميم", "مكتب التجهيز والممتلكات", "مكتب الصيانة وحظيرة السيارات والماء والكهرباء",
+        "مكتب تدبير المخزون", "مكتب الداخليات والإطعام المدرسي", "مكتب المحاسبة", "مكتب الأرشيف")),
+    ("مصلحة الشؤون القانونية والشراكة والتواصل", ("مكتب الشؤون القانونية", "مكتب التواصل", "مكتب الشراكة")),
+    ("المركز الإقليمي للامتحانات", (
+        "كتابة المركز", "وحدة الامتحانات الإشهادية", "وحدة المعلوميات والمباريات والأولمبياد والدراسات الدولية")),
+)
+INDEPENDANTS_DEFAUT = ("المفتشية الإقليمية", "وحدة الافتحاص الداخلي", "مكتب الضبط", "مكتب التعليم الأولي",
+                       "الكتابة التقنية", "الكتابة الخاصة", "المحاسب المفوض")
+
+
+def structure_defaut() -> list[dict]:
+    return [{"service": sv, "bureaux": list(bus)} for sv, bus in STRUCTURE_DEFAUT]
+
+
 def structure_direction(conn: sqlite3.Connection) -> list[dict]:
-    """[{"service": ..., "bureaux": [...]}]. إن لم تُدخل بعد: مصلحة الموارد البشرية ومكتباها الافتراضيان."""
+    """[{"service": ..., "bureaux": [...]}]. إن لم يُعدّلها المستعمل بعد: الهيكلة الافتراضية للمديرية الإقليمية."""
     from idara.services import fiches
     d = fiches.lire(conn, "structure_direction")
-    if d and d.get("services"):
+    if d and "services" in d:
         return d["services"]
-    p = parametres(conn)
-    return [{"service": p["service_rh"], "bureaux": [p["bureau_conges"], p["bureau_etablissements"]]}]
+    return structure_defaut()
+
+
+def retablir_structure_defaut(conn: sqlite3.Connection) -> list[dict]:
+    """يمحو تعديلات المستعمل ويعيد الهيكلة الافتراضية (المكاتب المعيّنة للرخص وأوراق الإرسال تُعاد إلى أصلها)."""
+    with conn:
+        conn.execute("DELETE FROM fiche_json WHERE cle='structure_direction'")
+        conn.execute("DELETE FROM parametre WHERE cle IN ('service_rh','bureau_conges','bureau_etablissements')")
+    return structure_direction(conn)
 
 
 def enregistrer_structure_direction(conn: sqlite3.Connection, lignes: list[tuple[str, str]],
@@ -110,8 +147,10 @@ def enregistrer_structure_direction(conn: sqlite3.Connection, lignes: list[tuple
 def bureaux_independants(conn: sqlite3.Connection) -> list[str]:
     """مكاتب غير تابعة لأي مصلحة (طلب المدير 2026-11-20)."""
     from idara.services import fiches
-    d = fiches.lire(conn, "structure_direction") or {}
-    return list(d.get("independants") or [])
+    d = fiches.lire(conn, "structure_direction")
+    if d and "services" in d:
+        return list(d.get("independants") or [])
+    return list(INDEPENDANTS_DEFAUT)
 
 
 def enregistrer_structure(conn: sqlite3.Connection, services: list[tuple[str, list[str]]],
