@@ -1002,7 +1002,7 @@ class PageSortants(QWidget):
         self.organigramme = Organigramme(cg.structure_direction(self.f.conn), cg.bureaux_independants(self.f.conn),
                                          {par["bureau_conges"], par["bureau_etablissements"]}, 1100)
         defil = QScrollArea()
-        defil.setWidgetResizable(False)
+        defil.setWidgetResizable(True)   # المبيان بعرض النافذة كيفما كان حجم الشاشة
         defil.setFrameShape(QFrame.NoFrame)
         defil.setWidget(self.organigramme)
         defil.setMinimumHeight(min(640, self.organigramme.height() + 20))
@@ -1245,12 +1245,22 @@ class Organigramme(QWidget):
                  largeur: int = 1100):
         super().__init__()
         self.services, self.independants, self.marques = services, independants, marques or set()
-        self.W = max(760, largeur)
-        self.par_ligne = 4 if self.W >= 980 else 3
+        self._dimensionner(largeur)
+        self.resize(self.W, self.minimumHeight())
+
+    def _dimensionner(self, largeur: int) -> None:
+        """يتكيف مع عرض النافذة: عدد المصالح في الصف وعدد الشرائح في السطر."""
+        self.W = max(480, int(largeur))
+        self.par_ligne = 4 if self.W >= 980 else 3 if self.W >= 700 else 2
         self.LC = (self.W - 40 - (self.par_ligne - 1) * self.ESP) / self.par_ligne
-        self.n_chips = 4
+        self.n_chips = 4 if self.W >= 900 else 3 if self.W >= 640 else 2
         self.lc_chip = (self.W - 80 - (self.n_chips - 1) * 10) / self.n_chips
-        self.setFixedSize(self.W, int(self._disposer(None)))
+        self.setMinimumHeight(int(self._disposer(None)))
+
+    def resizeEvent(self, e):   # noqa: N802
+        if abs(e.size().width() - self.W) > 1:
+            self._dimensionner(e.size().width())
+        super().resizeEvent(e)
 
     @staticmethod
     def _clair(c: str, k: float = 0.86) -> str:
