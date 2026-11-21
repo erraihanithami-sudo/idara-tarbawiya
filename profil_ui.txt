@@ -1,0 +1,116 @@
+فتح النافذة (قاعدة فارغة): 2.67s
+استيراد الوحدة المركزية: 0.15s
+استيراد وحدة فرعية: 0.15s
+عدد التلاميذ: 360
+
+زمن فتح كل صفحة (المرة الثانية):
+      305 ms  الريادة
+      212 ms  الوثائق
+      153 ms  التسجيلات
+      132 ms  لوحة القيادة
+      117 ms  استعمالات الزمن
+      115 ms  التلاميذ
+      112 ms  الموارد البشرية
+       94 ms  الأندية والأنشطة
+       90 ms  التنظيم التربوي
+       89 ms  ملفات الأساتذة
+       88 ms  نتائج الريادة
+       87 ms  إعداد المؤسسة
+       82 ms  مشروع المؤسسة
+       82 ms  بطاقة التلميذ
+       81 ms  مفكرة المدير
+       79 ms  الاستيراد من مسار
+       77 ms  أولياء الأمور
+       75 ms  الجرد
+       73 ms  الامتحان
+       72 ms  المراقبة المستمرة
+       72 ms  الإحصائيات
+       70 ms  تدبير الفائض
+       61 ms  الدعم التربوي
+       59 ms  خليتا اليقظة والإنصات
+       59 ms  النقل المدرسي
+       58 ms  دليل الاستخدام
+       58 ms  التعلمات الأساس
+       56 ms  فريق القيادة
+       55 ms  السكنيات
+       54 ms  السبورة المرجعية
+       54 ms  حركية التلاميذ
+       51 ms  التواصل
+       49 ms  الوثائق القانونية للجمعيات
+       48 ms  جمعية دعم مدرسة النجاح
+       46 ms  الرخص
+       46 ms  تواصل الريادة
+       45 ms  جدول الحراسة
+       45 ms  تتبع الغياب
+       43 ms  طلبات الموظفين
+       43 ms  برنامج العمل
+       43 ms  تسليم المهام
+       42 ms  مجالس الأقسام
+       42 ms  التحفيز والتهاني
+       41 ms  مؤشرات الريادة
+       39 ms  الإعلام والتواصل
+       38 ms  استثمار النتائج
+       36 ms  روابط مهمة
+       35 ms  محاضر الموارد البشرية
+       33 ms  الانفتاح والشراكة
+       33 ms  الجمعية الرياضية
+       32 ms  الصحة والسلامة
+       30 ms  مجالس المؤسسة
+       30 ms  سجل الصادر
+       29 ms  البنية المادية
+       29 ms  تتبع السلوك
+       29 ms  الأعوان
+       29 ms  جمعية تنمية التعاون المدرسي
+       25 ms  التلاميذ القدامى
+       23 ms  أداء المؤسسة
+
+الكتابة في بحث التلاميذ (6 أحرف): 190 ms
+
+         3477610 function calls (3474519 primitive calls) in 12.252 seconds
+
+   Ordered by: cumulative time
+   List reduced from 1809 to 40 due to restriction <40>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      118    0.005    0.000    8.516    0.072 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:1266(aller_a)
+      236    0.001    0.000    4.891    0.021 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:590(get)
+4194/2651    0.002    0.000    4.891    0.002 {built-in method builtins.getattr}
+      220    0.000    0.000    4.891    0.022 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:587(__getitem__)
+       54    0.001    0.000    4.890    0.091 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:950(__getattr__)
+      118    1.419    0.012    3.738    0.032 {built-in method processEvents}
+      118    0.001    0.000    2.502    0.021 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:1161(_rafraichir)
+     3530    0.369    0.000    1.744    0.000 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\rihab.py:458(paintEvent)
+       54    0.003    0.000    1.396    0.026 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:967(_installer_page)
+       82    1.218    0.015    1.346    0.016 {method 'setWidget' of 'PySide6.QtWidgets.QScrollArea' objects}
+     3538    1.012    0.000    1.140    0.000 {method 'addWidget' of 'PySide6.QtWidgets.QBoxLayout' objects}
+393625/392876    0.364    0.000    0.788    0.000 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\pictos.py:335(eventFilter)
+      118    0.589    0.005    0.649    0.006 {method 'setCurrentIndex' of 'PySide6.QtWidgets.QStackedWidget' objects}
+    33127    0.630    0.000    0.631    0.000 {method 'setItem' of 'PySide6.QtWidgets.QTableWidget' objects}
+        7    0.000    0.000    0.577    0.082 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:772(<lambda>)
+        7    0.002    0.000    0.577    0.082 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_registre.py:406(__init__)
+        3    0.000    0.000    0.546    0.182 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_pedagogie.py:863(rafraichir)
+        3    0.001    0.000    0.544    0.181 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_documents.py:114(rafraichir)
+        3    0.000    0.000    0.544    0.181 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_pedagogie.py:878(charger)
+        3    0.007    0.002    0.532    0.177 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_pedagogie.py:897(charger_comptes)
+       54    0.004    0.000    0.525    0.010 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\documents.py:162(etat_modele)
+     3644    0.441    0.000    0.504    0.000 {method 'setStyleSheet' of 'PySide6.QtWidgets.QWidget' objects}
+       12    0.011    0.001    0.437    0.036 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_registre.py:25(__init__)
+   393651    0.187    0.000    0.411    0.000 {method 'type' of 'PySide6.QtCore.QEvent' objects}
+        9    0.000    0.000    0.407    0.045 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:775(fab)
+       27    0.016    0.001    0.405    0.015 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\vitrine.py:99(__init__)
+     3585    0.125    0.000    0.391    0.000 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\pictos.py:260(pixmap)
+     7081    0.368    0.000    0.368    0.000 {method 'drawRoundedRect' of 'PySide6.QtGui.QPainter' objects}
+      108    0.095    0.001    0.351    0.003 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\moteur_docx.py:111(champs_du_modele)
+      691    0.296    0.000    0.349    0.001 {method 'addLayout' of 'PySide6.QtWidgets.QBoxLayout' objects}
+     8156    0.261    0.000    0.261    0.000 {method 'fillPath' of 'PySide6.QtGui.QPainter' objects}
+      118    0.001    0.000    0.259    0.002 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\rihab.py:582(afficher)
+       23    0.003    0.000    0.256    0.011 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\rihab.py:558(_construire)
+       57    0.033    0.001    0.249    0.004 D:\a\idara-tarbawiya\idara-tarbawiya\idara\services\personnel.py:299(lister)
+     6062    0.244    0.000    0.244    0.000 {method 'execute' of 'sqlite3.Connection' objects}
+   409277    0.137    0.000    0.236    0.000 C:\hostedtoolcache\windows\Python\3.12.10\x64\Lib\enum.py:720(__call__)
+        1    0.001    0.001    0.223    0.223 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\page_documents.py:69(__init__)
+      118    0.017    0.000    0.222    0.002 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\fenetre.py:734(paintEvent)
+    10516    0.051    0.000    0.222    0.000 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\zellige.py:32(dessiner_etoile)
+       97    0.179    0.002    0.217    0.002 D:\a\idara-tarbawiya\idara-tarbawiya\idara\ui\saisie.py:117(__init__)
+
+
