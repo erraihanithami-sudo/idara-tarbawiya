@@ -96,6 +96,10 @@ def verification_installation() -> int:
             assert champs_du_modele(dc.chemin_defaut(code)), f"القالب {code} غير مرفق"
         from docx import Document  # وثائق الجمعية: القالب الافتراضي لـ python-docx مرفق
         Document()
+        from pptx import Presentation  # تصدير شاشة العرض PowerPoint: القالب الافتراضي مرفق
+        Presentation()
+        from idara.services import ecran as _ec
+        assert _ec.MINISTERE.exists(), "شعار الوزارة غير مرفق"
         AssistantPremierLancement()
         BandeZellige()
         e = ecran_demarrage()

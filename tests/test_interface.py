@@ -1179,7 +1179,21 @@ def test_section_pedagogie(app, config_tmp, monkeypatch):
     cid = v.clubs.item(0, 0).data(Qt.UserRole)
     da = v._activite_club(cid)
     assert da.isVisible() and v.club_act.currentData() == cid and v.titre_act.text() == ""
+    assert not v.photos_act.b_ajouter.isEnabled() and "احفظ أولاً" in v.photos_act.note.text()
     da.hide()
+    # طلب المدير 2026-11-22: الصور في تقارير الأنشطة، وتقرير لكل نشاط
+    from PIL import Image
+    Image.new("RGB", (300, 200), "teal").save(config_tmp / "n.jpg")
+    aid = v.acts.item(0, 0).data(Qt.UserRole)
+    da = v.ouvrir_activite(aid)
+    assert v.photos_act.b_ajouter.isEnabled() and not v.b_act_rapport.isHidden()
+    assert v.photos_act.ajouter([str(config_tmp / "n.jpg")]) == 1 and v.photos_act.liste.count() == 1
+    assert "(1)" in v.photos_act.titre.text()
+    assert v.rapport_activite() and len(ouverts) == 4
+    da.hide()
+    assert v.acts.item(0, 5).text() == "1" and v.acts.cellWidget(0, 6) is not None
+    v.photos_act.liste.setCurrentRow(0)
+    assert v.photos_act.supprimer_selection() and v.photos_act.liste.count() == 0
     f.close()
 
 
@@ -1236,7 +1250,11 @@ def test_ecole_pionniere_composants(app, config_tmp, monkeypatch):
     c.c_theme.setText("الأبواب المفتوحة الأولى")
     c.c_invites.setValue(40)
     c.c_presents.setValue(30)
+    assert not c.photos.b_ajouter.isEnabled() or c.rid
     assert c.enregistrer_et_rapport() and len(ouverts) == 2
+    from PIL import Image
+    Image.new("RGB", (300, 200), "orange").save(config_tmp / "p.jpg")
+    assert c.photos.b_ajouter.isEnabled() and c.photos.ajouter([str(config_tmp / "p.jpg")]) == 1
     d.hide()
     assert c.liste.rowCount() == 1 and c.cartes["portes"].chiffre.text() == "1" and c.c_taux.chiffre.text() == "75.0%"
     assert c.liste.cellWidget(0, 6) is not None and c.rapport_synthese() and len(ouverts) == 3
@@ -1251,6 +1269,83 @@ def test_ecole_pionniere_composants(app, config_tmp, monkeypatch):
     assert i.cartes["isa2"].valeur.text() == "71.7%" and len(i.cartes["isa2"].points) == 2
     f.aller_a("الريادة")
     assert f.page_riyada.findChildren(type(f.page_riyada.message))  # الصفحة القائمة: شارة الريادة
+    f.close()
+
+
+def test_ecran_dfaa_thalitha(app, config_tmp, tmp_path, monkeypatch):
+    """طلب المدير 2026-11-22: شرائح الدفعة الثالثة، شعار الوزارة، PowerPoint، أين الأستاذ الآن، العدادات المتحركة."""
+    from datetime import datetime
+    from PIL import Image
+    from idara.services import bureautique
+    from idara.services import ecran as ec
+    from idara.services import isa
+    from idara.services import personnel as rh
+    from idara.services import vie_admin as va
+    from idara.ui import ecran_affichage as ea
+    monkeypatch.setattr(bureautique, "ouvrir_externe", lambda *a: None)
+    f = _fenetre_avec_eleves(config_tmp)
+    f.conn.execute("UPDATE eleve SET date_naissance=CASE WHEN id % 3 = 0 THEN '2017-02-01' ELSE '2018-05-09' END")
+    f.conn.commit()
+    isa.enregistrer(f.conn, "2026/2027", "1APG-1", "ar", 1, 4, 4, 2)
+    isa.enregistrer(f.conn, "2026/2027", "1APG-1", "ar", 2, 6, 3, 1)
+    pid = rh.enregistrer(f.conn, rh.Personnel(nom_ar="الوهمي", prenom_ar="أستاذ", sexe="M", categorie="enseignant",
+                                              ppr="900088"))
+    va.enregistrer_emploi(f.conn, pid, [[j, "08:00", "18:00", "الرياضيات", "4APG-1", "ق3"] for j in va.JOURS])
+    f.aller_a("شاشة العرض")
+    p = f.page_ecran
+    assert {"pyramide", "salles", "etoile", "annonces"} <= set(p.lignes)
+    assert not p.lignes["honneur"]["case"].isChecked() and p.lignes["pyramide"]["case"].isChecked()
+    # النماذج في نافذة النقاط
+    p.ouvrir_points("indicateurs")
+    p.c_ind_lib.setText("نسبة التمدرس")
+    p.c_ind_val.setText("98%")
+    assert p.ajouter_indicateur() and len(p.cases_points) == 1
+    p.ouvrir_points("annonces")
+    assert p.ajouter_annonce("انطلاق الأنشطة الرياضية", "كل أربعاء")
+    Image.new("RGB", (300, 400), "gold").save(tmp_path / "e.jpg")
+    p.ouvrir_points("etoile")
+    p.c_et_nom.setText("تلميذة وهمية")
+    p.c_et_motif.setText("التفوق في مسابقة القراءة")
+    assert p.definir_etoile(tmp_path / "e.jpg") is None   # دون موافقة: مرفوض
+    p.c_et_accord.setChecked(True)
+    assert p.definir_etoile(tmp_path / "e.jpg")
+    p.ouvrir_points("equipements")
+    assert p.photos_eq.b_ajouter.isEnabled() and p.photos_eq.ajouter([str(tmp_path / "e.jpg")]) == 1
+    p.fiche_points.hide()
+    for k in ("honneur", "galerie", "etoile", "annonces"):
+        p.lignes[k]["case"].setChecked(True)
+    # كل الشرائح ترسم دون خطأ (بمعطيات أو فارغة)، وبالحركة
+    ident = ec.identite(f.conn, f.dossier)
+    assert ident["ministere"].endswith("ministere.png")
+    for cle, *_ in ec.CATALOGUE:
+        d = ec.diapositive(f.conn, cle, datetime(2026, 11, 23, 9, 0), dossier=f.dossier)
+        assert not ea.image(d, ident, 960, 540).isNull()
+        assert not ea.image(d, ident, 960, 540, progres=0.3).isNull()
+    assert ea._P == 1.0
+    # أين الأستاذ الآن
+    r = p.chercher_prof("الوهمي")
+    assert "القاعة ق3" in r and not p.l_ou.isHidden()
+    # شعار الوزارة
+    fm = p.ouvrir_ministere()
+    assert fm.isVisible()
+    p.choisir_ministere(masquer=True)
+    assert ec.identite(f.conn, f.dossier)["ministere"] == "" and not fm.isVisible()
+    p.choisir_ministere(defaut=True)
+    # PowerPoint
+    pp = p.exporter_ppt(tmp_path / "عرض.pptx")
+    from pptx import Presentation
+    assert pp.exists() and len(Presentation(str(pp)).slides) == len(p.diapos) and "PowerPoint" in p.message.text()
+    # العرض: العدادات المتحركة والشريحة الحية
+    w = p.lancer()
+    w.resize(960, 540)
+    app.processEvents()
+    w.ecoule = 0.2
+    assert w.grab().width() > 0
+    cles = [d["cle"] for d in w.diapos]
+    if "salles" in cles:   # لا حصص يوم الأحد
+        w.aller(cles.index("salles"))
+        assert w.diapos[cles.index("salles")]["cle"] == "salles"
+    w.close()
     f.close()
 
 
@@ -3023,7 +3118,7 @@ def test_page_ecran_affichage(app, config_tmp, tmp_path, monkeypatch):
     p.lignes["couverture"]["duree"].setCurrentIndex(p.lignes["couverture"]["duree"].findData(20))
     assert ec.reglages(f.conn)["durees"]["couverture"] == 20
     p.deplacer("couverture", 1)
-    assert ec.reglages(f.conn)["ordre"][:2] == ["niveaux", "couverture"] and list(p.lignes)[1] == "couverture"
+    assert ec.reglages(f.conn)["ordre"][:2] == ["indicateurs", "couverture"] and list(p.lignes)[1] == "couverture"
     p.c_bandeau.setText("أهلاً وسهلاً")
     p.enregistrer()
     assert ec.reglages(f.conn)["bandeau"] == "أهلاً وسهلاً" and p.bandeau() == "أهلاً وسهلاً"

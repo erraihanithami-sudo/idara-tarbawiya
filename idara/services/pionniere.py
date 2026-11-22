@@ -241,6 +241,8 @@ def generer_rapport_rencontre(conn, dossier: DossierDonnees, rid: int) -> Path:
         para(d, titre, gras=True, taille=15, apres=2)
         for l in [x for x in (texte or "").splitlines() if x.strip()] or ["—"]:
             para(d, "• " + l.strip())
+    from idara.services import photos as ph
+    ph.inserer_docx(d, conn, dossier, "rencontre", rid, f"صور من {lib}")
     para(d, "", apres=10)
     para(d, "توقيع مدير المؤسسة", gras=True)
     return _sauver(d, dossier, annee, f"تقرير {lib} {r.date_rencontre}")

@@ -78,6 +78,8 @@ jobs:
           pyinstaller --noconfirm --windowed --name Idara
           --hidden-import win32com.client --hidden-import pythoncom
           --collect-data docx
+          --collect-data pptx
+          --hidden-import pptx
           --collect-submodules idara
           --icon idara/resources/icone.ico
           --add-data "idara/data/migrations;idara/data/migrations"

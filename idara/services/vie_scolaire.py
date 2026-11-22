@@ -206,9 +206,12 @@ def activites(conn, annee_id: int | None = None, statut: str | None = None, club
     return conn.execute(sql + " ORDER BY COALESCE(t.date_debut, '9999'), t.id", args).fetchall()
 
 
-def supprimer_activite(conn, aid: int) -> None:
+def supprimer_activite(conn, aid: int, dossier: DossierDonnees | None = None) -> None:
     with conn:
         conn.execute("DELETE FROM activite WHERE id=?", (aid,))
+    if dossier is not None:
+        from idara.services import photos as ph
+        ph.supprimer_tout(conn, dossier, "activite", aid)
 
 
 def bilan(conn, annee_id: int | None = None) -> dict:
@@ -315,6 +318,39 @@ def generer_bilan(conn, dossier: DossierDonnees, annee_id: int | None = None) ->
     para(d, apres=10)
     para(d, f"{c['mudir_moassasa']}", gras=True, centre=True)
     return _enregistrer(d, dossier, an["libelle"], "حصيلة الأنشطة")
+
+
+def generer_rapport_activite(conn, dossier: DossierDonnees, aid: int) -> Path:
+    """تقرير نشاط واحد (طلب المدير 2026-11-22): المعطيات، الحصيلة، والصور المضافة إليه."""
+    from idara.services import photos as ph
+    a = activite(conn, aid)
+    r = conn.execute("SELECT t.annee_id, c.nom FROM activite t LEFT JOIN club c ON c.id=t.club_id WHERE t.id=?",
+                     (aid,)).fetchone()
+    an = _annee(conn, r["annee_id"])
+    d = _nouveau()
+    c = _entete(conn, d, f"تقرير حول نشاط: {a.titre}", f"الموسم الدراسي {an['libelle']}")
+    dd = tx.date_chiffres(a.date_debut) if a.date_debut else ""
+    if a.date_fin and a.date_fin != a.date_debut:
+        dd += f" — {tx.date_chiffres(a.date_fin)}"
+    nb = None if a.nb_garcons is None and a.nb_filles is None else (a.nb_garcons or 0) + (a.nb_filles or 0)
+    lignes = [("نوع النشاط", a.type + (f" ({r['nom']})" if r["nom"] else "")), ("الحالة", STATUTS[a.statut]),
+              ("فترة الإنجاز", " ".join(x for x in (a.periode, dd) if x) or "—"),
+              ("المتدخلون", a.intervenants or "—"), ("المستهدفون", a.cibles or "—"),
+              ("آليات التنفيذ", a.mecanismes or "—"),
+              ("المشاركون", "—" if nb is None else f"{nb} (ذكور {a.nb_garcons or 0}، إناث {a.nb_filles or 0})")]
+    t = tableau(d, len(lignes), 2, largeurs=[4.5, 11.5])
+    for i, (k, v) in enumerate(lignes):
+        _cellule(t.cell(i, 0), k, gras=True, taille=12)
+        _ombre(t.cell(i, 0))
+        _cellule(t.cell(i, 1), v, taille=12, centre=False)
+    para(d, "", apres=4)
+    para(d, "الحصيلة والملاحظات", gras=True, taille=15, apres=2)
+    for l in [x for x in (a.bilan or "").splitlines() if x.strip()] or ["—"]:
+        para(d, "• " + l.strip())
+    ph.inserer_docx(d, conn, dossier, "activite", aid, "صور من النشاط")
+    para(d, apres=10)
+    para(d, f"{c['mudir_moassasa']}", gras=True, centre=True)
+    return _enregistrer(d, dossier, an["libelle"], f"تقرير نشاط {aid}")
 
 
 def generer_liste_club(conn, dossier: DossierDonnees, club_id: int) -> Path:

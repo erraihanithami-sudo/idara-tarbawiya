@@ -621,9 +621,66 @@ def main(sortie: Path) -> None:
             f.page_ecran._charger_diapos()
             photo(f.page_ecran.ouvrir_points("realisations"), "84c_ecran_points")
             f.page_ecran.fiche_points.hide()
-            for _k, _d in enumerate(_ec.diaporama(f.conn, avec_vides=True), start=1):
-                _ea.image(_d, _ec.identite(f.conn, f.dossier), 1280, 720, _ec.bandeau_defaut(f.conn)).save(
-                    str(sortie / f"84d_ecran_{_k}_{_d['cle']}.png"))
+            # الدفعة الثالثة (2026-11-22): معطيات وصور وهمية مولّدة (لا صور أطفال حقيقية)
+            from datetime import datetime as _dt
+            from PIL import Image as _Im, ImageDraw as _Dr
+            from idara.services import isa as _isa, photos as _ph, structure as _su, vie_scolaire as _vs
+            from idara.services import personnel as _rh, vie_admin as _va
+
+            def _synth(nom, c1, c2):
+                im = _Im.new("RGB", (900, 600), c1)
+                dr = _Dr.Draw(im)
+                for y in range(600):
+                    t = y / 600
+                    dr.line([(0, y), (900, y)], fill=tuple(int(a + (b - a) * t) for a, b in zip(c1, c2)))
+                dr.ellipse((560, 80, 820, 340), fill=(255, 236, 170))
+                dr.polygon([(0, 600), (300, 330), (520, 600)], fill=(30, 90, 70))
+                dr.polygon([(300, 600), (620, 300), (900, 600)], fill=(20, 70, 60))
+                import tempfile
+                pth = Path(tempfile.gettempdir()) / f"idara_synth_{nom}.jpg"
+                im.save(pth)
+                return pth
+            f.conn.execute("UPDATE eleve SET date_naissance=CASE WHEN id % 4 = 0 THEN '2016-02-01' WHEN id % 4 = 1 "
+                           "THEN '2017-05-09' ELSE '2018-03-03' END")
+            f.conn.commit()
+            for _ph_, (_a, _b, _c) in ((1, (4, 4, 2)), (2, (6, 3, 1)), (3, (7, 3, 0))):
+                _isa.enregistrer(f.conn, "2026/2027", "1APG-1", "ar", _ph_, _a, _b, _c)
+                _isa.enregistrer(f.conn, "2026/2027", "1APG-1", "ma", _ph_, _a - 1, _b + 1, _c)
+            _ec.ajouter_indicateur(f.conn, "نسبة التمدرس", "98%", "الفئة العمرية 6-11 سنة")
+            _ec.ajouter_indicateur(f.conn, "نسبة الحضور", "95%", "معدل الأسدوس الأول")
+            _ec.ajouter_indicateur(f.conn, "المستفيدون من الإطعام", "142", "تلميذة وتلميذاً")
+            _ec.ajouter_annonce(f.conn, "انطلاق الأنشطة الرياضية", "كل أربعاء بعد الزوال")
+            _ec.ajouter_annonce(f.conn, "اليوم التواصلي مع الأسر", "السبت المقبل على الساعة العاشرة")
+            _ec.definir_etoile(f.conn, f.dossier, "تلميذة وهمية", "4-1", "تفوقها في مسابقة القراءة وحسن سلوكها",
+                               _synth("etoile", (250, 214, 120), (180, 120, 40)), consentement=True)
+            _su.enregistrer(f.conn, [{"element": "salles", "nombres": {None: 8}},
+                                     {"element": "terrains", "nombres": {None: 2}},
+                                     {"element": "salle_ressources", "nombres": {None: 1}},
+                                     {"element": "sanitaires_eleves", "nombres": {None: 6}}])
+            _ph.ajouter(f.conn, f.dossier, "structure", "terrains", _synth("terrain", (90, 160, 220), (240, 200, 150)))
+            _aid = _vs.enregistrer_activite(f.conn, _vs.Activite("مسابقة", "مسابقة الرسم", periode="نونبر"))
+            for _n, (_c1, _c2) in enumerate((((120, 80, 200), (240, 160, 90)), ((40, 120, 180), (200, 230, 240)),
+                                             ((200, 90, 90), (250, 210, 120)))):
+                _ph.ajouter(f.conn, f.dossier, "activite", _aid, _synth(f"act{_n}", _c1, _c2), "مسابقة الرسم")
+            _pid = _rh.enregistrer(f.conn, _rh.Personnel(nom_ar="الوهمي", prenom_ar="أستاذ", sexe="M",
+                                                         categorie="enseignant", ppr="900099"))
+            _va.enregistrer_emploi(f.conn, _pid, [["الاثنين", "08:30", "10:30", "الرياضيات", "4APG-1", "ق3"]])
+            _r = _ec.reglages(f.conn)
+            _ec.enregistrer_reglages(f.conn, _r["ordre"], _r["ordre"], _r["durees"])
+            f.page_ecran.rafraichir()
+            photo(f, "84c_ecran_page_complete")
+            photo(f.page_ecran.ouvrir_points("etoile"), "84c_ecran_points_etoile")
+            f.page_ecran.fiche_points.hide()
+            _ident = _ec.identite(f.conn, f.dossier)
+            for _k, (_cle, *_x) in enumerate(_ec.CATALOGUE, start=1):
+                _d = _ec.diapositive(f.conn, _cle, _dt(2026, 11, 23, 9, 0), dossier=f.dossier)
+                _ea.image(_d, _ident, 1280, 720, _ec.bandeau_defaut(f.conn)).save(
+                    str(sortie / f"84d_ecran_{_k:02d}_{_cle}.png"))
+            _ea.image(_ec.diapositive(f.conn, "mouvements"), _ident, 1280, 720, progres=0.45).save(
+                str(sortie / "84e_ecran_compteurs_animes.png"))
+            f.aller_a("الأندية والأنشطة")
+            photo(f.page_vie.ouvrir_activite(_aid), "84f_activite_photos")
+            f.page_vie.fiche_act.hide()
         except Exception as e:  # noqa: BLE001
             print("capture ecran:", e)
         f.aller_a("استعمالات الزمن")

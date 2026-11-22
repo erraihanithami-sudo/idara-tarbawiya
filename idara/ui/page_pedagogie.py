@@ -329,8 +329,10 @@ class PageVieScolaire(QWidget):
         racine.addWidget(c)
         # ---- الأنشطة (الصفحة) ----
         c, v = carte("البرنامج السنوي للأنشطة وإنجازها")
-        self.acts = tableau(["فترة الإنجاز", "نوع النشاط", "النشاط", "الحالة", "المشاركون"], etirer=2)
+        self.acts = tableau(["فترة الإنجاز", "نوع النشاط", "النشاط", "الحالة", "المشاركون", "الصور", "الإجراءات"],
+                            etirer=2)
         self.acts.setMinimumHeight(240)
+        self.acts.verticalHeader().setDefaultSectionSize(46)
         self.acts.itemSelectionChanged.connect(self._sel_act)
         self.acts.itemDoubleClicked.connect(lambda it: self.ouvrir_activite(self.acts.item(it.row(), 0)
                                                                              .data(Qt.UserRole)))
@@ -424,11 +426,18 @@ class PageVieScolaire(QWidget):
         self.b_act_maj.clicked.connect(lambda: self.enregistrer_activite(False))
         h.addWidget(self.b_act_nouveau)
         h.addWidget(self.b_act_maj)
+        self.b_act_rapport = bouton_couleur("تقرير النشاط", "#2E7D32", "document",
+                                            "تقرير Word بمعطيات النشاط وحصيلته وصوره")
+        self.b_act_rapport.clicked.connect(lambda: self.rapport_activite())
+        h.addWidget(self.b_act_rapport)
         b = bouton("حذف النشاط")
         b.clicked.connect(lambda: self.supprimer_activite())
         h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
+        from idara.ui.photos_ui import BandePhotos
+        self.photos_act = BandePhotos(self.f, "activite", w, "صور النشاط")
+        v.addWidget(self.photos_act)
         self.message_act = QLabel()
         self.message_act.setWordWrap(True)
         self.message_act.hide()
@@ -467,6 +476,8 @@ class PageVieScolaire(QWidget):
             self.statut.setCurrentIndex(0)
         self.b_act_nouveau.setVisible(aid is None)
         self.b_act_maj.setVisible(aid is not None)
+        self.b_act_rapport.setVisible(aid is not None)
+        self.photos_act.definir(aid)
         self.message_act.hide()
         self.fiche_act.definir_titre("تعديل نشاط" if aid else "نشاط جديد")
         self.fiche_act.ouvrir()
@@ -515,7 +526,10 @@ class PageVieScolaire(QWidget):
         self._membres()
 
     def _acts(self) -> None:
+        from idara.services import photos as ph
+        from idara.ui.vitrine import ajuster_colonne_actions, boutons_ligne, vider_colonne_widgets
         ts = vs.activites(self.f.conn)
+        vider_colonne_widgets(self.acts, 6)
         self.acts.setRowCount(len(ts))
         for i, a in enumerate(ts):
             per = a["periode"] or ""
@@ -523,9 +537,14 @@ class PageVieScolaire(QWidget):
                 from idara.services import textes as tx
                 per = (per + " " if per else "") + tx.date_chiffres(a["date_debut"])
             part = "—" if a["nb_garcons"] is None else f"{a['nb_garcons'] + (a['nb_filles'] or 0)}"
+            nph = ph.nombre(self.f.conn, "activite", a["id"])
             for j, v in enumerate((per, a["type"] + (f": {a['club']}" if a["club"] else ""), a["titre"],
-                                   vs.STATUTS[a["statut"]], part)):
+                                   vs.STATUTS[a["statut"]], part, str(nph) if nph else "—")):
                 self.acts.setItem(i, j, cellule(v, a["id"] if j == 0 else None))
+            self.acts.setCellWidget(i, 6, boutons_ligne([
+                ("التقرير", "#2E7D32", "document", lambda x=a["id"]: self.rapport_activite(x)),
+                ("الصور", "#00897B", "image", lambda x=a["id"]: self.ouvrir_activite(x))]))
+        ajuster_colonne_actions(self.acts, 6)
 
     def _sel(self, t) -> int | None:
         rows = {i.row() for i in t.selectedIndexes()}
@@ -654,12 +673,30 @@ class PageVieScolaire(QWidget):
                             self.statut.currentData(), self.nb_g.text(), self.nb_f.text(), self.bilan.toPlainText(),
                             None if nouveau else self.act_id)
             return vs.enregistrer_activite(self.f.conn, a)
-        return self._faire(fn, "حُفظ النشاط.")
+        r = self._faire(fn, "حُفظ النشاط.")
+        if r and nouveau and isinstance(r, int) and self.fiche_act.isVisible():
+            self.ouvrir_activite(r)   # بعد التسجيل: إضافة الصور وتوليد التقرير في النافذة نفسها
+            message(self.message_act, "حُفظ النشاط. يمكنك الآن إضافة صوره وتوليد تقريره.")
+        return r
+
+    def rapport_activite(self, aid: int | None = None) -> Path | None:
+        aid = aid or self.act_id
+        if not aid:
+            message(self.message, "احفظ النشاط أولاً.", True)
+            return None
+        try:
+            p = vs.generer_rapport_activite(self.f.conn, self.f.dossier, aid)
+        except (vs.ErreurVie, Exception) as e:  # noqa: BLE001
+            for m in (self.message, self.message_act):
+                message(m, str(e), True)
+            return None
+        message(self.message_act, f"وُلّد تقرير النشاط: {p.name}")
+        return self._ouvrir(p)
 
     def supprimer_activite(self):
         if not self.act_id:
             return None
-        r = self._faire(lambda: vs.supprimer_activite(self.f.conn, self.act_id), "حُذف النشاط.")
+        r = self._faire(lambda: vs.supprimer_activite(self.f.conn, self.act_id, self.f.dossier), "حُذف النشاط.")
         self.act_id = None
         return r
 

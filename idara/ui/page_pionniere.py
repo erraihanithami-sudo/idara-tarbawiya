@@ -287,6 +287,9 @@ class PageCommunicationPionniere(QWidget):
         h.addWidget(self.b_save_rapport)
         h.addStretch()
         fl.addRow(h)
+        from idara.ui.photos_ui import BandePhotos
+        self.photos = BandePhotos(self.f, "rencontre", w, "صور اللقاء")
+        fl.addRow(self.photos)
         self.message_fiche = QLabel()
         self.message_fiche.setWordWrap(True)
         self.message_fiche.hide()
@@ -333,6 +336,7 @@ class PageCommunicationPionniere(QWidget):
     def _actions(self, rid: int) -> QWidget:
         from idara.ui.vitrine import boutons_ligne
         return boutons_ligne([("التقرير", "#2E7D32", "document", lambda: self.rapport(rid)),
+                              ("الصور", "#00897B", "image", lambda: self.ouvrir_rencontre(rid)),
                               ("تعديل", "#1565C0", "modifier", lambda: self.ouvrir_rencontre(rid)),
                               ("حذف", "#C62828", "annuler", lambda: self.supprimer(rid))])
 
@@ -363,6 +367,7 @@ class PageCommunicationPionniere(QWidget):
             self.c_invites.setValue(0)
             self.c_presents.setValue(0)
             self.fiche.definir_titre("تسجيل لقاء مع الأسر")
+        self.photos.definir(rid)
         self.fiche.ouvrir()
         return self.fiche
 
@@ -381,6 +386,7 @@ class PageCommunicationPionniere(QWidget):
             message(self.message_fiche, str(e) or "تاريخ غير صحيح.", True)
             return None
         self.rid = rid
+        self.photos.definir(rid)
         message(self.message_fiche, "حُفظ اللقاء.")
         message(self.message, "حُفظ اللقاء.")
         self.rafraichir()
@@ -392,6 +398,8 @@ class PageCommunicationPionniere(QWidget):
 
     def supprimer(self, rid: int) -> None:
         pn.supprimer_rencontre(self.f.conn, rid)
+        from idara.services import photos as ph
+        ph.supprimer_tout(self.f.conn, self.f.dossier, "rencontre", rid)
         message(self.message, "حُذف اللقاء.")
         self.rafraichir()
 
