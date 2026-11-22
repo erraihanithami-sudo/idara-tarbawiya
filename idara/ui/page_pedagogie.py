@@ -437,6 +437,7 @@ class PageVieScolaire(QWidget):
         v.addLayout(h)
         from idara.ui.photos_ui import BandePhotos
         self.photos_act = BandePhotos(self.f, "activite", w, "صور النشاط")
+        self.photos_act.apres_changement = self._acts
         v.addWidget(self.photos_act)
         self.message_act = QLabel()
         self.message_act.setWordWrap(True)

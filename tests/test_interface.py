@@ -1323,7 +1323,7 @@ def test_ecran_dfaa_thalitha(app, config_tmp, tmp_path, monkeypatch):
         assert not ea.image(d, ident, 960, 540, progres=0.3).isNull()
     assert ea._P == 1.0
     # أين الأستاذ الآن
-    r = p.chercher_prof("الوهمي")
+    r = p.chercher_prof("الوهمي", datetime(2026, 11, 23, 9, 0))
     assert "القاعة ق3" in r and not p.l_ou.isHidden()
     # شعار الوزارة
     fm = p.ouvrir_ministere()

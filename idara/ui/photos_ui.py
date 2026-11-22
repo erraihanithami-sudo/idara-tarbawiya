@@ -29,6 +29,7 @@ class BandePhotos(QWidget):
         super().__init__(parent)
         from idara.ui.vitrine import bouton_couleur
         self.f, self.objet, self.ref = fenetre, objet, None
+        self.apres_changement = None   # مثلاً: تحديث عدد الصور في جدول الصفحة
         v = QVBoxLayout(self)
         v.setContentsMargins(0, 4, 0, 4)
         v.setSpacing(6)
@@ -76,6 +77,10 @@ class BandePhotos(QWidget):
         self.message.hide()
         self.rafraichir()
 
+    def _signaler(self) -> None:
+        if self.apres_changement is not None:
+            self.apres_changement()
+
     def rafraichir(self) -> None:
         self.liste.blockSignals(True)
         self.liste.clear()
@@ -108,6 +113,7 @@ class BandePhotos(QWidget):
             return 0
         n, erreurs = ph.ajouter_plusieurs(self.f.conn, self.f.dossier, self.objet, self.ref, chemins)
         self.rafraichir()
+        self._signaler()
         if erreurs:
             message(self.message, (f"أضيفت {n} صورة. " if n else "") + " ".join(erreurs[:3]), True)
         else:
@@ -122,6 +128,7 @@ class BandePhotos(QWidget):
             return False
         ph.supprimer(self.f.conn, self.f.dossier, it.data(Qt.UserRole))
         self.rafraichir()
+        self._signaler()
         return True
 
     def _legende(self, it: QListWidgetItem) -> None:

@@ -611,8 +611,8 @@ class PageEcran(QWidget):
         message(self.message, "أزيل شعار الوزارة من الغلاف." if masquer else "حُدّث شعار الوزارة في الغلاف.")
         return r
 
-    def chercher_prof(self, texte: str | None = None) -> str:
-        r = ec.ou_est(self.f.conn, self.c_ou.text() if texte is None else texte)
+    def chercher_prof(self, texte: str | None = None, le: datetime | None = None) -> str:
+        r = ec.ou_est(self.f.conn, self.c_ou.text() if texte is None else texte, le)
         self.l_ou.setText(r)
         self.l_ou.show()
         return r
