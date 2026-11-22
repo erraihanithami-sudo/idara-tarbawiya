@@ -539,7 +539,7 @@ SECTIONS = [
                          ("مؤشرات الريادة", "المؤشرات العامة"), ("الريادة", "شارة الريادة")]),
     ("الحياة المدرسية", [("الأندية والأنشطة", "الأندية والأنشطة"),
                          ("خليتا اليقظة والإنصات", "خليتا اليقظة والإنصات"),
-                         ("التحفيز والتهاني", "التحفيز والتهاني"), ("الانفتاح والشراكة", "الانفتاح والشراكة"),
+                         ("التحفيز والتشجيع", "التحفيز والتشجيع"), ("الانفتاح والشراكة", "الانفتاح والشراكة"),
                          ("الإعلام والتواصل", "الإعلام والتواصل")]),
     ("التدبير المالي والمادي", [("التسجيلات", "تدبير التسجيلات"), ("الجرد", "الجرد"),
                                 ("جمعية دعم مدرسة النجاح", "جمعية دعم مدرسة النجاح"),
@@ -722,7 +722,7 @@ MOTS_CLES = {"ملفات الأساتذة": "طلب إرسال ملف إداري
              "طلبات الموظفين": "إذن بالتغيب أبوة زواج فحص طبي مضاد ورقة شخصية",
              "الأعوان": "عون حارس منظفة طباخة شركة مناولة حصيلة شهرية جدول الخدمة",
              "خليتا اليقظة والإنصات": "خلية يقظة إنصات مصالحة وساطة رصد مواكبة حالات محضر",
-             "التحفيز والتهاني": "شهادة تقديرية تهنئة تشجيع لوحة الشرف متفوقين",
+             "التحفيز والتشجيع": "شهادة تقديرية شواهد معرض تفوق تهنئة تشجيع لوحة الشرف متفوقين",
              "الانفتاح والشراكة": "شراكة اتفاقية شريك جمعية جماعة",
              "الإعلام والتواصل": "إعلان مزخرف ملصق استدعاء أولياء الأمور جمع عام أبواب مفتوحة لقاء تواصلي بلاغ",
              "فريق القيادة": "فريق قيادة المشروع محضر تشكيل مصادقة مجلس التدبير"}
@@ -781,10 +781,10 @@ class FenetrePrincipale(QMainWindow):
 
         # استيراد صريح (لا importlib) حتى يضمّ PyInstaller الوحدات في النسخة المثبتة (بلاغ المدير 2026-11-21)
         from idara.ui import (page_contact, page_dossier_prof, page_ecran, page_fiche_eleve, page_liens,
-                              page_logements, page_memo, page_pionniere)
+                              page_logements, page_memo, page_pionniere, page_tahfiz)
         modules = {"page_contact": page_contact, "page_dossier_prof": page_dossier_prof, "page_ecran": page_ecran,
                    "page_fiche_eleve": page_fiche_eleve, "page_liens": page_liens, "page_logements": page_logements,
-                   "page_memo": page_memo, "page_pionniere": page_pionniere}
+                   "page_memo": page_memo, "page_pionniere": page_pionniere, "page_tahfiz": page_tahfiz}
 
         def importer(module, classe):
             return lambda: getattr(modules[module], classe)(self)
@@ -839,8 +839,7 @@ class FenetrePrincipale(QMainWindow):
             "page_cellules": registres(
                 "خليتا اليقظة والإنصات", "تركيبة الخليتين، اجتماعاتهما، والحالات المرصودة وما اتُّخذ فيها.",
                 ["cellule_membres", "cellule_reunions", "cellule_cas"], cs["الحياة المدرسية"], fenetres=True),
-            "page_tahfiz": registres(
-                "التحفيز والتهاني", "سجّل كل تحفيز ثم اطبع شهادته المزخرفة.", ["tahfiz"], cs["الحياة المدرسية"]),
+            "page_tahfiz": lambda: page_tahfiz.PageTahfiz(self, cs["الحياة المدرسية"]),
             "page_partenariats": registres(
                 "الانفتاح والشراكة", "اتفاقيات الشراكة وحالتها.", ["partenariats"], cs["الحياة المدرسية"]),
             "page_annonces": lambda: PageCommunication(self, cs["الحياة المدرسية"]),
@@ -852,11 +851,11 @@ class FenetrePrincipale(QMainWindow):
         self.cles_pages = {"الصحة والسلامة": ["accidents", "examens_medicaux"], "طلبات الموظفين": ["demandes"],
                            "الأعوان": ["agents", "suivi_agents"],
                            "خليتا اليقظة والإنصات": ["cellule_membres", "cellule_reunions", "cellule_cas"],
-                           "التحفيز والتهاني": ["tahfiz"], "الانفتاح والشراكة": ["partenariats"],
+                           "التحفيز والتشجيع": ["tahfiz"], "الانفتاح والشراكة": ["partenariats"],
                            "فريق القيادة": ["equipe"]}
         self.attr_page = {
             "الصحة والسلامة": "page_sante", "طلبات الموظفين": "page_demandes", "الأعوان": "page_agents",
-            "خليتا اليقظة والإنصات": "page_cellules", "التحفيز والتهاني": "page_tahfiz",
+            "خليتا اليقظة والإنصات": "page_cellules", "التحفيز والتشجيع": "page_tahfiz",
             "الانفتاح والشراكة": "page_partenariats", "الإعلام والتواصل": "page_annonces",
             "فريق القيادة": "page_equipe", "لوحة القيادة": "tableau", "برنامج العمل": "page_calendrier",
             "التلاميذ": "page_eleves", "بطاقة التلميذ": "page_fiche_eleve", "ملفات الأساتذة": "page_dossier_prof",

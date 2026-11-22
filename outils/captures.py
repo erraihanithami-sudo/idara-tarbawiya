@@ -495,8 +495,26 @@ def main(sortie: Path) -> None:
         print("capture accidents:", e)
     f.aller_a("خليتا اليقظة والإنصات")
     photo(f, "64_cellules")
-    f.aller_a("التحفيز والتهاني")
+    f.aller_a("التحفيز والتشجيع")
     photo(f, "65_tahfiz")
+    try:   # معرض الشواهد (2026-11-22): كل تصميم بمعطيات وهمية، والنافذة المنبثقة
+        from idara.services import chawahid as _ch
+        from idara.ui import chawahid_rendu as _cr
+        _pt = f.page_tahfiz
+        _el = _ch.eleves(f.conn)
+        for _k, _m in enumerate(_ch.MODELES, start=1):
+            _c = _ch.contenu(f.conn, _el[_k % len(_el)] if _el else {"nom": "تلميذة وهمية", "sexe": "F"},
+                             "شهادة تفوق" if _m.cle == "banafsaji" else "شهادة تقديرية", _ch.MOTIFS[_k % 3],
+                             "الأسدوس الأول", signataires=("مدير المؤسسة", "رئيس جمعية الآباء") if _k % 2 else
+                             ("مدير المؤسسة",))
+            _cr.apercu(_m.cle, _c, 1600, _ch.logo_etablissement(f.conn, f.dossier)).save(
+                str(sortie / f"65b_chahada_{_k}_{_m.cle}.png"))
+        _fi = _pt.ouvrir("dhahabi_taqdir")
+        _pt.cocher([e["nom"] for e in _el[:3]])
+        photo(_fi, "65c_tahfiz_popup")
+        _fi.hide()
+    except Exception as e:  # noqa: BLE001
+        print("capture chawahid:", e)
     # الإعلانات المزخرفة والاستدعاءات (2026-11-15)
     try:
         from PySide6.QtCore import QRectF as _R

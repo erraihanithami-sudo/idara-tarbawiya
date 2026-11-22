@@ -1272,6 +1272,49 @@ def test_ecole_pionniere_composants(app, config_tmp, monkeypatch):
     f.close()
 
 
+def test_tahfiz_maarid_chawahid(app, config_tmp, tmp_path, monkeypatch):
+    """طلب المدير 2026-11-22: «التحفيز والتشجيع»: معرض الشواهد، والنافذة المنبثقة، وPDF وPowerPoint."""
+    from idara.services import bureautique
+    from idara.services import chawahid as ch
+    from idara.services import registres as rg
+    from idara.ui import chawahid_rendu as cr
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("التحفيز والتشجيع")
+    p = f.page_tahfiz
+    assert list(p.cartes) == [m.cle for m in ch.MODELES]
+    assert all(not c.vignette.pixmap().isNull() for c in p.cartes.values())
+    ex = ch.exemple(f.conn)
+    for m in ch.MODELES:
+        img = cr.apercu(m.cle, ex, 800)
+        assert not img.isNull() and img.width() == 800
+    fi = p.ouvrir("rasmi")
+    assert fi.isVisible() and p.c_modele.currentData() == "rasmi" and p.l_eleves.count() > 0
+    assert p.generer_pdf() is None and "حدد" in p.message_fiche.text()
+    noms = [p.l_eleves.item(i).data(Qt.UserRole)["nom"] for i in range(2)]
+    assert p.cocher(noms) == 2 and len(p.selection()) == 2 and "2 شهادة" in p.l_nombre.text()
+    p.c_type.setCurrentIndex(ch.TYPES.index("شهادة تفوق"))
+    assert "شهادة التفوق" in p.c_intro.text()
+    p.c_motif.setEditText("تهنئةً على تتويجه في {المسابقة}")
+    p._motif_libre()
+    assert p.generer_pdf() is None and "أكمل" in p.message_fiche.text()
+    p.c_motif.setCurrentIndex(1)
+    p._choisir_motif(1)
+    p.c_asso.setChecked(True)
+    pdf = p.generer_pdf(tmp_path / "ش.pdf")
+    assert pdf.exists() and pdf.read_bytes()[:4] == b"%PDF" and ouverts[-1] == pdf
+    ls = rg.lister(f.conn, "tahfiz")
+    assert len(ls) == 2 and all(l["type"] == "شهادة تفوق" and l["modele"] == "الرسمي بالأحمر والأخضر" for l in ls)
+    p.c_modele.setCurrentIndex(0)
+    pp = p.generer_ppt(tmp_path / "ش.pptx")
+    from pptx import Presentation
+    assert len(Presentation(str(pp)).slides) == 2 and len(rg.lister(f.conn, "tahfiz")) == 4
+    assert p.vue.table.rowCount() == 4
+    fi.hide()
+    f.close()
+
+
 def test_ecran_dfaa_thalitha(app, config_tmp, tmp_path, monkeypatch):
     """طلب المدير 2026-11-22: شرائح الدفعة الثالثة، شعار الوزارة، PowerPoint، أين الأستاذ الآن، العدادات المتحركة."""
     from datetime import datetime
@@ -2681,12 +2724,12 @@ def test_rihab_et_registres(app, config_tmp, monkeypatch):
     assert list(r.cartes) == [p for p, _ in SECTIONS[i][1]]
     assert all(c.l_desc.text() for c in r.cartes.values())
     assert f.bandeau_page.indice == i and not any(b.isChecked() for b in f.bandeau_page.pilules.values())
-    r.cartes["التحفيز والتهاني"].cliquer()
-    assert f.page_courante() == "التحفيز والتهاني" and f.bandeau_page.pilules["التحفيز والتهاني"].isChecked()
+    r.cartes["التحفيز والتشجيع"].cliquer()
+    assert f.page_courante() == "التحفيز والتشجيع" and f.bandeau_page.pilules["التحفيز والتشجيع"].isChecked()
     from idara.ui.rihab import PiluleOrnee, picto_page   # حبوب مزخرفة بأيقونة لكل صفحة (2026-11-20)
     assert all(isinstance(b, PiluleOrnee) for b in f.bandeau_page.pilules.values())
     assert picto_page("روابط مهمة") == "ouvrir" and picto_page("تتبع الغياب") == "absent"
-    assert f.bandeau_page.pilules["التحفيز والتهاني"].grab().width() > 60
+    assert f.bandeau_page.pilules["التحفيز والتشجيع"].grab().width() > 60
     # الحبوب كلها ظاهرة كاملة حتى في شاشة ضيقة: تلتف على سطر ثانٍ (2026-11-21)
     f.aller_a("لوحة القيادة")
     f.resize(1100, 760)
@@ -2698,9 +2741,9 @@ def test_rihab_et_registres(app, config_tmp, monkeypatch):
         assert g.left() >= 0 and g.right() <= z.width() and g.bottom() <= z.height(), b.text()
     assert len({b.geometry().top() for b in f.bandeau_page.pilules.values()}) >= 2   # سطران
     f.hide()
-    f.aller_a("التحفيز والتهاني")
+    f.aller_a("التحفيز والتشجيع")
     f.bandeau_page.pilules["الإعلام والتواصل"].click()   # الحبوب تنقل بين صفحات القسم
-    assert f.page_courante() == "الإعلام والتواصل" and not f.bandeau_page.pilules["التحفيز والتهاني"].isChecked()
+    assert f.page_courante() == "الإعلام والتواصل" and not f.bandeau_page.pilules["التحفيز والتشجيع"].isChecked()
     f.bandeau_page.b_rahba.click()
     assert f.rahba_courante() == i
     j = titres.index("تسليم المهام")   # قسم بصفحة واحدة: لا رحبة، يفتح صفحته
