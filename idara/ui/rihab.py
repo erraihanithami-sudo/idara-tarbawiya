@@ -565,6 +565,7 @@ class BandeauPage(QFrame):
         while self.flux.count():
             it = self.flux.takeAt(0)
             if it.widget():
+                it.widget().hide()   # يختفي فوراً (الحذف المؤجل قد يتأخر فتتراكب الحبوب القديمة والجديدة)
                 it.widget().deleteLater()
         self.groupe = QButtonGroup(self.zone)
         self.groupe.setExclusive(False)
