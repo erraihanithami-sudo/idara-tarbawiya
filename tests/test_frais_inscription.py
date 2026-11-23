@@ -61,3 +61,30 @@ def test_montants_manuels_et_sans_prescolaire(base):  # noqa: F811
     assert {x["classe"] for x in fr.lister(base, classe=cls[0])} == {cls[0]}
     fr.marquer(base, liste[0]["id"], "assurance", True)
     assert fr.totaux(base)["elements"]["assurance"]["montant"] == 12.5
+
+
+def test_mokhrajat_wajibat(base, dossier):  # noqa: F811
+    """طلب المدير 2026-11-23: وثيقة مخرجات الواجبات المدرسية حسب الأقسام أو المؤسسة كاملة أو قسم."""
+    from docx import Document
+    _milieu(base, "urbain")
+    liste = fr.lister(base)
+    ids = [x["id"] for x in liste]
+    fr.marquer_tous(base, ids, "assurance")
+    fr.marquer(base, ids[0], "sport", True)
+    r = fr.releve(base, "classes")
+    assert sum(l["eleves"] for l in r["lignes"]) == len(ids) and r["totaux"]["total"] == 12 * len(ids) + 10
+    assert {l["libelle"] for l in r["lignes"]} == set(fr.classes(base))
+    re_ = fr.releve(base, "etablissement")
+    assert sum(l["total"] for l in re_["lignes"]) == r["totaux"]["total"]
+    cl = liste[0]["classe"]
+    rc = fr.releve(base, "classe", cl)
+    assert rc["lignes"][0]["elements"]["assurance"] and all(l["code"] is not None for l in rc["lignes"])
+    with pytest.raises(fr.ErreurFrais, match="اختر القسم"):
+        fr.releve(base, "classe")
+    for portee, cle in (("classes", None), ("etablissement", None), ("classe", cl)):
+        p = fr.generer_releve(base, dossier, portee, cle)
+        d = Document(p)
+        texte = "\n".join(x.text for x in d.paragraphs)
+        cellules = " ".join(c.text for t in d.tables for row in t.rows for c in row.cells)
+        assert "مخرجات الواجبات المدرسية" in texte and "المبلغ الإجمالي المتحصل عليه" in texte
+        assert "المجموع" in cellules and "التأمين المدرسي" in cellules

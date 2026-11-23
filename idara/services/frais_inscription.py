@@ -137,3 +137,138 @@ def totaux(conn: sqlite3.Connection, niveau: str | None = None, unite: str | Non
         res["total"] += mt or 0
     res["total"] = _nombre(res["total"])
     return res
+
+
+# ---------- وثيقة «مخرجات الواجبات المدرسية» (طلب المدير 2026-11-23) ----------
+
+PORTEES = {"etablissement": "المؤسسة كاملة", "classes": "حسب الأقسام", "classe": "قسم واحد (لائحة التلاميذ)"}
+
+
+def _dh(v) -> str:
+    if v is None:
+        return "غير محدد"
+    return f"{_nombre(v):,}".replace(",", " ")
+
+
+def releve(conn: sqlite3.Connection, portee: str = "classes", classe: str | None = None,
+           unite: str | None = None) -> dict:
+    """معطيات الوثيقة: أسطر (قسم أو مستوى أو تلميذ) مع عدد المؤدين ومبلغ كل عنصر، والمجموع."""
+    if portee not in PORTEES:
+        raise ErreurFrais("نطاق الوثيقة غير معروف.")
+    m = montants(conn)
+    if portee == "classe":
+        if not classe:
+            raise ErreurFrais("اختر القسم.")
+        ls = lister(conn, unite=unite, classe=classe)
+        if not ls:
+            raise ErreurFrais(f"لا تلاميذ في القسم {classe}.")
+        lignes = []
+        for x in ls:
+            mt = sum(m[k] or 0 for k in ELEMENTS if x[k])
+            lignes.append({"libelle": f"{x['prenom_ar']} {x['nom_ar']}".strip(), "code": x["code_massar"] or "",
+                           "elements": {k: bool(x[k]) for k in ELEMENTS}, "total": _nombre(mt)})
+        return {"portee": portee, "classe": classe, "lignes": lignes, "totaux": totaux(conn, unite=unite,
+                                                                                         classe=classe), "montants": m}
+    if portee == "classes":
+        groupes = [(c, totaux(conn, unite=unite, classe=c)) for c in classes(conn, unite)]
+    else:
+        from idara.services import textes as tx
+        niveaux = list(dict.fromkeys(x["niveau"] for x in lister(conn, unite=unite) if x["niveau"]))
+        groupes = [(tx.niveau_ar(n) if n in tx.NIVEAUX else n, totaux(conn, niveau=n, unite=unite))
+                   for n in niveaux]
+    if not groupes:
+        raise ErreurFrais("لا تلاميذ مسجلين هذه السنة.")
+    return {"portee": portee, "classe": None, "montants": m, "totaux": totaux(conn, unite=unite),
+            "lignes": [{"libelle": lib, "eleves": t["eleves"],
+                        "elements": {k: (v["payes"], v["montant"]) for k, v in t["elements"].items()},
+                        "total": t["total"]} for lib, t in groupes]}
+
+
+def generer_releve(conn: sqlite3.Connection, dossier, portee: str = "classes", classe: str | None = None,
+                   unite: str | None = None) -> "Path":
+    """وثيقة Word: الواجبات المتحصل عليها حسب الأقسام، أو للمؤسسة كاملة (حسب المستوى)، أو لائحة قسم."""
+    from pathlib import Path  # noqa: F401
+    from docx.shared import Cm
+    from idara.services import documents as dc
+    from idara.services import textes as tx
+    from idara.services.docs_association import _cellule, _nouveau, _ombre, para, tableau
+    r = releve(conn, portee, classe, unite)
+    a = annee_srv.annee_courante(conn)
+    try:
+        c = dc.champs_communs(conn)
+    except dc.ErreurDocument as e:
+        raise ErreurFrais(str(e)) from None
+    m = r["montants"]
+    d = _nouveau(paysage=portee != "classe")
+    e = etab_srv.lire_etablissement(conn)
+    if e and e.logo_path and (dossier.racine / e.logo_path).exists():
+        d.add_picture(str(dossier.racine / e.logo_path), width=Cm(17 if portee == "classe" else 24))
+    para(d, "مخرجات الواجبات المدرسية", gras=True, taille=20, centre=True, apres=0)
+    sous = {"etablissement": "المؤسسة كاملة (حسب المستوى)", "classes": "حسب الأقسام",
+            "classe": f"القسم {classe}"}[portee]
+    para(d, f"{sous} · الموسم الدراسي {a['libelle']}" + (f" · {unite}" if unite else ""), centre=True, taille=13,
+         apres=4)
+    para(d, "المبالغ المعتمدة للتلميذ الواحد: " + "، ".join(
+        f"{lib} {_dh(m[k])}" + (" درهم" if m[k] is not None else "") for k, lib in ELEMENTS.items()), taille=11,
+        apres=6)
+    ks = list(ELEMENTS)
+    if portee == "classe":
+        entetes = ["ر.ت", "الاسم الكامل", "رمز مسار"] + [ELEMENTS[k] for k in ks] + ["المبلغ المؤدى (درهم)"]
+        t = tableau(d, 2 + len(r["lignes"]), len(entetes), largeurs=[1.0, 4.8, 2.8, 2.3, 2.3, 2.3, 2.5])
+        for j, lib in enumerate(entetes):
+            _cellule(t.cell(0, j), lib, gras=True, taille=10)
+            _ombre(t.cell(0, j))
+        for i, l in enumerate(r["lignes"], start=1):
+            vals = [str(i), l["libelle"], l["code"]] + ["✓" if l["elements"][k] else "—" for k in ks] + \
+                [_dh(l["total"])]
+            for j, v in enumerate(vals):
+                _cellule(t.cell(i, j), v, taille=10, centre=j != 1)
+        i = len(r["lignes"]) + 1
+        tt = r["totaux"]["elements"]
+        vals = ["", "المجموع", f"{r['totaux']['eleves']} تلميذاً"] + [f"{tt[k]['payes']} · {_dh(tt[k]['montant'])}"
+                                                                     for k in ks] + [_dh(r["totaux"]["total"])]
+    else:
+        entetes = ["القسم" if portee == "classes" else "المستوى", "عدد التلاميذ"]
+        for k in ks:
+            entetes += [f"{ELEMENTS[k]}: المؤدون", "المبلغ"]
+        entetes += ["المجموع (درهم)"]
+        t = tableau(d, 2 + len(r["lignes"]), len(entetes),
+                    largeurs=[3.0, 2.0] + [2.4, 2.4] * len(ks) + [3.0])
+        for j, lib in enumerate(entetes):
+            _cellule(t.cell(0, j), lib, gras=True, taille=9)
+            _ombre(t.cell(0, j))
+        for i, l in enumerate(r["lignes"], start=1):
+            vals = [l["libelle"], str(l["eleves"])]
+            for k in ks:
+                n, mt = l["elements"][k]
+                vals += [str(n), _dh(mt)]
+            vals.append(_dh(l["total"]))
+            for j, v in enumerate(vals):
+                _cellule(t.cell(i, j), v, taille=10)
+        i = len(r["lignes"]) + 1
+        tt = r["totaux"]
+        vals = ["المجموع", str(tt["eleves"])]
+        for k in ks:
+            vals += [str(tt["elements"][k]["payes"]), _dh(tt["elements"][k]["montant"])]
+        vals.append(_dh(tt["total"]))
+    for j, v in enumerate(vals):
+        _cellule(t.cell(i, j), v, gras=True, taille=10)
+        _ombre(t.cell(i, j))
+    tt = r["totaux"]
+    para(d, apres=6)
+    para(d, f"المبلغ الإجمالي المتحصل عليه: {_dh(tt['total'])} درهم، من {tt['eleves']} تلميذاً وتلميذة.", gras=True,
+         taille=12, apres=2)
+    for k, lib in ELEMENTS.items():
+        x = tt["elements"][k]
+        reste = tt["eleves"] - x["payes"]
+        para(d, f"• {lib}: أدّاه {x['payes']} من {tt['eleves']}" + (f"، والباقي {reste}" if reste else "، الجميع")
+             + (f" · {_dh(x['montant'])} درهم" if x["montant"] is not None else ""), taille=11, apres=0)
+    para(d, apres=8)
+    para(d, f"حرر ب{c['ville']} في: {tx.date_chiffres(datetime.now().date().isoformat())}", taille=12, apres=4)
+    para(d, f"توقيع {c['mudir_moassasa']}", gras=True, taille=13)
+    rep = dossier.archives / a["libelle"].replace("/", "-") / "التسجيلات"
+    rep.mkdir(parents=True, exist_ok=True)
+    nom = {"etablissement": "المؤسسة", "classes": "حسب الأقسام", "classe": f"القسم {classe}"}[portee]
+    chemin = rep / f"{datetime.now():%Y%m%d_%H%M%S}_مخرجات الواجبات المدرسية - {nom}.docx"
+    d.save(chemin)
+    return chemin

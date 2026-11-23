@@ -2103,6 +2103,21 @@ def test_inscriptions_frais(app, config_tmp):
     cl = p.classe.itemData(1)
     p.classe.setCurrentIndex(1)
     assert all(p.table.item(i, 2).text() == cl for i in range(p.table.rowCount()))
+    # طلب المدير 2026-11-23: وثيقة مخرجات الواجبات المدرسية من نافذة منبثقة
+    from idara.services import bureautique
+    from idara.services import frais_inscription as fr
+    ouverts = []
+    bureautique_ouvrir = bureautique.ouvrir
+    bureautique.ouvrir = lambda x: ouverts.append(x)
+    try:
+        fr_ = p.ouvrir_releve()
+        assert fr_.isVisible() and not p.c_classe_rel.isEnabled() and p.c_classe_rel.count() >= 1
+        p.c_portee.setCurrentIndex(list(fr.PORTEES).index("classe"))
+        assert p.c_classe_rel.isEnabled()
+        assert p.generer_releve() and not fr_.isVisible() and "مخرجات الواجبات" in ouverts[-1].name
+        assert p.generer_releve("classes") and p.generer_releve("etablissement") and len(ouverts) == 3
+    finally:
+        bureautique.ouvrir = bureautique_ouvrir
     f.aller_a("إعداد المؤسسة")
     assert f.page_etab.f_etab.milieu.currentData() == "urbain"
     f.close()
@@ -2209,6 +2224,35 @@ def test_projet_etablissement(app, config_tmp, monkeypatch, tmp_path):
     assert p.synthese["par_statut"]["realisee"] == 1 and p.synthese["taux_global"] == 50
     assert p.generer() is not None and p.generer(final=True) is not None
     assert p.generer_tableau_bord() is not None and "لوحة القيادة" in p.message.text()
+    # طلب المدير 2026-11-23: المشروع في نافذة منبثقة، وحاجيات المؤسسة ووثيقتها بتوقيعات مجلس التدبير
+    fp = p.ouvrir_projet()
+    assert fp.isVisible() and p.intitule.text()
+    fp.hide()
+    fp = p.ouvrir_projet(nouveau=True)
+    assert p.intitule.text() == ""
+    fp.hide()
+    from idara.services import besoins as bz
+    from idara.services import conseils_etab as ce
+    b = p.besoins
+    fb = b.ouvrir()
+    assert fb.isVisible() and b.c_operation.count() == 4   # فارغ + العمليات الثلاث المستوردة
+    assert b.enregistrer() is None and "الحاجة" in b.message_fiche.text()
+    b.c_besoin.setText("حواسيب محمولة")
+    b.c_cout.setText("12000")
+    b.c_priorite.setCurrentIndex(0)
+    b.c_operation.setCurrentIndex(1)
+    bid = b.enregistrer()
+    assert bid and not fb.isVisible() and b.table.rowCount() == 1 and "12 000" in b.l_synthese.text()
+    assert bz.besoin(f.conn, bid)["operation"] == b.c_operation.itemText(1)
+    b.ouvrir(bid)
+    assert b.c_besoin.text() == "حواسيب محمولة"
+    b.fiche.hide()
+    fd = b.ouvrir_document()
+    assert b.generer() is None and "مجلس التدبير" in b.message_doc.text()
+    ce.enregistrer_membres(f.conn, "gestion", [("مدير وهمي", "رئيس المجلس"), ("أستاذ وهمي", "ممثل القسم الأول")])
+    assert b.generer() is not None and not fd.isVisible()
+    b.supprimer(bid)
+    assert b.table.rowCount() == 0
     f.close()
 
 

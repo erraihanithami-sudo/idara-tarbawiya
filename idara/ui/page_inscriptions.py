@@ -37,6 +37,10 @@ class PageInscriptions(QWidget):
                                          "قيمة التأمين والانخراط في الجمعية الرياضية وجمعية تنمية التعاون المدرسي")
         self.b_montants.clicked.connect(lambda: self.ouvrir_montants())
         h0.addWidget(self.b_montants)
+        self.b_releve = bouton_couleur("مخرجات الواجبات المدرسية", "#2E7D32", "document",
+                                       "وثيقة الواجبات المتحصل عليها حسب الأقسام أو للمؤسسة كاملة")
+        self.b_releve.clicked.connect(lambda: self.ouvrir_releve())
+        h0.addWidget(self.b_releve)
         racine.addLayout(h0)
 
         c, v = carte("المجموع التراكمي")
@@ -164,6 +168,69 @@ class PageInscriptions(QWidget):
         self.rafraichir()
         message(self.message, "حُفظت مبالغ التسجيل، وتحيّن العدّاد.")
         return True
+
+    # ---- وثيقة «مخرجات الواجبات المدرسية» في نافذة منبثقة (طلب المدير 2026-11-23) ----
+    def ouvrir_releve(self):
+        from PySide6.QtWidgets import QFormLayout, QVBoxLayout
+
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        if not hasattr(self, "fiche_releve"):
+            w = QWidget()
+            v = QVBoxLayout(w)
+            fl = QFormLayout()
+            self.c_portee = QComboBox(w)
+            for k, lib in fr.PORTEES.items():
+                self.c_portee.addItem(lib, k)
+            self.c_portee.setCurrentIndex(1)
+            self.c_classe_rel = QComboBox(w)
+            self.c_portee.currentIndexChanged.connect(
+                lambda _: self.c_classe_rel.setEnabled(self.c_portee.currentData() == "classe"))
+            fl.addRow("النطاق", self.c_portee)
+            fl.addRow("القسم", self.c_classe_rel)
+            v.addLayout(fl)
+            aide = QLabel("«حسب الأقسام»: سطر لكل قسم. «المؤسسة كاملة»: سطر لكل مستوى مع المجموع. "
+                          "«قسم واحد»: لائحة تلاميذ القسم وما أدّاه كل واحد.")
+            aide.setObjectName("etiquette")
+            aide.setWordWrap(True)
+            v.addWidget(aide)
+            b = bouton_couleur("توليد الوثيقة", "#2E7D32", "document")
+            b.clicked.connect(lambda: self.generer_releve())
+            v.addWidget(b, 0, Qt.AlignLeft)
+            self.message_releve = QLabel()
+            self.message_releve.setWordWrap(True)
+            self.message_releve.hide()
+            v.addWidget(self.message_releve)
+            self.fiche_releve = FenetreFiche(self, "مخرجات الواجبات المدرسية", "الواجبات المتحصل عليها هذه السنة.",
+                                             w, largeur=560)
+        self.c_classe_rel.clear()
+        try:
+            for c in fr.classes(self.f.conn, self.unite.currentData()):
+                self.c_classe_rel.addItem(c, c)
+        except fr.ErreurFrais:
+            pass
+        if self.classe.currentData():
+            self.c_classe_rel.setCurrentIndex(max(0, self.c_classe_rel.findData(self.classe.currentData())))
+        self.c_classe_rel.setEnabled(self.c_portee.currentData() == "classe")
+        self.message_releve.hide()
+        self.fiche_releve.ouvrir()
+        return self.fiche_releve
+
+    def generer_releve(self, portee: str | None = None, classe: str | None = None):
+        from idara.services import bureautique
+        portee = portee or self.c_portee.currentData()
+        classe = classe or (self.c_classe_rel.currentData() if portee == "classe" else None)
+        try:
+            p = fr.generer_releve(self.f.conn, self.f.dossier, portee, classe, self.unite.currentData())
+        except fr.ErreurFrais as e:
+            message(self.message_releve, str(e), True)
+            return None
+        self.fiche_releve.hide()
+        message(self.message, f"وُلّدت الوثيقة: ⁦{p.name}⁩")
+        try:
+            bureautique.ouvrir(p)
+        except OSError:
+            pass
+        return p
 
     def afficher(self) -> None:
         try:

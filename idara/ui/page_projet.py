@@ -58,19 +58,32 @@ class PageProjet(QWidget):
                 cb.addItem(f"{y}/{y + 1}", f"{y}/{y + 1}")
         self.debut.setCurrentIndex(self.debut.findData(f"{a0}/{a0 + 1}"))
         self.fin.setCurrentIndex(self.fin.findData(f"{a0 + 2}/{a0 + 3}"))
-        v.addLayout(_grille([("المشروع المتتبَّع", self.c_projet), ("العنوان", self.intitule),
-                             ("سنة البداية", self.debut), ("سنة النهاية", self.fin)]))
+        # طلب المدير 2026-11-23: كل الإدخالات في نوافذ منبثقة
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
         h = QHBoxLayout()
-        b = QPushButton("حفظ المشروع")
-        b.setObjectName("principal")
-        b.clicked.connect(lambda: self.enregistrer_projet())
-        bn = QPushButton("مشروع جديد")
-        bn.clicked.connect(lambda: self.enregistrer_projet(nouveau=True))
+        h.addWidget(QLabel("المشروع المتتبَّع"))
+        h.addWidget(self.c_projet, 1)
+        b = bouton_couleur("تعديل المشروع", "#1565C0", "modifier")
+        b.clicked.connect(lambda: self.ouvrir_projet())
+        bn = bouton_couleur("مشروع جديد", "#2E7D32", "ajouter")
+        bn.clicked.connect(lambda: self.ouvrir_projet(nouveau=True))
         h.addWidget(b)
         h.addWidget(bn)
-        h.addStretch()
         v.addLayout(h)
         racine.addWidget(c)
+        wp = QWidget()
+        vp = QVBoxLayout(wp)
+        vp.addLayout(_grille([("العنوان", self.intitule), ("سنة البداية", self.debut), ("سنة النهاية", self.fin)]))
+        bp = bouton_couleur("حفظ المشروع", "#2E7D32", "enregistrer")
+        bp.clicked.connect(lambda: self._valider_projet())
+        vp.addWidget(bp, 0, Qt.AlignLeft)
+        self.message_projet = QLabel()
+        self.message_projet.setWordWrap(True)
+        self.message_projet.hide()
+        vp.addWidget(self.message_projet)
+        self.mode_nouveau = False
+        self.fiche_projet = FenetreFiche(self, "مشروع المؤسسة", "العنوان وسنتا البداية والنهاية كما في مسار.", wp,
+                                         largeur=760)
         # 2. لوحة القيادة (يعاد بناؤها)
         self.tv = QVBoxLayout()   # محتوى يُعاد بناؤه كاملاً مباشرة في الصفحة (نفس طريقة صفحة الإحصائيات)
         self.tv.setContentsMargins(0, 0, 0, 0)
@@ -126,7 +139,11 @@ class PageProjet(QWidget):
         h.addStretch()
         v.addLayout(h)
         racine.addWidget(c)
-        # 5. التقارير
+        # 5. حاجيات المؤسسة (طلب المدير 2026-11-23)
+        from idara.ui.bloc_besoins import BlocBesoins
+        self.besoins = BlocBesoins(self)
+        racine.addWidget(self.besoins)
+        # 6. التقارير
         c, v = carte("التقارير")
         h = QHBoxLayout()
         b = QPushButton("وثيقة لوحة القيادة")
@@ -176,6 +193,8 @@ class PageProjet(QWidget):
         self._tableau_bord()
         self._cibles()
         self._operations()
+        if hasattr(self, "besoins"):
+            self.besoins.rafraichir()
 
     def _tableau_bord(self) -> None:
         if self.contenu_tb is not None:
@@ -283,12 +302,31 @@ class PageProjet(QWidget):
             self.l_ops.setText("")
 
     # ---------- الأفعال ----------
+    def ouvrir_projet(self, nouveau: bool = False):
+        self.mode_nouveau = nouveau
+        if nouveau:
+            self.intitule.setText("")
+            self.fiche_projet.definir_titre("مشروع جديد")
+        else:
+            self.changer_projet()
+            self.fiche_projet.definir_titre("تعديل المشروع")
+        self.message_projet.hide()
+        self.fiche_projet.ouvrir()
+        return self.fiche_projet
+
+    def _valider_projet(self) -> int | None:
+        pid = self.enregistrer_projet(self.mode_nouveau)
+        if pid:
+            self.fiche_projet.hide()
+        return pid
+
     def enregistrer_projet(self, nouveau: bool = False) -> int | None:
         try:
             pid = pe.enregistrer_projet(self.f.conn, self.intitule.text(), self.debut.currentData(),
                                         self.fin.currentData(), None if nouveau else self.pid())
         except pe.ErreurProjet as e:
             message(self.message, str(e), True)
+            message(self.message_projet, str(e), True)
             return None
         self.c_projet.blockSignals(True)
         self.c_projet.clear()

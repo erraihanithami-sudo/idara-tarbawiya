@@ -22,7 +22,7 @@ _PORTEES = {"ligne": "للسطر المحدد في الجدول", "tout": "لك�
 
 
 class VueRegistre(QWidget):
-    def __init__(self, page, cle: str, couleur: str, fenetre: bool = False):
+    def __init__(self, page, cle: str, couleur: str, fenetre: bool = True):
         super().__init__()
         self.en_fenetre = fenetre   # طلب المدير 2026-11-19: الإضافة والتعديل في نافذة منبثقة
         self.page, self.f, self.r = page, page.f, rg.registre(cle)
@@ -406,7 +406,7 @@ class VueRegistre(QWidget):
 
 class PageRegistres(QWidget):
     def __init__(self, fenetre, titre: str, sous: str, cles: list[str], couleur: str | None = None,
-                 fenetres: bool = False):
+                 fenetres: bool = True):
         super().__init__()
         self.f = fenetre
         self.cles_registres = list(cles)

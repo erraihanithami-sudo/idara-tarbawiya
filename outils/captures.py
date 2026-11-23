@@ -418,6 +418,8 @@ def main(sortie: Path) -> None:
     f.bandeau_archive.revenir()
     f.aller_a("التسجيلات")
     photo(f, "54_inscriptions")
+    photo(f.page_inscriptions.ouvrir_releve(), "54b_mokhrajat_popup")
+    f.page_inscriptions.fiche_releve.hide()
     f.aller_a("تتبع الغياب")
     pa = f.page_absences
     pa.mois.setCurrentIndex(pa.mois.findData("2026-10"))
@@ -470,6 +472,21 @@ def main(sortie: Path) -> None:
             pp.t_ops.cellWidget(0, 5).setCurrentIndex(pp.t_ops.cellWidget(0, 5).findData("realisee"))
             pp.enregistrer_suivi()
     photo(f, "57_projet_etablissement")
+    try:   # حاجيات المؤسسة (2026-11-23)
+        from idara.services import besoins as _bz
+        for _v in ({"domaine": _bz.DOMAINES[1], "besoin": "حواسيب محمولة لقاعة الموارد", "quantite": 4, "cout": 16000,
+                    "priorite": "عالية", "source": _bz.SOURCES[0]},
+                   {"domaine": _bz.DOMAINES[0], "besoin": "قصص ومراجع للمكتبة المدرسية", "cout": 3000,
+                    "source": _bz.SOURCES[4]},
+                   {"domaine": _bz.DOMAINES[2], "besoin": "إصلاح المرافق الصحية", "cout": 9000, "priorite": "عالية",
+                    "source": _bz.SOURCES[3]}):
+            _bz.enregistrer(f.conn, _v)
+        pp.besoins.rafraichir()
+        pp.besoins.grab().save(str(sortie / "57b_projet_besoins.png"))
+        photo(pp.besoins.ouvrir(), "57c_besoin_popup")
+        pp.besoins.fiche.hide()
+    except Exception as e:  # noqa: BLE001
+        print("capture besoins:", e)
     # الرحاب والسجلات (2026-11-14)
     from idara.ui.fenetre import SECTIONS
     titres = [t for t, _ in SECTIONS]
