@@ -139,7 +139,20 @@ class PageSabboura(QWidget):
         self.v_ed.addStretch()
         corps.addWidget(self.c_ed, 7)
         racine.addLayout(corps, 1)
+        # توجيه المدير 2026-11-23: تحرير اللوحة في نافذة منبثقة (نقرتان على اللوحة أو الزر)
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        self.fiche_lavha = en_fenetre(self, self.c_ed, "اللوحة", "", 1100, ("enregistrer",))
+        self.liste.itemDoubleClicked.connect(lambda _: self.ouvrir_lavha())
+        self.b_editer = bouton_couleur("تحرير اللوحة المحددة", "#1565C0", "modifier")
+        self.b_editer.clicked.connect(lambda: self.ouvrir_lavha())
+        v.addWidget(self.b_editer)
         self.liste.setCurrentRow(0)
+
+    def ouvrir_lavha(self):
+        if self.liste.currentItem() is None:
+            return None
+        self.fiche_lavha.definir_titre(self.titre.text() or "اللوحة")
+        return self.fiche_lavha.ouvrir()
 
     def rafraichir(self) -> None:
         if self.cle:

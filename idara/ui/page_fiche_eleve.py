@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QTableWidget, QWidget)
+                               QTableWidget, QVBoxLayout, QWidget)
 
 from idara.services import annee as annee_srv
 from idara.services import bureautique
@@ -73,7 +73,7 @@ class PageFicheEleve(QWidget):
         v.addWidget(self.t_tarl)
         self.g_tarl = Graphe(peindre_tarl, 300)
         v.addWidget(self.g_tarl)
-        t = QLabel("مستوى التحكم حسب الروائز والمراحل (اكتب A أو B أو C ثم «حفظ المستويات»)")
+        t = QLabel("مستوى التحكم حسب الروائز والمراحل")
         t.setObjectName("titreCarte")
         t.setWordWrap(True)
         v.addWidget(t)
@@ -81,11 +81,22 @@ class PageFicheEleve(QWidget):
         self.t_etapes.setHorizontalHeaderLabels([fe.libelle_phase(ph) for ph in fe.PHASES])
         self.t_etapes.setVerticalHeaderLabels(list(fe.MATIERES.values()))
         self.t_etapes.setEditTriggers(QAbstractItemView.AllEditTriggers)
-        self.t_etapes.setMaximumHeight(140)
-        v.addWidget(self.t_etapes)
+        self.t_etapes.setMinimumHeight(160)
+        # توجيه المدير 2026-11-23: الإدخال في نافذة منبثقة
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        w_e = QWidget()
+        ve = QVBoxLayout(w_e)
+        ve.setContentsMargins(0, 0, 0, 0)
+        ve.addWidget(self.t_etapes)
+        be = QPushButton("حفظ المستويات")
+        be.setObjectName("principal")
+        be.clicked.connect(lambda: self.enregistrer())
+        ve.addWidget(be, 0, Qt.AlignLeft)
+        self.fiche_etapes = en_fenetre(self, w_e, "مستوى التحكم حسب الروائز والمراحل", "اكتب A أو B أو C.", 900,
+                                       ("enregistrer",))
         h = QHBoxLayout()
-        b = QPushButton("حفظ المستويات")
-        b.clicked.connect(lambda: self.enregistrer())
+        b = bouton_couleur("إدخال مستويات التحكم", "#1565C0", "modifier")
+        b.clicked.connect(lambda: self.fiche_etapes.ouvrir())
         h.addWidget(b)
         h.addStretch()
         v.addLayout(h)

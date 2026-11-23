@@ -52,10 +52,26 @@ class PageStructure(QWidget):
         self.b_suppr.clicked.connect(lambda: self.supprimer())
         h.addWidget(self.b_suppr)
         h.addStretch()
+        v.addLayout(h)
+        racine.addWidget(c)
+        # توجيه المدير 2026-11-23: المسك في نافذة منبثقة، والصفحة للاطلاع والوثيقة
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        self.fiche = en_fenetre(self, c, "مسك البنية المادية", "عدد كل مكوّن لكل وحدة مدرسية.", 1000,
+                                ("enregistrer", ("ajouter", False), ("supprimer", False)))
+        c, v = carte("مكونات البنية المادية")
+        h = QHBoxLayout()
+        bm = bouton_couleur("مسك البنية المادية", "#1565C0", "modifier")
+        bm.clicked.connect(lambda: self.fiche.ouvrir())
+        h.addWidget(bm)
         b = QPushButton("توليد وثيقة البنية المادية")
+        b.setObjectName("principal")
         b.clicked.connect(lambda: self.generer())
         h.addWidget(b)
+        h.addStretch()
         v.addLayout(h)
+        self.t_resume = tableau(["المكوّن", "العدد"], etirer=0)
+        self.t_resume.setMinimumHeight(360)
+        v.addWidget(self.t_resume)
         racine.addWidget(c)
         racine.addStretch()
         self.rafraichir()
@@ -72,6 +88,13 @@ class PageStructure(QWidget):
         self.table.setRowCount(len(t["lignes"]))
         for i, l in enumerate(t["lignes"]):
             self._ligne(i, l)
+        if hasattr(self, "t_resume"):
+            from idara.ui.saisie import cellule
+            ls = [l for l in t["lignes"] if l.get("total")]
+            self.t_resume.setRowCount(len(ls))
+            for i, l in enumerate(ls):
+                self.t_resume.setItem(i, 0, cellule(l["libelle"]))
+                self.t_resume.setItem(i, 1, cellule(str(l["total"])))
 
     def _ligne(self, i: int, l: dict) -> None:
         autre = l["element"].startswith("autre")

@@ -115,6 +115,7 @@ class PageAssoLegal(QWidget):
             self.champs[cle] = w
         v.addLayout(g)
         racine.addWidget(c)
+        self.carte_asso = c
         c, v = carte("أعضاء المكتب")
         self.table = _grille(va.COLS_BUREAU, 280)
         v.addWidget(self.table)
@@ -131,6 +132,33 @@ class PageAssoLegal(QWidget):
         h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
+        racine.addWidget(c)
+        # توجيه المدير 2026-11-23: المعطيات والأعضاء في نوافذ منبثقة، والصفحة للجمعية ووثائقها
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        lay = racine
+        lay.removeWidget(self.carte_asso)
+        cl = self.carte_asso.layout()
+        cl.removeWidget(self.asso)
+        self.fiche_asso = en_fenetre(self, self.carte_asso, "معطيات الجمعية والجمع العام", "", 980, ("enregistrer",))
+        self.fiche_bureau = en_fenetre(self, c, "أعضاء المكتب", "", 1000, ("enregistrer",))
+        b2 = QPushButton("حفظ")
+        b2.setObjectName("principal")
+        b2.clicked.connect(lambda: self.enregistrer(True))
+        cl.addWidget(b2, 0, Qt.AlignLeft)
+        c, v = carte("الجمعية ووثائقها")
+        v.addWidget(self.asso)
+        h = QHBoxLayout()
+        for lib, fi, coul, pic in (("معطيات الجمعية والجمع العام", self.fiche_asso, "#1565C0", "modifier"),
+                                   ("أعضاء المكتب", self.fiche_bureau, "#2E7D32", "personnes")):
+            b = bouton_couleur(lib, coul, pic)
+            b.clicked.connect(lambda _=False, fi=fi: fi.ouvrir())
+            h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        self.l_bureau = QLabel()
+        self.l_bureau.setObjectName("etiquette")
+        self.l_bureau.setWordWrap(True)
+        v.addWidget(self.l_bureau)
         h = QHBoxLayout()
         for cle, lib in va.DOCS_ASSO.items():
             b = QPushButton(f"{lib}")
@@ -166,6 +194,11 @@ class PageAssoLegal(QWidget):
                 w.setText(v)
         _remplir(self.table, d["membres"])
         self.cle = cle
+        if hasattr(self, "l_bureau"):
+            ms = [m for m in d["membres"] if any(m)]
+            self.l_bureau.setText("أعضاء المكتب: " + "، ".join(
+                f"{m[0]} ({m[1]})" if len(m) > 1 and m[1] else str(m[0]) for m in ms) if ms else
+                "لم يُسجَّل أعضاء المكتب بعد.")
 
     def donnees(self) -> dict:
         ch = {}
@@ -283,6 +316,7 @@ class PageGarde(QWidget):
         hz.addWidget(self.l_cle, 1)
         v.addLayout(hz)
         racine.addWidget(c)
+        self.carte_config = c
         wz = QWidget()
         vz = QVBoxLayout(wz)
         az = QLabel("اكتب شرح كل منطقة (عدد المناطق تحدده أنت في «عدد المناطق»). الشرح يظهر مفتاحاً أسفل كل "
@@ -327,11 +361,32 @@ class PageGarde(QWidget):
         self.bilan.setWordWrap(True)
         v.addWidget(self.bilan)
         self.consignes = QPlainTextEdit()
-        self.consignes.setFixedHeight(120)
-        v.addWidget(etiquette("مقتضيات المذكرة الداخلية (سطر لكل مقتضى)", self.consignes))
-        v.addWidget(self.consignes)
+        self.consignes.setFixedHeight(220)
+        # توجيه المدير 2026-11-23: الإعداد والمقتضيات في نوافذ منبثقة
+        from idara.ui.vitrine import en_fenetre
+        wc = QWidget()
+        vc = QVBoxLayout(wc)
+        vc.addWidget(etiquette("مقتضيات المذكرة الداخلية (سطر لكل مقتضى)", self.consignes))
+        vc.addWidget(self.consignes)
+        bc = QPushButton("حفظ")
+        bc.setObjectName("principal")
+        bc.clicked.connect(lambda: self.enregistrer(True))
+        vc.addWidget(bc, 0, Qt.AlignLeft)
+        self.fiche_consignes = en_fenetre(self, wc, "مقتضيات المذكرة الداخلية", "", 760, ("enregistrer",))
+        self.fiche_config = en_fenetre(self, self.carte_config, "المناطق والدورة",
+                                       "عدد المناطق وأسابيع الدورة وبدايتها وأيام الحراسة؛ الجدول يتكيف مباشرة.", 900)
+        bok = QPushButton("تم")
+        bok.setObjectName("principal")
+        bok.clicked.connect(lambda: self.fiche_config.hide())
+        self.fiche_config.layout().addWidget(bok, 0, Qt.AlignLeft)
         h = QHBoxLayout()
-        b = QPushButton("حفظ")
+        for lib, fn, coul, pic in (("المناطق والدورة", lambda: self.fiche_config.ouvrir(), "#1565C0", "modifier"),
+                                   ("مقتضيات المذكرة الداخلية", lambda: self.fiche_consignes.ouvrir(), "#6A1B9A",
+                                    "document")):
+            bb = bouton_couleur(lib, coul, pic)
+            bb.clicked.connect(fn)
+            h.addWidget(bb)
+        b = QPushButton("حفظ الجدول")
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer(True))
         h.addWidget(b)
@@ -531,10 +586,15 @@ class PageTransport(QWidget):
         self.t_veh = _grille(va.COLS_VEHICULE, 170)
         v.addWidget(self.t_veh)
         h = QHBoxLayout()
+        bsv = QPushButton("حفظ")
+        bsv.setObjectName("principal")
+        bsv.clicked.connect(lambda: self.enregistrer(True))
+        h.addWidget(bsv)
         _boutons_lignes(h, self.t_veh)
         h.addStretch()
         v.addLayout(h)
         racine.addWidget(c)
+        self.carte_veh = c
         c, v = carte("المستفيدون")
         h = QHBoxLayout()
         self.recherche = QLineEdit()
@@ -555,13 +615,31 @@ class PageTransport(QWidget):
         b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer(True))
         h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
+        racine.addWidget(c)
+        # توجيه المدير 2026-11-23: الإدخال في نوافذ منبثقة، والصفحة للحصيلة والوثائق
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        self.fiche_veh = en_fenetre(self, self.carte_veh, "وسائل النقل", "رقم الوسيلة ونوعها وسائقها ومسارها.", 1000,
+                                    ("enregistrer",))
+        self.fiche_el = en_fenetre(self, c, "المستفيدون من النقل المدرسي", "", 1000, ("enregistrer",))
+        c, v = carte("النقل المدرسي")
+        h = QHBoxLayout()
+        for lib, fi, coul, pic in (("وسائل النقل", self.fiche_veh, "#1565C0", "modifier"),
+                                   ("المستفيدون", self.fiche_el, "#2E7D32", "personnes")):
+            b = bouton_couleur(lib, coul, pic)
+            b.clicked.connect(lambda _=False, fi=fi: fi.ouvrir())
+            h.addWidget(b)
         b = QPushButton("لوائح المستفيدين وإحصاء الدواوير")
+        b.setObjectName("principal")
         b.clicked.connect(lambda: self.generer())
         h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
         self.stats = QLabel()
         self.stats.setObjectName("etiquette")
-        h.addWidget(self.stats, 1)
-        v.addLayout(h)
+        self.stats.setWordWrap(True)
+        v.addWidget(self.stats)
         racine.addWidget(c)
         racine.addStretch()
         self.rafraichir()

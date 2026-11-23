@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 from idara.services import annee as annee_srv
 from idara.services import etablissement as etab_srv
@@ -185,9 +186,8 @@ def releve(conn: sqlite3.Connection, portee: str = "classes", classe: str | None
 
 
 def generer_releve(conn: sqlite3.Connection, dossier, portee: str = "classes", classe: str | None = None,
-                   unite: str | None = None) -> "Path":
+                   unite: str | None = None) -> Path:
     """وثيقة Word: الواجبات المتحصل عليها حسب الأقسام، أو للمؤسسة كاملة (حسب المستوى)، أو لائحة قسم."""
-    from pathlib import Path  # noqa: F401
     from docx.shared import Cm
     from idara.services import documents as dc
     from idara.services import textes as tx

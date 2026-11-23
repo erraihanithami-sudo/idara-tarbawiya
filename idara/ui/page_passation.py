@@ -54,6 +54,7 @@ class PagePassation(QWidget):
         h.addStretch()
         v.addLayout(h)
         racine.addWidget(c)
+        self.carte_general = c
 
         corps = QHBoxLayout()
         corps.setSpacing(20)
@@ -121,7 +122,30 @@ class PagePassation(QWidget):
         corps.addWidget(self.carte_ed, 7)
         racine.addLayout(corps, 1)
         self.table: TableauRapide | None = None
+        # توجيه المدير 2026-11-23: الإدخال في نوافذ منبثقة
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        self.fiche_general = en_fenetre(self, self.carte_general, "المحضر: المعطيات العامة والتوليد", "", 1100,
+                                        ("generer",))
+        self.fiche_axe = en_fenetre(self, self.carte_ed, "محور المحضر", "", 1100, ("enregistrer",))
+        self.liste.itemDoubleClicked.connect(lambda _: self.ouvrir_axe())
+        hb = QHBoxLayout()
+        for lib, fn, coul, pic in (("المعطيات العامة وتوليد المحضر", lambda: self.fiche_general.ouvrir(), "#2E7D32",
+                                    "document"),
+                                   ("تحرير المحور المحدد", lambda: self.ouvrir_axe(), "#1565C0", "modifier")):
+            b = bouton_couleur(lib, coul, pic)
+            b.clicked.connect(fn)
+            hb.addWidget(b)
+        hb.addStretch()
+        racine.insertLayout(racine.indexOf(self.message) + 1, hb)
         self.rafraichir()
+
+    def ouvrir_axe(self):
+        it = self.liste.currentItem()
+        if it is None:
+            message(self.message, "حدد محوراً في القائمة.", True)
+            return None
+        self.fiche_axe.definir_titre(self.titre.text() or "محور المحضر")
+        return self.fiche_axe.ouvrir()
 
     # ---------- التحميل ----------
 

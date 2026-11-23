@@ -107,8 +107,9 @@ class PageProjet(QWidget):
         h.addStretch()
         v.addLayout(h)
         racine.addWidget(c)
+        self.carte_cibles = c
         # 4. العمليات
-        c, v = carte("تتبع تنزيل العمليات")
+        c, v = carte("المستهدفات وتنزيل العمليات")
         n = QLabel("استورد تقرير «خطة العمل» أو ملف تصدير العمليات من مسار. إعادة الاستيراد تحدّث المبالغ والتواريخ "
                    "ولا تمس الحالة والإنجاز والمصروف.")
         n.setObjectName("etiquette")
@@ -118,12 +119,20 @@ class PageProjet(QWidget):
         b = QPushButton("استيراد خطة العمل من مسار")
         b.clicked.connect(self.choisir_fichier)
         h.addWidget(b)
+        from idara.ui.vitrine import bouton_couleur as _bc
+        for lib, fn, coul, pic in (("المستهدفات", lambda: self.fiche_cibles.ouvrir(), "#6A1B9A", "statistiques"),
+                                   ("تتبع تنزيل العمليات", lambda: self.fiche_ops.ouvrir(), "#2E7D32", "modifier")):
+            bb = _bc(lib, coul, pic)
+            bb.clicked.connect(fn)
+            h.addWidget(bb)
         h.addStretch()
         v.addLayout(h)
         self.l_ops = QLabel()
         self.l_ops.setObjectName("etiquette")
         self.l_ops.setWordWrap(True)
         v.addWidget(self.l_ops)
+        self.carte_suivi = c
+        c, v = carte("تتبع تنزيل العمليات")
         self.t_ops = tableau_editable(["العملية", "المحور", "المعيار", "الفترة", "المبلغ", "الحالة", "الإنجاز %",
                                        "المصروف", "ملاحظات"])
         self.t_ops.setMinimumHeight(380)
@@ -138,7 +147,12 @@ class PageProjet(QWidget):
         h.addWidget(bs)
         h.addStretch()
         v.addLayout(h)
-        racine.addWidget(c)
+        racine.addWidget(self.carte_suivi)
+        from idara.ui.vitrine import en_fenetre
+        self.fiche_cibles = en_fenetre(self, self.carte_cibles, "القيمة المرجعية والمستهدفات", "", 980,
+                                       ("enregistrer_cibles",))
+        self.fiche_ops = en_fenetre(self, c, "تتبع تنزيل العمليات", "الحالة ونسبة الإنجاز والمصروف لكل عملية.", 1150,
+                                    ("enregistrer_suivi", ("supprimer_operation", False)))
         # 5. حاجيات المؤسسة (طلب المدير 2026-11-23)
         from idara.ui.bloc_besoins import BlocBesoins
         self.besoins = BlocBesoins(self)

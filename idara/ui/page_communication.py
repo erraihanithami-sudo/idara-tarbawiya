@@ -104,9 +104,22 @@ class VueAffiche(QWidget):
         aide.setWordWrap(True)
         v.addWidget(aide)
         v.addStretch()
-        h0.addWidget(c, 3)
+        # توجيه المدير 2026-11-23: المعطيات في نافذة منبثقة، مع معاينة حية داخلها
+        self.w_donnees = QWidget()
+        hd = QHBoxLayout(self.w_donnees)
+        hd.setContentsMargins(0, 0, 0, 0)
+        hd.addWidget(c, 3)
+        self.apercu_fiche = QLabel(self.w_donnees)
+        self.apercu_fiche.setFixedSize(QSize(260, 368))
+        self.apercu_fiche.setStyleSheet("border: 1px solid #8E8E99; background: #FFFFFF;")
+        hd.addWidget(self.apercu_fiche, 0, Qt.AlignTop)
 
-        c, v = carte("٣ · المعاينة والطبع")
+        c, v = carte("٢ · المعطيات، ثم المعاينة والطبع")
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        self.b_donnees = bouton_couleur("معطيات الإعلان", "#1565C0", "modifier",
+                                        "المناسبة والعنوان والتاريخ والمكان والنص، مع معاينة حية")
+        self.b_donnees.clicked.connect(lambda: self.ouvrir_donnees())
+        v.addWidget(self.b_donnees, 0, Qt.AlignHCenter)
         self.apercu = QLabel()
         self.apercu.setFixedSize(QSize(340, 481))
         self.apercu.setStyleSheet("border: 1px solid #8E8E99; background: #FFFFFF;")
@@ -126,8 +139,15 @@ class VueAffiche(QWidget):
         h.addWidget(b)
         v.addLayout(h)
         v.addStretch()
+        h0.addStretch(1)
         h0.addWidget(c, 2)
+        h0.addStretch(1)
         v0.addLayout(h0)
+        self.fiche_donnees = en_fenetre(self.page, self.w_donnees, "معطيات الإعلان",
+                                        "الحقل الفارغ لا يظهر في الإعلان.", 1000)
+        bf = bouton_couleur("تم", "#2E7D32", "valider")
+        bf.clicked.connect(lambda: self.fiche_donnees.hide())
+        self.fiche_donnees.layout().addWidget(bf, 0, Qt.AlignLeft)
 
         self.minuteur = QTimer(self)
         self.minuteur.setSingleShot(True)
@@ -184,8 +204,13 @@ class VueAffiche(QWidget):
             d = af.apercu_vide(self.theme)
         else:
             d = af.composer(self.theme, c)
-        self.apercu.setPixmap(affiche_qt.pixmap(d, 680).scaled(self.apercu.size(), Qt.KeepAspectRatio,
-                                                               Qt.SmoothTransformation))
+        px = affiche_qt.pixmap(d, 680)
+        self.apercu.setPixmap(px.scaled(self.apercu.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.apercu_fiche.setPixmap(px.scaled(self.apercu_fiche.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
+    def ouvrir_donnees(self):
+        self.actualiser()
+        return self.fiche_donnees.ouvrir()
 
     def _chemin(self, ext: str) -> Path:
         rep = self.f.dossier.archives / "الإعلانات المزخرفة"
@@ -267,7 +292,14 @@ class VueConvocations(QWidget):
         self.ordre.setPlaceholderText("جدول الأعمال (اختياري): نقطة في كل سطر")
         g.addWidget(self.ordre, 4, 0, 1, 3)
         v.addLayout(g)
-        v0.addWidget(c)
+        bg = QPushButton("توليد الاستدعاءات")
+        bg.setObjectName("principal")
+        bg.clicked.connect(lambda: self.generer())
+        hg = QHBoxLayout()
+        hg.addWidget(bg)
+        hg.addStretch()
+        v.addLayout(hg)
+        self.carte_rdv = c
 
         c, v = carte("المدعوون")
         h = QHBoxLayout()
@@ -278,9 +310,10 @@ class VueConvocations(QWidget):
         self.nb.setObjectName("etiquette")
         self.nb.setWordWrap(True)
         h.addWidget(self.nb, 1)
-        b = QPushButton("توليد الاستدعاءات")
+        b = QPushButton("المناسبة والموعد ثم التوليد")
         b.setObjectName("principal")
-        b.clicked.connect(lambda: self.generer())
+        b.setToolTip("نافذة: المناسبة والتاريخ والساعة والمكان وجدول الأعمال، ثم توليد الاستدعاءات")
+        b.clicked.connect(lambda: self.fiche_rdv.ouvrir())
         h.addWidget(b)
         v.addLayout(h)
         self.table = tableau(["التلميذ(ة)", "القسم", "تاريخ الازدياد", "رقم مسار"], etirer=0)
@@ -290,9 +323,17 @@ class VueConvocations(QWidget):
         v.addWidget(self.table)
         v0.addWidget(c)
         self.lignes: list[dict] = []
+        from idara.ui.vitrine import en_fenetre
+        self.fiche_rdv = en_fenetre(self, self.carte_rdv, "الاستدعاءات: المناسبة والموعد",
+                                    "تُولَّد للتلاميذ المحددين في الجدول، أو لكل المعروضين.", 900, ("generer",),
+                                    message_attr="_msg_page")
         self.occasion.currentIndexChanged.connect(lambda _: self._numeros())
         self.par_page.currentIndexChanged.connect(lambda _: self._compte())
         self._numeros()
+
+    @property
+    def _msg_page(self):
+        return self.page.message
 
     def _numeros(self) -> None:
         nums = cv.OCCASIONS[self.occasion.currentData()][1]

@@ -74,6 +74,7 @@ class PageCalendrier(QWidget):
             h.addWidget(x)
         h.addStretch()
         v.addLayout(h)
+        self.barre_stations = h
         racine.addWidget(c)
 
         # ---- محطة محلية ----
@@ -105,7 +106,31 @@ class PageCalendrier(QWidget):
         v.addLayout(h)
         racine.addWidget(c)
         racine.addStretch()
+        # توجيه المدير 2026-11-23: المحطة الخاصة في نافذة منبثقة
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        self.fiche_locale = en_fenetre(self, c, "محطة خاصة بالمؤسسة", "تظهر في محطات السنة وفي برنامج العمل السنوي.",
+                                       880, ("enregistrer", "supprimer"))
+        self.b_nouvelle = bouton_couleur("محطة خاصة جديدة", "#2E7D32", "ajouter")
+        self.b_nouvelle.clicked.connect(lambda: self.ouvrir_locale(None))
+        self.b_modif_loc = bouton_couleur("تعديل المحطة المحددة", "#1565C0", "modifier")
+        self.b_modif_loc.clicked.connect(lambda: self.ouvrir_locale(self.sid))
+        self.barre_stations.insertWidget(0, self.b_modif_loc)
+        self.barre_stations.insertWidget(0, self.b_nouvelle)
+        self.t_stations.itemDoubleClicked.connect(lambda _: self.sid and self.ouvrir_locale(self.sid))
         self.rafraichir()
+
+    def ouvrir_locale(self, sid: int | None):
+        if sid is None:
+            self._remplir(None)
+            self.fiche_locale.definir_titre("محطة خاصة جديدة")
+        else:
+            s = next((x for x in self.stations if x.locale and x.id == sid), None)
+            if s is None:
+                message(self.message, "حدد محطة خاصة بالمؤسسة (المحطات الوزارية لا تُعدَّل).", True)
+                return None
+            self._remplir(s)
+            self.fiche_locale.definir_titre("تعديل المحطة")
+        return self.fiche_locale.ouvrir()
 
     # ---------- العرض ----------
     def rafraichir(self) -> None:

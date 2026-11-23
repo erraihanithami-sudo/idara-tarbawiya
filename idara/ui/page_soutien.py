@@ -6,7 +6,7 @@ from __future__ import annotations
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QGridLayout, QHBoxLayout, QLabel, QPushButton,
-                               QTableWidgetItem, QWidget)
+                               QTableWidgetItem, QVBoxLayout, QWidget)
 
 from idara.services import annee as annee_srv
 from idara.services import bureautique
@@ -58,44 +58,67 @@ class PageSoutien(QWidget):
                                      "نتائج التلاميذ قبل الدعم وبعده (على 10).")
         self.setLayout(racine)
 
+        # توجيه المدير 2026-11-23: كل الإدخالات في نوافذ منبثقة، والصفحة للمعطيات
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+
+        def formulaire():
+            w = QWidget()
+            v = QVBoxLayout(w)
+            v.setContentsMargins(0, 0, 0, 0)
+            return w, v
+
+        def bouton_principal(texte, fn):
+            b = QPushButton(texte)
+            b.setObjectName("principal")
+            b.clicked.connect(fn)
+            h = QHBoxLayout()
+            h.addWidget(b)
+            h.addStretch()
+            return h
+
         # 1. المرحلة والفئات
         c, v = carte("مرحلة الدعم وفئات التعثر")
         self.etape = QComboBox()
         self.etape.currentIndexChanged.connect(lambda _: self.afficher_etape())
-        self.nom_etape = champ("مثلاً: الدعم المرحلي الأول")
-        self.debut, self.fin = ChampDate(), ChampDate()
-        v.addLayout(_grille([("المرحلة", self.etape), ("مرحلة جديدة", self.nom_etape), ("من", self.debut),
-                             ("إلى", self.fin)]))
-        h = QHBoxLayout()
-        b = QPushButton("إضافة المرحلة")
-        b.clicked.connect(lambda: self.ajouter_etape())
-        h.addWidget(b)
-        h.addStretch()
-        v.addLayout(h)
+        v.addLayout(_grille([("المرحلة", self.etape)]))
         self.l_categories = QLabel()
         self.l_categories.setWordWrap(True)
         self.l_categories.setObjectName("etiquette")
-        self.nom_categorie = champ("فئة جديدة، مثلاً: صعوبات في التركيز")
-        b2 = QPushButton("إضافة الفئة")
-        b2.clicked.connect(lambda: self.ajouter_categorie())
-        h2 = QHBoxLayout()
-        h2.addWidget(self.nom_categorie, 1)
-        h2.addWidget(b2)
         v.addWidget(self.l_categories)
-        v.addLayout(h2)
+        w, fv = formulaire()
+        self.nom_etape = champ("مثلاً: الدعم المرحلي الأول")
+        self.debut, self.fin = ChampDate(), ChampDate()
+        fv.addLayout(_grille([("اسم المرحلة", self.nom_etape), ("من", self.debut), ("إلى", self.fin)]))
+        fv.addLayout(bouton_principal("إضافة المرحلة", lambda: self.ajouter_etape()))
+        self.fiche_etape = en_fenetre(self, w, "مرحلة دعم جديدة", "", 760, ("ajouter_etape",))
+        w, fv = formulaire()
+        self.nom_categorie = champ("فئة جديدة، مثلاً: صعوبات في التركيز")
+        fv.addLayout(_grille([("فئة التعثر", self.nom_categorie)]))
+        fv.addLayout(bouton_principal("إضافة الفئة", lambda: self.ajouter_categorie()))
+        self.fiche_categorie = en_fenetre(self, w, "فئة تعثر جديدة", "", 620, ("ajouter_categorie",))
+        h = QHBoxLayout()
+        for lib, fi, coul in (("مرحلة جديدة", self.fiche_etape, "#2E7D32"),
+                              ("فئة تعثر جديدة", self.fiche_categorie, "#6A1B9A")):
+            b = bouton_couleur(lib, coul, "ajouter")
+            b.clicked.connect(lambda _=False, fi=fi: fi.ouvrir())
+            h.addWidget(b)
+        h.addStretch()
+        v.addLayout(h)
         racine.addWidget(c)
 
         # 2. المجموعات
         c, v = carte("مجموعات الدعم")
+        w, fv = formulaire()
         self.categorie = QComboBox()
         self.intervenant = QComboBox()
         self.matiere = champ("العربية، الرياضيات...")
-        v.addLayout(_grille([("فئة التعثر", self.categorie), ("الأستاذ(ة) المتدخل(ة)", self.intervenant),
-                             ("المادة", self.matiere)]))
+        fv.addLayout(_grille([("فئة التعثر", self.categorie), ("الأستاذ(ة) المتدخل(ة)", self.intervenant),
+                              ("المادة", self.matiere)]))
+        fv.addLayout(bouton_principal("إنشاء المجموعة", lambda: self.creer_groupe()))
+        self.fiche_groupe = en_fenetre(self, w, "مجموعة دعم جديدة", "", 860, ("creer_groupe",))
         h = QHBoxLayout()
-        b = QPushButton("إنشاء مجموعة")
-        b.setObjectName("principal")
-        b.clicked.connect(lambda: self.creer_groupe())
+        b = bouton_couleur("مجموعة جديدة", "#2E7D32", "ajouter")
+        b.clicked.connect(lambda: self.fiche_groupe.ouvrir())
         bs = bouton("حذف المجموعة المحددة")
         bs.clicked.connect(lambda: self.supprimer_groupe())
         h.addWidget(b)
@@ -105,6 +128,7 @@ class PageSoutien(QWidget):
         self.t_groupes = tableau(["المجموعة", "الفئة", "الأستاذ(ة)", "المادة", "الأقسام", "التلاميذ", "الحصص"], etirer=0)
         self.t_groupes.setMinimumHeight(220)
         self.t_groupes.itemSelectionChanged.connect(self.afficher_groupe)
+        self.t_groupes.itemDoubleClicked.connect(lambda _: self.ouvrir_membres())
         v.addWidget(self.t_groupes)
         racine.addWidget(c)
 
@@ -113,22 +137,20 @@ class PageSoutien(QWidget):
         self.l_groupe = QLabel("حدد مجموعة في الجدول أعلاه.")
         self.l_groupe.setObjectName("etiquette")
         v.addWidget(self.l_groupe)
+        w, fv = formulaire()
         self.classe = QComboBox()
         self.classe.currentIndexChanged.connect(lambda _: self.afficher_classe())
-        v.addLayout(_grille([("القسم", self.classe)]))
+        fv.addLayout(_grille([("القسم", self.classe)]))
         self.t_classe = tableau(["", "الاسم الكامل", "رقم مسار"], etirer=1)
-        self.t_classe.setMinimumHeight(220)
-        v.addWidget(self.t_classe)
-        h = QHBoxLayout()
-        b = QPushButton("إضافة التلاميذ المؤشر عليهم إلى المجموعة")
-        b.clicked.connect(lambda: self.affecter())
-        h.addWidget(b)
-        h.addStretch()
-        v.addLayout(h)
+        self.t_classe.setMinimumHeight(260)
+        fv.addWidget(self.t_classe)
+        fv.addLayout(bouton_principal("إضافة التلاميذ المؤشر عليهم إلى المجموعة", lambda: self.affecter()))
+        self.fiche_affecter = en_fenetre(self, w, "إضافة تلاميذ إلى المجموعة", "", 820, ("affecter",))
+        w, fv = formulaire()
         self.t_membres = tableau(["الاسم الكامل", "القسم", "قبل الدعم", "بعد الدعم", "التطور", "ملاحظات"], etirer=5)
         self.t_membres.setEditTriggers(QAbstractItemView.AllEditTriggers)
-        self.t_membres.setMinimumHeight(260)
-        v.addWidget(self.t_membres)
+        self.t_membres.setMinimumHeight(320)
+        fv.addWidget(self.t_membres)
         h = QHBoxLayout()
         b = QPushButton("حفظ النتائج")
         b.setObjectName("principal")
@@ -138,21 +160,34 @@ class PageSoutien(QWidget):
         h.addWidget(b)
         h.addWidget(br)
         h.addStretch()
+        fv.addLayout(h)
+        self.fiche_membres = en_fenetre(self, w, "تلاميذ المجموعة ونتائجهم", "النقط على 10 قبل الدعم وبعده.", 980,
+                                        ("enregistrer_notes", ("retirer", False)))
+        h = QHBoxLayout()
+        for lib, fn, coul in (("إضافة تلاميذ إلى المجموعة", lambda: self.ouvrir_affecter(), "#1565C0"),
+                              ("التلاميذ ونتائجهم", lambda: self.ouvrir_membres(), "#00838F")):
+            b = bouton_couleur(lib, coul, "personnes")
+            b.clicked.connect(fn)
+            h.addWidget(b)
+        h.addStretch()
         v.addLayout(h)
         racine.addWidget(c)
 
         # 4. استعمال الزمن
         c, v = carte("استعمال زمن الدعم")
+        w, fv = formulaire()
         self.jour = QComboBox()
         for i, j in enumerate(sv.JOURS):
             self.jour.addItem(j, i)
         self.h_debut, self.h_fin = champ("14:30", ltr=True), champ("15:30", ltr=True)
         self.lieu = champ("القاعة")
-        v.addLayout(_grille([("اليوم", self.jour), ("من الساعة", self.h_debut), ("إلى", self.h_fin),
-                             ("المكان", self.lieu)]))
+        fv.addLayout(_grille([("اليوم", self.jour), ("من الساعة", self.h_debut), ("إلى", self.h_fin),
+                              ("المكان", self.lieu)]))
+        fv.addLayout(bouton_principal("إضافة الحصة", lambda: self.ajouter_seance()))
+        self.fiche_seance = en_fenetre(self, w, "حصة دعم للمجموعة المحددة", "", 860, ("ajouter_seance",))
         h = QHBoxLayout()
-        b = QPushButton("إضافة حصة للمجموعة المحددة")
-        b.clicked.connect(lambda: self.ajouter_seance())
+        b = bouton_couleur("حصة جديدة للمجموعة المحددة", "#2E7D32", "ajouter")
+        b.clicked.connect(lambda: self.ouvrir_seance())
         bs = bouton("حذف الحصة المحددة")
         bs.clicked.connect(lambda: self.supprimer_seance())
         h.addWidget(b)
@@ -256,6 +291,21 @@ class PageSoutien(QWidget):
                                      s["lieu"] or "—")):
                 self.t_edt.setItem(i, j, cellule(val, s["id"] if j == 0 else None))
         self.bilan()
+
+    def _avec_groupe(self, fiche):
+        if self.gid() is None:
+            message(self.message, "حدد مجموعة في جدول المجموعات أولاً.", True)
+            return None
+        return fiche.ouvrir()
+
+    def ouvrir_affecter(self):
+        return self._avec_groupe(self.fiche_affecter)
+
+    def ouvrir_membres(self):
+        return self._avec_groupe(self.fiche_membres)
+
+    def ouvrir_seance(self):
+        return self._avec_groupe(self.fiche_seance)
 
     def gid(self) -> int | None:
         rows = self.t_groupes.selectionModel().selectedRows() if self.t_groupes.selectionModel() else []

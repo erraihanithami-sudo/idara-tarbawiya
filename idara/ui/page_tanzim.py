@@ -42,9 +42,15 @@ class PageTanzim(QWidget):
         self.insp = {k: champ("اسم المفتش(ة)") for k in tz.INSPECTEURS}
         v.addLayout(_grille([(lib, self.insp[k]) for k, lib in tz.INSPECTEURS.items()]))
         b = QPushButton("حفظ المفتشين")
+        b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer_inspecteurs())
         v.addWidget(b)
         racine.addWidget(c)
+        # توجيه المدير 2026-11-23: الإدخال في نافذة منبثقة
+        from idara.ui.vitrine import bouton_lanceur, en_fenetre
+        self.fiche_insp = en_fenetre(self, c, "المفتشون التربويون", "", 820, ("enregistrer_inspecteurs",))
+        racine.addWidget(bouton_lanceur("المفتشون التربويون", lambda: self.fiche_insp.ouvrir(), "#6A1B9A",
+                                        "modifier"))
 
         self.tables = {}
         for cle, titre, cols in (

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QHeaderView, QAbstractItemView, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QPushButton,
-                               QSpinBox, QTableWidgetItem, QWidget)
+                               QSpinBox, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from idara.services import bureautique
 from idara.services import deliberations as dl
@@ -189,14 +189,30 @@ class PageExamen(QWidget):
         self.premier, self.capacite = QSpinBox(), QSpinBox()
         self.premier.setRange(1, 999999)
         self.capacite.setRange(1, 60)
-        v.addLayout(_grille([("النوع", self.type), ("الدورة", self.session), ("مركز الامتحان", self.centre),
-                             ("رمز المركز", self.code_centre)]))
-        v.addLayout(_grille([("اسم الامتحان", self.intitule)], etirer=0))
-        v.addLayout(_grille([("الرقم الأول (المحلي)", self.premier), ("عدد المترشحين في القاعة", self.capacite)]))
+        # توجيه المدير 2026-11-23: النوع في الصفحة، والمعطيات في نافذة منبثقة
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        he = QHBoxLayout()
+        he.addWidget(QLabel("النوع"))
+        he.addWidget(self.type)
+        self.b_donnees_exam = bouton_couleur("معطيات الامتحان", "#1565C0", "modifier",
+                                             "الدورة والمركز ورمزه واسم الامتحان والترقيم وطاقة القاعة")
+        self.b_donnees_exam.clicked.connect(lambda: self.fiche_exam.ouvrir())
+        he.addWidget(self.b_donnees_exam)
+        he.addStretch()
+        v.addLayout(he)
+        w_ex = QWidget()
+        vx = QVBoxLayout(w_ex)
+        vx.setContentsMargins(0, 0, 0, 0)
+        vx.addLayout(_grille([("الدورة", self.session), ("مركز الامتحان", self.centre),
+                              ("رمز المركز", self.code_centre)]))
+        vx.addLayout(_grille([("اسم الامتحان", self.intitule)], etirer=0))
+        vx.addLayout(_grille([("الرقم الأول (المحلي)", self.premier), ("عدد المترشحين في القاعة", self.capacite)]))
         b = QPushButton("حفظ معطيات الامتحان")
+        b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer())
-        v.addWidget(b)
+        vx.addWidget(b, 0, Qt.AlignLeft)
         racine.addWidget(c)
+        self.fiche_exam = en_fenetre(self, w_ex, "معطيات الامتحان", "", 900, ("enregistrer",))
 
         # ---- المترشحون ----
         c, v = carte("المترشحون والقاعات")

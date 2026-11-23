@@ -372,6 +372,7 @@ class PageAssociations(QWidget):
         h.addWidget(self.b_suppr)
         h.addWidget(self.l_pieces, 1)
         cv.addLayout(h)
+        self.barre_ops = h
         racine.addWidget(c)
         corps = QHBoxLayout()
         corps.setSpacing(20)
@@ -431,7 +432,8 @@ class PageAssociations(QWidget):
         self.b_save.setObjectName("principal")
         self.b_save.clicked.connect(lambda: self.enregistrer())
         self.b_annuler = QPushButton("إلغاء التعديل")
-        self.b_annuler.clicked.connect(lambda: self._fin_edition())
+        self.b_annuler.clicked.connect(lambda: (self._fin_edition(), getattr(self, "fiche_operation", None) and
+                                                self.fiche_operation.hide()))
         self.b_annuler.hide()
         h.addWidget(self.b_save)
         h.addWidget(self.b_annuler)
@@ -439,6 +441,7 @@ class PageAssociations(QWidget):
         fv.addLayout(h)
         fv.addStretch()
         corps.addWidget(c, 5)
+        self.carte_operation = c
 
         # ---- الميزانية ----
         c, bv = carte()
@@ -464,8 +467,16 @@ class PageAssociations(QWidget):
         self.prevu.setMaximumWidth(160)
         self.b_prev = QPushButton("حفظ المتوقع")
         self.b_prev.clicked.connect(lambda: self.enregistrer_prevision())
+        self.w_prev = QWidget()
+        hp = QVBoxLayout(self.w_prev)
         for w in (self.l_prev, self.prevu, self.b_prev):
-            h.addWidget(w)
+            hp.addWidget(w)
+        hp.addStretch()
+        self.b_prevision = QPushButton("تحديد المبلغ المتوقع للبند المحدد")
+        self.b_prevision.setObjectName("principal")
+        self.b_prevision.clicked.connect(lambda: self.ouvrir_prevision())
+        self.budget.itemDoubleClicked.connect(lambda _: self.ouvrir_prevision())
+        h.addWidget(self.b_prevision)
         h.addStretch()
         bv.addLayout(h)
         corps.addWidget(c, 6)
@@ -483,12 +494,27 @@ class PageAssociations(QWidget):
         av.addLayout(g)
         h = QHBoxLayout()
         b = QPushButton("حفظ معطيات الجمعية")
+        b.setObjectName("principal")
         b.clicked.connect(lambda: self.enregistrer_association())
         h.addWidget(b)
         h.addStretch()
         av.addLayout(h)
         racine.addWidget(c)
         racine.addStretch()
+        # توجيه المدير 2026-11-23: كل الإدخالات في نوافذ منبثقة
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        self.fiche_operation = en_fenetre(self, self.carte_operation, "عملية جديدة", "مدخول أو مصروف أو تحويل.",
+                                          860, ("enregistrer",), conteneur=self.w_finance)
+        self.fiche_prevision = en_fenetre(self, self.w_prev, "المبلغ المتوقع", "", 520, ("enregistrer_prevision",),
+                                          conteneur=self.w_finance)
+        self.fiche_association = en_fenetre(self, c, "معطيات الجمعية", "الحساب البنكي والمكتب المسير.", 860,
+                                            ("enregistrer_association",), conteneur=self.w_finance)
+        self.b_nouvelle_op = bouton_couleur("عملية جديدة", "#2E7D32", "ajouter", "تسجيل مدخول أو مصروف أو تحويل")
+        self.b_nouvelle_op.clicked.connect(lambda: self.nouvelle_operation())
+        self.b_asso = bouton_couleur("معطيات الجمعية", "#6A1B9A", "modifier")
+        self.b_asso.clicked.connect(lambda: self.fiche_association.ouvrir())
+        self.barre_ops.insertWidget(0, self.b_nouvelle_op)
+        self.barre_ops.addWidget(self.b_asso)
 
         self._remplir_chapitres()
         self._charger_association()
@@ -678,6 +704,18 @@ class PageAssociations(QWidget):
         message(self.message, "عُدلت العملية." if modif else "سُجلت العملية.")
         return oid
 
+    def nouvelle_operation(self):
+        self._fin_edition()
+        self.fiche_operation.definir_titre("عملية جديدة")
+        return self.fiche_operation.ouvrir()
+
+    def ouvrir_prevision(self):
+        if not {i.row() for i in self.budget.selectedIndexes()}:
+            message(self.message, "اختر بنداً من جدول الميزانية.", True)
+            return None
+        self._selection_budget()
+        return self.fiche_prevision.ouvrir()
+
     def modifier(self) -> bool:
         """يحمّل العملية المحددة في الاستمارة لتعديلها (المنقول: نافذة «تعديل المنقول»)."""
         if self.op_id is None:
@@ -707,6 +745,9 @@ class PageAssociations(QWidget):
         self.b_annuler.show()
         self.l_mode.setText(f"تعديل العملية رقم {o['numero']}: صحح الخانات ثم «حفظ التعديل».")
         self.l_mode.show()
+        if hasattr(self, "fiche_operation"):
+            self.fiche_operation.definir_titre(f"تعديل العملية رقم {o['numero']}")
+            self.fiche_operation.ouvrir()
         self.montant.setFocus()
         return True
 

@@ -320,6 +320,29 @@ class PageAchats(QWidget):
         v.addLayout(_grille([("تاريخ الأداء", self.date_paie), ("الطريقة", self.mode_paie),
                              ("رقم الشيك / المرجع", self.ref_paie)]))
         v.addLayout(self._ligne_boutons([("تسجيل الأداء بسجل البنك", self.payer)], []))
+        z.addWidget(c)
+        # توجيه المدير 2026-11-23: كل مرحلة في نافذة منبثقة، والصفحة تعرض مراحل الملف وحالتها
+        from idara.ui.vitrine import bouton_couleur, en_fenetre
+        cartes = [z.itemAt(i).widget() for i in range(z.count())]
+        titres = ("1. التعبير عن الحاجة", "2. طلب عروض الأثمان", "3. لجنة دراسة عروض الأثمان",
+                  "4. العروض المتوصل بها واختيار اللجنة", "5. سند الطلب أو الاتفاقية، ثم التسليم",
+                  "6. الفاتورة والأداء")
+        actions = (("enregistrer_besoin",), ("enregistrer_demande",), ("enregistrer_commission",),
+                   ("ajouter_offre", "supprimer_offre", "choisir", "editer_fournisseur"),
+                   ("engager", "enregistrer_reception"), ("enregistrer_facture", "payer"))
+        c, v = carte("مراحل الملف")
+        g = QGridLayout()
+        g.setSpacing(10)
+        self.fiches_etapes, self.b_etapes = [], []
+        couleurs = ("#1565C0", "#00838F", "#6A1B9A", "#EF6C00", "#2E7D32", "#C62828")
+        for k, (ct, ti, acts) in enumerate(zip(cartes, titres, actions)):
+            fi = en_fenetre(self, ct, ti, "", 980, tuple((a, False) for a in acts), conteneur=self.zone)
+            self.fiches_etapes.append(fi)
+            b = bouton_couleur(ti, couleurs[k], "document")
+            b.clicked.connect(lambda _=False, fi=fi: fi.ouvrir())
+            self.b_etapes.append(b)
+            g.addWidget(b, k // 3, k % 3)
+        v.addLayout(g)
         t = QLabel("ملف الأداء:")
         t.setObjectName("titreCarte")
         v.addWidget(t)
@@ -334,7 +357,7 @@ class PageAchats(QWidget):
         h = QHBoxLayout()
         for lib, f in actions:
             b = QPushButton(lib)
-            b.clicked.connect(lambda _=False, f=f: f())
+            b.clicked.connect(lambda _=False, n=f.__name__: getattr(self, n)())   # الدالة المغلَّفة إن وُجدت
             h.addWidget(b)
         self.boutons_docs = getattr(self, "boutons_docs", {})
         for code in docs:

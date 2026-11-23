@@ -54,6 +54,7 @@ class PageParents(QWidget):
         b.setToolTip("للقسم المختار، أو لكل الأقسام (صفحة لكل قسم)")
         b.clicked.connect(lambda: self.generer())
         h.addWidget(b)
+        self.barre = h
         v.addLayout(h)
         self.table = tableau(["التلميذ(ة)", "القسم", "ولي الأمر", "الصفة", "الهاتف", "العنوان"], etirer=5)
         self.table.setMinimumHeight(360)
@@ -132,10 +133,25 @@ class PageParents(QWidget):
         h.addWidget(b)
         h.addStretch()
         v.addLayout(h)
-        self.c_fiche.hide()
         racine.addWidget(self.c_fiche)
         racine.addStretch()
+        # توجيه المدير 2026-11-23: معلومات الأولياء في نافذة منبثقة (نقرتان على التلميذ)
+        from idara.ui.vitrine import en_fenetre
+        self.fiche = en_fenetre(self, self.c_fiche, "معلومات أولياء الأمور", "الأب والأم والولي، ورسالة واتساب.", 1100,
+                                ("enregistrer",))
+        self.table.itemDoubleClicked.connect(lambda it: self.ouvrir(self.table.item(it.row(), 0).data(Qt.UserRole)))
+        self.b_fiche = QPushButton("معلومات أولياء التلميذ(ة) المحدد(ة)")
+        self.b_fiche.setObjectName("principal")
+        self.b_fiche.clicked.connect(lambda: self.ouvrir(getattr(self, "eid", None)))
+        self.barre.addWidget(self.b_fiche)
         self.rafraichir()
+
+    def ouvrir(self, eid: int | None):
+        if eid is None:
+            message(self.message, "حدد تلميذاً في الجدول.", True)
+            return None
+        self.charger(eid)
+        return self.fiche.ouvrir()
 
     def rafraichir(self) -> None:
         a = annee_srv.annee_courante(self.f.conn)

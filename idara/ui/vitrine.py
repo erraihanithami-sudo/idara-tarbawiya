@@ -356,3 +356,84 @@ def vider_colonne_widgets(table, col: int) -> None:
         if w is not None:
             w.hide()
             table.removeCellWidget(i, col)
+
+
+# ---------- «جميع الإدخالات عبر نوافذ منبثقة» (توجيه المدير 2026-11-23) ----------
+
+def _layout_contenant(layout, w):
+    """التخطيط (أو التخطيط الفرعي) الذي يحتوي العنصر w."""
+    if layout is None:
+        return None
+    for i in range(layout.count()):
+        it = layout.itemAt(i)
+        if it.widget() is w:
+            return layout
+        sous = it.layout()
+        if sous is not None:
+            r = _layout_contenant(sous, w)
+            if r is not None:
+                return r
+    return None
+
+
+def en_fenetre(page: QWidget, contenu: QWidget, titre: str, sous: str = "", largeur: int = 900,
+               methodes: tuple = (), message_attr: str = "message", conteneur: QWidget | None = None) -> "FenetreFiche":
+    """ينقل استمارة موجودة في الصفحة (بطاقتها أو عنصرها) إلى نافذة منبثقة دون إعادة كتابتها.
+
+    methodes: دوال الحفظ في الصفحة؛ تُغلَّف: عند النجاح (رسالة «info» في الصفحة أو قيمة صحيحة) تُغلق النافذة،
+    وعند الخطأ (رسالة «erreur») تُعرض الرسالة داخل النافذة حتى يراها المستعمل أمامه."""
+    from idara.ui.saisie import message
+    lay = _layout_contenant((conteneur or page).layout(), contenu)
+    if lay is not None:
+        lay.removeWidget(contenu)
+    fiche = FenetreFiche(page, titre, sous, contenu, largeur)
+    fiche.message = QLabel(fiche)
+    fiche.message.setWordWrap(True)
+    fiche.message.hide()
+    fiche.layout().addWidget(fiche.message)
+    ouvrir0 = fiche.ouvrir
+
+    def ouvrir():
+        fiche.message.hide()
+        ouvrir0()
+        return fiche
+    fiche.ouvrir = ouvrir
+    for m in methodes:
+        nom, fermer = (m, True) if isinstance(m, str) else m
+        _envelopper(page, nom, fiche, message_attr, message, fermer)
+    return fiche
+
+
+def _envelopper(page, nom: str, fiche, message_attr: str, message, fermer: bool = True) -> None:
+    orig = getattr(page, nom)
+
+    def f(*a, **k):
+        lab = getattr(page, message_attr, None)
+        if lab is not None:
+            lab.setObjectName("")
+            lab.setText("")
+        r = orig(*a, **k)
+        if lab is not None and lab.objectName() == "erreur" and lab.text():
+            if fiche.isVisible():
+                message(fiche.message, lab.text(), True)
+        elif fiche.isVisible() and ((lab is not None and lab.objectName() == "info") or r):
+            if fermer:
+                fiche.hide()
+            elif lab is not None and lab.text():
+                message(fiche.message, lab.text())
+        return r
+    setattr(page, nom, f)
+
+
+def bouton_lanceur(texte: str, fn, couleur: str = "#1565C0", picto: str = "ajouter", aide: str = "") -> QWidget:
+    """سطر فيه زر يفتح نافذة الإدخال."""
+    w = QWidget()
+    h = QHBoxLayout(w)
+    h.setContentsMargins(0, 0, 0, 0)
+    b = bouton_couleur(texte, couleur, picto, aide)
+    b.setParent(w)
+    b.clicked.connect(lambda: fn())
+    h.addWidget(b)
+    h.addStretch()
+    w.bouton = b
+    return w
