@@ -145,3 +145,13 @@ def test_accidents_vaziyat_al_irsal(base, dossier):  # noqa: F811
     assert "التواء في الكاحل" in c and "ر/77" not in c and "وضعية ملف الحادثة" not in c
     c, _ = _lire(rg.generer(base, dossier, "accidents", "registre"))
     assert "أُرسل إلى المديرية الإقليمية" in c
+
+
+def test_partenariats_sans_etat_sont_sarya(base):  # noqa: F811
+    """طلب المدير 2026-11-23: الصفحة الثابتة للاتفاقيات القائمة؛ اتفاقية بلا حالة تُعدّ سارية."""
+    r = rg.registre("partenariats")
+    assert r.filtre_defaut == "سارية" and r.ajout == "إضافة اتفاقية شراكة" and r.dossier
+    lid = rg.enregistrer(base, "partenariats", {"partenaire": "جمعية وهمية", "objet": "مكتبة القسم"})
+    assert rg.lire(base, "partenariats", lid)["etat"] == "سارية"
+    rg.enregistrer(base, "partenariats", {"partenaire": "جماعة وهمية", "objet": "النقل", "etat": "منتهية"})
+    assert [l["id"] for l in rg.lister(base, "partenariats", "سارية")] == [lid]

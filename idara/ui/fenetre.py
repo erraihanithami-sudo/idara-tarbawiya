@@ -841,7 +841,7 @@ class FenetrePrincipale(QMainWindow):
                 ["cellule_membres", "cellule_reunions", "cellule_cas"], cs["الحياة المدرسية"], fenetres=True),
             "page_tahfiz": lambda: page_tahfiz.PageTahfiz(self, cs["الحياة المدرسية"]),
             "page_partenariats": registres(
-                "الانفتاح والشراكة", "اتفاقيات الشراكة وحالتها.", ["partenariats"], cs["الحياة المدرسية"]),
+                "الانفتاح والشراكة", "", ["partenariats"], cs["الحياة المدرسية"], fenetres=True),
             "page_annonces": lambda: PageCommunication(self, cs["الحياة المدرسية"]),
             "page_equipe": registres(
                 "فريق القيادة ومحاضر المشروع", "أعضاء فريق قيادة مشروع المؤسسة المندمج، ومحضر تشكيله، ومحضر "

@@ -1272,6 +1272,27 @@ def test_ecole_pionniere_composants(app, config_tmp, monkeypatch):
     f.close()
 
 
+def test_inftah_charaka_fenetre(app, config_tmp):
+    """طلب المدير 2026-11-23: لا سطر تعريفي تحت العنوان، والصفحة للاتفاقيات القائمة، والإضافة في نافذة منبثقة."""
+    from idara.services import registres as rg
+    f = _fenetre_avec_eleves(config_tmp)
+    rg.enregistrer(f.conn, "partenariats", {"partenaire": "جمعية وهمية", "objet": "القراءة", "etat": "سارية"})
+    rg.enregistrer(f.conn, "partenariats", {"partenaire": "جماعة وهمية", "objet": "النقل", "etat": "منتهية"})
+    f.aller_a("الانفتاح والشراكة")
+    p = f.page_partenariats
+    v = p.vue()
+    assert v.fiche is not None and "إضافة اتفاقية شراكة" in v.b_ajouter.text()
+    assert v.filtre.currentData() == "سارية" and v.table.rowCount() == 1
+    from idara.ui.composants import EnTete
+    assert all(not e.sous.text() for e in p.findChildren(EnTete))
+    fi = v.ouvrir_nouveau()
+    assert fi.isVisible()
+    fi.hide()
+    v.filtre.setCurrentIndex(0)
+    assert v.table.rowCount() == 2
+    f.close()
+
+
 def test_tahfiz_maarid_chawahid(app, config_tmp, tmp_path, monkeypatch):
     """طلب المدير 2026-11-22: «التحفيز والتشجيع»: معرض الشواهد، والنافذة المنبثقة، وPDF وPowerPoint."""
     from idara.services import bureautique

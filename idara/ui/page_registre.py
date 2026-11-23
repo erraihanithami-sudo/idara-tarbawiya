@@ -86,7 +86,7 @@ class VueRegistre(QWidget):
             self.message_fiche.hide()
             v.addWidget(self.message_fiche)
             hb = QHBoxLayout()
-            self.b_ajouter = bouton_couleur(f"إضافة: {self.r.titre}", couleur, "ajouter")
+            self.b_ajouter = bouton_couleur(self.r.ajout or f"إضافة: {self.r.titre}", couleur, "ajouter")
             self.b_ajouter.clicked.connect(lambda: self.ouvrir_nouveau())
             hb.addWidget(self.b_ajouter)
             hb.addStretch()
@@ -96,13 +96,15 @@ class VueRegistre(QWidget):
             v0.addWidget(c)
 
         # ---- الجدول
-        c, v = carte("الأسطر المسجلة")
+        c, v = carte(self.r.titre_liste or "الأسطر المسجلة")
         h = QHBoxLayout()
         self.filtre = QComboBox(self)
         self.filtre.addItem("الكل", None)
         if self.r.filtre:
             for x in self.r.champ(self.r.filtre).choix:
                 self.filtre.addItem(x, x)
+        if self.r.filtre_defaut:
+            self.filtre.setCurrentIndex(max(0, self.filtre.findData(self.r.filtre_defaut)))
         self.filtre.currentIndexChanged.connect(lambda _: self.afficher())
         h.addWidget(self.filtre)
         self.filtre.setVisible(bool(self.r.filtre))
@@ -279,7 +281,7 @@ class VueRegistre(QWidget):
         self.nouveau()
         if self.fiche is not None:
             self.message_fiche.hide()
-            self.fiche.definir_titre(f"إضافة: {self.r.titre}")
+            self.fiche.definir_titre(self.r.ajout or f"إضافة: {self.r.titre}")
             self.fiche.ouvrir()
         return self.fiche
 

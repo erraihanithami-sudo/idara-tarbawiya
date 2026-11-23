@@ -62,6 +62,9 @@ class Registre:
     defaut_etat: str = ""      # ما يُعرض حين يكون حقل الوضعية فارغاً
     dossier: bool = False      # زر «الاطلاع على الملف كاملاً» أمام كل سطر
     internes: tuple = ()       # حقول تتبع داخلية لا تُطبع في بطاقة السطر (مثل وضعية الإرسال)
+    filtre_defaut: str = ""    # التصفية عند فتح الصفحة (مثلاً الشراكات «السارية» فقط)
+    titre_liste: str = ""      # عنوان جدول الأسطر في الصفحة الثابتة
+    ajout: str = ""            # نص زر الإضافة في النافذة المنبثقة
 
     def champ(self, cle: str) -> Champ:
         return next(c for c in self.champs if c.cle == cle)
@@ -188,7 +191,8 @@ REGISTRES: dict[str, Registre] = {r.cle: r for r in (
               Champ("etat", "الحالة", "choix", ("سارية", "قيد الإعداد", "منتهية"))),
              (Doc("registre", "سجل الشراكات", "كل الشراكات بحالتها."),
               Doc("fiche", "بطاقة شراكة", "بطاقة الشراكة المحددة بالتزامات الطرفين.", "ligne")),
-             filtre="etat", par_annee=False),
+             filtre="etat", par_annee=False, filtre_defaut="سارية", dossier=True,
+             titre_liste="اتفاقيات الشراكة القائمة", ajout="إضافة اتفاقية شراكة"),
     Registre("annonces", "الإعلام والتواصل",
              "الإعلانات والبلاغات الموجهة للأساتذة أو أولياء الأمور أو التلاميذ.",
              (Champ("date", "التاريخ", "date", requis=True), Champ("titre", "الموضوع", requis=True),
@@ -271,6 +275,8 @@ def _valider(r: Registre, valeurs: dict) -> dict:
 def enregistrer(conn: sqlite3.Connection, cle: str, valeurs: dict, lid: int | None = None) -> int:
     r = registre(cle)
     v = _valider(r, valeurs)
+    if r.filtre and r.filtre_defaut and not v.get(r.filtre):
+        v[r.filtre] = r.filtre_defaut   # اتفاقية بلا حالة: تُعدّ سارية فتظهر في الصفحة الثابتة
     d = _charger(conn, r)
     if lid is None:
         lid = d["suivant"]

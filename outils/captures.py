@@ -495,6 +495,8 @@ def main(sortie: Path) -> None:
         print("capture accidents:", e)
     f.aller_a("خليتا اليقظة والإنصات")
     photo(f, "64_cellules")
+    f.aller_a("الانفتاح والشراكة")
+    photo(f, "64b_partenariats")
     f.aller_a("التحفيز والتشجيع")
     photo(f, "65_tahfiz")
     try:   # معرض الشواهد (2026-11-22): كل تصميم بمعطيات وهمية، والنافذة المنبثقة
