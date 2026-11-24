@@ -41,6 +41,10 @@ class PageInscriptions(QWidget):
                                        "وثيقة الواجبات المتحصل عليها حسب الأقسام أو للمؤسسة كاملة")
         self.b_releve.clicked.connect(lambda: self.ouvrir_releve())
         h0.addWidget(self.b_releve)
+        self.b_fiche = bouton_couleur("مطبوع الاستخلاص للأساتذة", "#6A1B9A", "document",
+                                      "أسماء التلاميذ وخانات الواجبات فارغة، يملؤها الأستاذ(ة) يدوياً")
+        self.b_fiche.clicked.connect(lambda: self.ouvrir_fiche_collecte())
+        h0.addWidget(self.b_fiche)
         racine.addLayout(h0)
 
         c, v = carte("المجموع التراكمي")
@@ -214,6 +218,68 @@ class PageInscriptions(QWidget):
         self.message_releve.hide()
         self.fiche_releve.ouvrir()
         return self.fiche_releve
+
+    # ---- مطبوع الاستخلاص الفارغ للأساتذة (طلب المدير 2026-11-24) ----
+    def ouvrir_fiche_collecte(self):
+        from PySide6.QtWidgets import QCheckBox, QFormLayout, QSpinBox, QVBoxLayout
+
+        from idara.ui.vitrine import FenetreFiche, bouton_couleur
+        if not hasattr(self, "fiche_collecte"):
+            w = QWidget()
+            v = QVBoxLayout(w)
+            fl = QFormLayout()
+            self.c_classe_fc = QComboBox(w)
+            self.c_vides = QSpinBox(w)
+            self.c_vides.setRange(0, 15)
+            self.c_vides.setValue(3)
+            self.c_vides.setSuffix(" أسطر")
+            self.c_montants = QCheckBox("إظهار مبلغ كل واجب في رأس العمود", w)
+            self.c_montants.setChecked(True)
+            fl.addRow("القسم", self.c_classe_fc)
+            fl.addRow("أسطر فارغة للوافدين", self.c_vides)
+            fl.addRow(self.c_montants)
+            v.addLayout(fl)
+            aide = QLabel("صفحة لكل قسم: أسماء التلاميذ، وخانات التأمين والجمعية الرياضية والتعاونية ورقم الوصل "
+                          "ورقم السجل فارغة يملؤها الأستاذ(ة) يدوياً، وسطر المجموع والتوقيع.")
+            aide.setObjectName("etiquette")
+            aide.setWordWrap(True)
+            v.addWidget(aide)
+            b = bouton_couleur("توليد المطبوع", "#6A1B9A", "document")
+            b.clicked.connect(lambda: self.generer_fiche_collecte())
+            v.addWidget(b, 0, Qt.AlignLeft)
+            self.message_fc = QLabel()
+            self.message_fc.setWordWrap(True)
+            self.message_fc.hide()
+            v.addWidget(self.message_fc)
+            self.fiche_collecte = FenetreFiche(self, "مطبوع الاستخلاص للأساتذة", "يُطبع فارغاً ويُملأ يدوياً.", w,
+                                               largeur=600)
+        self.c_classe_fc.clear()
+        self.c_classe_fc.addItem("كل الأقسام (صفحة لكل قسم)", "")
+        try:
+            for c in fr.classes(self.f.conn, self.unite.currentData()):
+                self.c_classe_fc.addItem(c, c)
+        except fr.ErreurFrais:
+            pass
+        self.message_fc.hide()
+        self.fiche_collecte.ouvrir()
+        return self.fiche_collecte
+
+    def generer_fiche_collecte(self, classe: str | None = None):
+        from idara.services import bureautique
+        classe = classe if classe is not None else (self.c_classe_fc.currentData() or None)
+        try:
+            p = fr.generer_fiche_collecte(self.f.conn, self.f.dossier, classe, self.unite.currentData(),
+                                          self.c_vides.value(), self.c_montants.isChecked())
+        except fr.ErreurFrais as e:
+            message(self.message_fc, str(e), True)
+            return None
+        self.fiche_collecte.hide()
+        message(self.message, f"وُلّد المطبوع: ⁦{p.name}⁩")
+        try:
+            bureautique.ouvrir(p)
+        except OSError:
+            pass
+        return p
 
     def generer_releve(self, portee: str | None = None, classe: str | None = None):
         from idara.services import bureautique

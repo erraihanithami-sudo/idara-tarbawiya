@@ -2116,6 +2116,9 @@ def test_inscriptions_frais(app, config_tmp):
         assert p.c_classe_rel.isEnabled()
         assert p.generer_releve() and not fr_.isVisible() and "مخرجات الواجبات" in ouverts[-1].name
         assert p.generer_releve("classes") and p.generer_releve("etablissement") and len(ouverts) == 3
+        ff = p.ouvrir_fiche_collecte()   # 2026-11-24: المطبوع الفارغ للأساتذة
+        assert ff.isVisible() and p.c_classe_fc.count() == 1 + len(fr.classes(f.conn))
+        assert p.generer_fiche_collecte() and not ff.isVisible() and "مطبوع واجبات الاستخلاص" in ouverts[-1].name
     finally:
         bureautique.ouvrir = bureautique_ouvrir
     f.aller_a("إعداد المؤسسة")

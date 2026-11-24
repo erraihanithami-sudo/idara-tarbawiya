@@ -272,3 +272,79 @@ def generer_releve(conn: sqlite3.Connection, dossier, portee: str = "classes", c
     chemin = rep / f"{datetime.now():%Y%m%d_%H%M%S}_مخرجات الواجبات المدرسية - {nom}.docx"
     d.save(chemin)
     return chemin
+
+
+# ---------- مطبوع الاستخلاص للأساتذة (طلب المدير 2026-11-24، على نموذجه) ----------
+
+COLONNES_FICHE = ("رقم الوصل", "رقم السجل")
+
+
+def _profs_classe(conn, classe: str) -> str:
+    rs = conn.execute(
+        "SELECT DISTINCT p.prenom_ar, p.nom_ar FROM affectation_classe f JOIN classe c ON c.id=f.classe_id "
+        "JOIN personnel p ON p.id=f.personnel_id WHERE c.code=? AND p.statut='actif'", (classe,)).fetchall()
+    return "، ".join(f"{r['prenom_ar']} {r['nom_ar']}".strip() for r in rs)
+
+
+def generer_fiche_collecte(conn: sqlite3.Connection, dossier, classe: str | None = None, unite: str | None = None,
+                           lignes_vides: int = 3, avec_montants: bool = True) -> Path:
+    """مطبوع فارغ يملؤه الأستاذ(ة) يدوياً: صفحة لكل قسم فيها أسماء التلاميذ وخانات الواجبات (لا تُملأ من البرنامج)،
+    ورقم الوصل ورقم السجل، وسطر المجموع، وتوقيع الأستاذ(ة)."""
+    from docx.enum.text import WD_BREAK
+    from docx.shared import Cm
+    from idara.services import documents as dc
+    from idara.services.docs_association import _cellule, _nouveau, _ombre, para, tableau
+    cls = [classe] if classe else classes(conn, unite)
+    if not cls:
+        raise ErreurFrais("لا تلاميذ مسجلين هذه السنة.")
+    lignes_vides = max(0, min(int(lignes_vides), 15))
+    try:
+        c = dc.champs_communs(conn)
+    except dc.ErreurDocument as e:
+        raise ErreurFrais(str(e)) from None
+    a = annee_srv.annee_courante(conn)
+    m = montants(conn)
+    e = etab_srv.lire_etablissement(conn)
+    logo = dossier.racine / e.logo_path if e and e.logo_path else None
+    d = _nouveau()
+    ks = list(ELEMENTS)
+    courts = {"assurance": "التأمين", "sport": "الجمعية الرياضية", "cooperative": "التعاونية"}
+    entetes = ["ر.ت", "النسب", "الاسم"] + [
+        courts[k] + (f" ({_dh(m[k])} د)" if avec_montants and m[k] is not None else "") for k in ks] + \
+        list(COLONNES_FICHE)
+    largeurs = [1.1, 3.2, 3.2, 2.0, 2.3, 2.0, 2.3, 2.3]
+    for n, cl in enumerate(cls):
+        ls = lister(conn, unite=unite, classe=cl)
+        if n:
+            d.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+        if logo is not None and logo.exists():
+            d.add_picture(str(logo), width=Cm(17.4))
+        para(d, f"واجبات الاستخلاص لتلاميذ {c['etablissement']}", gras=True, taille=18, centre=True, apres=0)
+        profs = _profs_classe(conn, cl)
+        para(d, f"القسم: {cl}  ·  الموسم الدراسي {a['libelle']}" + (f"  ·  الأستاذ(ة): {profs}" if profs else ""),
+             gras=True, taille=13, centre=True, apres=4)
+        t = tableau(d, 2 + len(ls) + lignes_vides, len(entetes), largeurs=largeurs)
+        for j, h in enumerate(entetes):
+            _cellule(t.cell(0, j), h, gras=True, taille=11)
+            _ombre(t.cell(0, j))
+        for i, x in enumerate(ls, start=1):
+            for j, v in enumerate((f"{i:02d}", x["nom_ar"] or "", x["prenom_ar"] or "")):
+                _cellule(t.cell(i, j), v, taille=12, centre=j == 0)
+        for i in range(len(ls) + 1, len(ls) + 1 + lignes_vides):
+            _cellule(t.cell(i, 0), f"{i:02d}", taille=12)
+        der = 1 + len(ls) + lignes_vides
+        cel = t.cell(der, 1).merge(t.cell(der, 2))
+        _cellule(cel, "المجموع", gras=True, taille=12)
+        for j in range(len(entetes)):
+            _ombre(t.cell(der, j), "F3EAD3")
+        for r in t.rows[1:]:
+            r.height = Cm(0.62)
+        para(d, apres=6)
+        para(d, "توقيع الأستاذ(ة): ............................          "
+                f"تأشيرة {c['mudir_moassasa']}: ............................", taille=12, apres=0)
+    rep = dossier.archives / a["libelle"].replace("/", "-") / "التسجيلات"
+    rep.mkdir(parents=True, exist_ok=True)
+    nom = f"القسم {classe}" if classe else "كل الأقسام"
+    chemin = rep / f"{datetime.now():%Y%m%d_%H%M%S}_مطبوع واجبات الاستخلاص - {nom}.docx"
+    d.save(chemin)
+    return chemin

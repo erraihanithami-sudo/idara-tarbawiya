@@ -88,3 +88,23 @@ def test_mokhrajat_wajibat(base, dossier):  # noqa: F811
         cellules = " ".join(c.text for t in d.tables for row in t.rows for c in row.cells)
         assert "مخرجات الواجبات المدرسية" in texte and "المبلغ الإجمالي المتحصل عليه" in texte
         assert "المجموع" in cellules and "التأمين المدرسي" in cellules
+
+
+def test_fiche_collecte_vierge(base, dossier):  # noqa: F811
+    """طلب المدير 2026-11-24: مطبوع يملؤه الأساتذة يدوياً: الأسماء فقط، وخانات الواجبات فارغة."""
+    from docx import Document
+    _milieu(base, "urbain")
+    liste = fr.lister(base)
+    fr.marquer_tous(base, [x["id"] for x in liste], "assurance")   # ما سُجل في البرنامج لا يُطبع في المطبوع
+    cl = liste[0]["classe"]
+    d = Document(fr.generer_fiche_collecte(base, dossier, cl, lignes_vides=2))
+    t = d.tables[0]
+    n = len(fr.lister(base, classe=cl))
+    assert len(t.rows) == 1 + n + 2 + 1
+    assert [c.text for c in t.rows[0].cells][:4] == ["ر.ت", "النسب", "الاسم", "التأمين (12 د)"]
+    assert t.rows[0].cells[-1].text == "رقم السجل" and t.rows[-1].cells[1].text == "المجموع"
+    assert all(not c.text for r in t.rows[1:-1] for c in r.cells[3:])   # خانات الواجبات فارغة
+    assert t.rows[1].cells[1].text == liste[0]["nom_ar"] and t.rows[n + 2].cells[0].text == f"{n + 2:02d}"
+    assert any(f"القسم: {cl}" in p.text for p in d.paragraphs)
+    d2 = Document(fr.generer_fiche_collecte(base, dossier, avec_montants=False))
+    assert len(d2.tables) == len(fr.classes(base)) and d2.tables[0].rows[0].cells[3].text == "التأمين"
