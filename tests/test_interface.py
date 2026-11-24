@@ -165,7 +165,7 @@ def test_navigation_deroulante(app, config_tmp):
     assert f.groupe.checkedButton() is None and f.boutons[i].actif
     assert [b.text().split("  ")[0] for b in f.sous[i]][:3] == ["تدبير التسجيلات", "الجرد", "جمعية دعم مدرسة النجاح"]
     assert "قريباً" not in f.sous[i][1].text() and "قريباً" not in f.sous[i][2].text()   # الجرد مبرمج (2026-11-13)
-    assert any("قريباً" in b.text() for b in f.sous[i])
+    assert not any("قريباً" in b.text() for b in f.sous[i])   # الجمعيتان مبرمجتان (2026-11-24)
     f.sous[i][2].click()
     assert f.page_courante() == "جمعية دعم مدرسة النجاح" and f.sous[i][2].isChecked() and f.boutons[i].actif
     f.boutons[i].click()   # الضغطة الثانية تطوي الفروع، والصفحة تبقى
@@ -1307,7 +1307,7 @@ def test_asso_sportive_cooperative(app, config_tmp, monkeypatch):
     assert p.type_ == "sportive" and p.onglets[1].text() == "الاستخلاص وتحويل الحصص"
     p.choisir_onglet(1)
     b = p.achats
-    assert type(b).__name__ == "BlocTransferts" and b.table.rowCount() == 6 and not p.w_finance.isVisible()
+    assert type(b).__name__ == "BlocTransferts" and b.table.rowCount() == 6 and p.w_finance.isHidden()
     fc = b.ouvrir_collecte()
     b.c_montant.setText("abc")
     assert not b.enregistrer_collecte() and fc.isVisible() and "رقم" in fc.msg.text()
@@ -1331,7 +1331,7 @@ def test_asso_sportive_cooperative(app, config_tmp, monkeypatch):
     b.ouvrir_part()
     assert b.inscrire_part() and asso.totaux(f.conn, asso.exercices(f.conn, "sportive")[0]["id"])["recettes"] == 1300
     p.choisir_onglet(0)
-    assert p.w_finance.isVisible() and p.nature.count() > 0
+    assert not p.w_finance.isHidden() and p.nature.count() > 0
     # التعاونية: مجالات الصرف
     f.aller_a("جمعية تنمية التعاون المدرسي")
     pc = f.page_asso_coop
