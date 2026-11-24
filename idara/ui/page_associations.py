@@ -227,17 +227,25 @@ class DialogueRapport(QDialog):
 
 
 class PageAssociations(QWidget):
-    def __init__(self, fenetre):
+    """جمعية دعم مدرسة النجاح، والجمعية الرياضية المدرسية، وجمعية تنمية التعاون المدرسي (2026-11-24)."""
+
+    def __init__(self, fenetre, type_: str = "najah"):
         super().__init__()
         self.f = fenetre
+        self.type_ = type_
         self.eid: int | None = None
         self.op_id: int | None = None
         racine = QVBoxLayout(self)
         racine.setContentsMargins(40, 32, 40, 32)
         racine.setSpacing(16)
-        a = asso.association(self.f.conn, TYPE)
-        racine.addWidget(entete(a["nom"], "المداخيل والمصاريف حسب أبواب وبنود نموذجكم، بسجلين: البنك والصندوق. الوصولات والسجلات "
-                                          "والمحاضر على نماذج الدليل المسطري للتدبير المالي (يوليوز 2023)."))
+        a = asso.association(self.f.conn, self.type_)
+        sous = {"najah": "المداخيل والمصاريف حسب أبواب وبنود نموذجكم، بسجلين: البنك والصندوق. الوصولات والسجلات "
+                         "والمحاضر على نماذج الدليل المسطري للتدبير المالي (يوليوز 2023).",
+                "sportive": "استخلاص واجبات الانخراط وتحويل حصصها (65% للجمعية)، ثم المداخيل والمصاريف بسجلي البنك "
+                            "والصندوق حسب مجالات الصرف في الدورية 3 للجامعة الملكية المغربية للرياضة المدرسية.",
+                "cooperative": "استخلاص واجب الاشتراك وتحويل حصصه (40% للتعاونية بالمؤسسة)، ثم المداخيل والمصاريف "
+                               "حسب مجالات الصرف في المذكرة الوزارية 24 (20 فبراير 2007)."}[self.type_]
+        racine.addWidget(entete(a["nom"], sous))
         self.message = QLabel()
         self.message.setWordWrap(True)
         self.message.hide()
@@ -246,7 +254,8 @@ class PageAssociations(QWidget):
         self.onglets: list[QPushButton] = []
         ho = QHBoxLayout()
         ho.setSpacing(8)
-        for k, lib in enumerate(("المداخيل والمصاريف والسجلات", "الصرف: سند الطلب والاتفاقية")):
+        second = "الصرف: سند الطلب والاتفاقية" if self.type_ == "najah" else "الاستخلاص وتحويل الحصص"
+        for k, lib in enumerate(("المداخيل والمصاريف والسجلات", second)):
             b = QPushButton(lib)
             b.setObjectName("pilule")
             b.setCheckable(True)
@@ -525,8 +534,12 @@ class PageAssociations(QWidget):
     def choisir_onglet(self, k: int) -> None:
         """0: المداخيل والمصاريف؛ 1: الصرف (سند الطلب والاتفاقية)."""
         if not hasattr(self, "achats"):
-            from idara.ui.page_achats import PageAchats
-            self.achats = PageAchats(self.f, integre=True)
+            if self.type_ == "najah":
+                from idara.ui.page_achats import PageAchats
+                self.achats = PageAchats(self.f, integre=True)
+            else:   # الجمعية الرياضية والتعاونية: الاستخلاص وتحويل الحصص
+                from idara.ui.bloc_transferts import BlocTransferts
+                self.achats = BlocTransferts(self, self.type_)
             self._racine_page.insertWidget(self._racine_page.indexOf(self.w_finance) + 1, self.achats)
         for i, b in enumerate(self.onglets):
             b.setChecked(i == k)
@@ -536,16 +549,19 @@ class PageAssociations(QWidget):
         if k == 1:
             self.achats.rafraichir()
 
+    def rafraichir_finance(self) -> None:
+        self.rafraichir()
+
     def rafraichir(self) -> None:
         if not hasattr(self, "onglet"):
             self.choisir_onglet(0)
         elif self.onglet == 1:
             self.achats.rafraichir()
-        self._alertes_report = asso.synchroniser(self.f.conn, TYPE)
+        self._alertes_report = asso.synchroniser(self.f.conn, self.type_)
         courant = self.eid
         self.exercice.blockSignals(True)
         self.exercice.clear()
-        for e in asso.exercices(self.f.conn, TYPE):
+        for e in asso.exercices(self.f.conn, self.type_):
             self.exercice.addItem(e["libelle"], e["id"])
         i = self.exercice.findData(courant)
         self.exercice.setCurrentIndex(i if i >= 0 else 0)
@@ -643,7 +659,7 @@ class PageAssociations(QWidget):
                     self.budget.item(i, j).setForeground(Qt.darkRed)
 
     def _charger_association(self) -> None:
-        a = asso.association(self.f.conn, TYPE)
+        a = asso.association(self.f.conn, self.type_)
         self.rib.setText(a["rib"] or "")
         self.president.setText(a["president"] or "")
         self.tresorier.setText(a["tresorier"] or "")
@@ -661,7 +677,7 @@ class PageAssociations(QWidget):
         self.chapitre.clear()
         if not transfert:
             vus = []
-            for r in asso.rubriques(self.f.conn, TYPE, nat, actifs=True):
+            for r in asso.rubriques(self.f.conn, self.type_, nat, actifs=True):
                 if r["ligne"] != asso.REPORT and r["chapitre"] not in vus:
                     vus.append(r["chapitre"])
             self.chapitre.addItems(vus)
@@ -673,7 +689,7 @@ class PageAssociations(QWidget):
         self.ligne.clear()
         nat, ch = self.nature.currentData(), self.chapitre.currentText()
         if nat != "transfert":
-            for r in asso.rubriques(self.f.conn, TYPE, nat, actifs=True):
+            for r in asso.rubriques(self.f.conn, self.type_, nat, actifs=True):
                 if r["chapitre"] == ch and r["ligne"] != asso.REPORT:
                     self.ligne.addItem(r["ligne"], r["id"])
         self.ligne.blockSignals(False)
@@ -864,7 +880,7 @@ class PageAssociations(QWidget):
             message(self.message, "تاريخ التجديد غير صحيح.", True)
             return False
         try:
-            asso.modifier_association(self.f.conn, TYPE, self.rib.text(), self.president.text(),
+            asso.modifier_association(self.f.conn, self.type_, self.rib.text(), self.president.text(),
                                       self.tresorier.text(), d)
         except asso.ErreurAssociation as e:
             message(self.message, str(e), True)
@@ -905,7 +921,7 @@ class PageAssociations(QWidget):
 
     def passation(self, valeurs: dict | None = None) -> Path | None:
         if valeurs is None:
-            dlg = DialoguePassation(self, asso.association(self.f.conn, TYPE)["tresorier"])
+            dlg = DialoguePassation(self, asso.association(self.f.conn, self.type_)["tresorier"])
             if dlg.exec() != QDialog.Accepted:
                 return None
             try:
@@ -917,8 +933,8 @@ class PageAssociations(QWidget):
         p = self._produire(lambda: da.generer_pv_passation(self.f.conn, self.f.dossier, self.eid, **valeurs),
                            "وُلّد محضر تسليم المهام المالية")
         if p and maj:
-            a = asso.association(self.f.conn, TYPE)
-            asso.modifier_association(self.f.conn, TYPE, a["rib"] or "", a["president"] or "", valeurs["nouveau"],
+            a = asso.association(self.f.conn, self.type_)
+            asso.modifier_association(self.f.conn, self.type_, a["rib"] or "", a["president"] or "", valeurs["nouveau"],
                                       a["date_renouvellement"] or "")
             self._charger_association()
         return p
@@ -996,7 +1012,7 @@ class PageAssociations(QWidget):
     def ouvrir(self, valeurs: dict | None = None) -> int | None:
         """يفتح سنة مالية (valeurs للاختبار، وإلا عبر النافذة)."""
         if valeurs is None:
-            ex = asso.exercices(self.f.conn, TYPE)
+            ex = asso.exercices(self.f.conn, self.type_)
             d = DialogueExercice(self, premiere=not ex, derniere_fin=ex[0]["date_fin"] if ex else None)
             if d.exec() != QDialog.Accepted:
                 return None
@@ -1006,7 +1022,7 @@ class PageAssociations(QWidget):
                 message(self.message, str(e), True)
                 return None
         try:
-            eid = asso.ouvrir_exercice(self.f.conn, TYPE, **valeurs)
+            eid = asso.ouvrir_exercice(self.f.conn, self.type_, **valeurs)
         except asso.ErreurAssociation as e:
             message(self.message, str(e), True)
             return None

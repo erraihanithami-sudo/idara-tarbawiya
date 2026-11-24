@@ -174,8 +174,11 @@ def saut_page(d) -> None:
     p.add_run().add_break(WD_BREAK.PAGE)
 
 
-def _enregistrer(d: Document, dossier: DossierDonnees, exercice: str, sous: str, nom: str) -> Path:
-    rep = dossier.archives / f"جمعية النجاح {exercice.replace('/', '-')}" / sous
+def _enregistrer(d: Document, dossier: DossierDonnees, exercice: str, sous: str, nom: str,
+                 asso_nom: str = "جمعية النجاح") -> Path:
+    if asso_nom == "جمعية دعم مدرسة النجاح":
+        asso_nom = "جمعية النجاح"
+    rep = dossier.archives / f"{asso_nom} {exercice.replace('/', '-')}" / sous
     rep.mkdir(parents=True, exist_ok=True)
     chemin = rep / f"{datetime.now():%Y%m%d_%H%M%S}_{nom}.docx"
     n = 1
@@ -313,7 +316,7 @@ def generer_piece(conn, dossier: DossierDonnees, op_id: int, type_: str) -> Path
         para(c, signataire, gras=True, centre=True, apres=40)
     else:
         para(c, apres=30)
-    return _enregistrer(d, dossier, ctx["e"]["libelle"], titre, f"{titre} {n:02d}")
+    return _enregistrer(d, dossier, ctx["e"]["libelle"], titre, f"{titre} {n:02d}", ctx["a"]["nom"])
 
 
 # ---------- السجلات (الملاحق 17 إلى 19) ----------
@@ -391,7 +394,7 @@ def generer_registre(conn, dossier: DossierDonnees, eid: int, kind: str) -> Path
                 vals = ("", "", "", "", "", "", "")
             for j, v in enumerate(vals):
                 _cellule(t.cell(row, j), v, taille=10.5, centre=j != 3)
-    return _enregistrer(d, dossier, ctx["e"]["libelle"], "السجلات", titre)
+    return _enregistrer(d, dossier, ctx["e"]["libelle"], "السجلات", titre, ctx["a"]["nom"])
 
 
 # ---------- وثيقة الميزانية (الملحق 1) ----------
@@ -498,7 +501,7 @@ def generer_budget(conn, dossier: DossierDonnees, eid: int) -> Path:
     t = tableau(d, 1, 2, bordures=False, largeurs=[8.7, 8.7])
     _cellule(t.cell(0, 0), "توقيع رئيس الجمعية", gras=True)
     _cellule(t.cell(0, 1), "توقيع أمين المال", gras=True)
-    return _enregistrer(d, dossier, ctx["e"]["libelle"], "الميزانية", "وثيقة الميزانية")
+    return _enregistrer(d, dossier, ctx["e"]["libelle"], "الميزانية", "وثيقة الميزانية", ctx["a"]["nom"])
 
 
 # ---------- محضر تسليم المهام المالية (الملحق 25) ----------
@@ -552,7 +555,7 @@ def generer_pv_passation(conn, dossier: DossierDonnees, eid: int, date_pv: str, 
     t = tableau(d, 1, 3, bordures=False, largeurs=[5.8, 5.8, 5.8])
     for j, lib in enumerate(("توقيع أمين المال السابق", "توقيع أمين المال الجديد", "توقيع رئيس الجمعية")):
         _cellule(t.cell(0, j), lib, gras=True)
-    return _enregistrer(d, dossier, e["libelle"], "محاضر", "محضر تسليم المهام المالية")
+    return _enregistrer(d, dossier, e["libelle"], "محاضر", "محضر تسليم المهام المالية", a["nom"])
 
 
 
@@ -661,4 +664,4 @@ def generer_rapport_financier(conn, dossier: DossierDonnees, eid: int, numero_ag
     para(d, apres=30)
     para(d, "يُرسل هذا التقرير إلى مجلس تدبير المؤسسة وإلى المديرية الإقليمية قبل 15 يناير من السنة التي تلي تلقي "
             "المنحة أو الإعانة (الدليل المسطري).", taille=11)
-    return _enregistrer(d, dossier, ctx["e"]["libelle"], "التقارير", "التقرير المالي")
+    return _enregistrer(d, dossier, ctx["e"]["libelle"], "التقارير", "التقرير المالي", ctx["a"]["nom"])

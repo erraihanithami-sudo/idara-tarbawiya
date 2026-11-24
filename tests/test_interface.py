@@ -6,6 +6,7 @@
 import os
 
 import pytest
+from datetime import date
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
@@ -1290,6 +1291,55 @@ def test_inftah_charaka_fenetre(app, config_tmp):
     fi.hide()
     v.filtre.setCurrentIndex(0)
     assert v.table.rowCount() == 2
+    f.close()
+
+
+def test_asso_sportive_cooperative(app, config_tmp, monkeypatch):
+    """وثائق المدير 2026-11-24: الجمعية الرياضية والتعاونية: الاستخلاص وتحويل الحصص والمالية."""
+    from idara.services import associations as asso
+    from idara.services import bureautique
+    from idara.services import transferts as tr
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    f.aller_a("الجمعية الرياضية")
+    p = f.page_asso_sport
+    assert p.type_ == "sportive" and p.onglets[1].text() == "الاستخلاص وتحويل الحصص"
+    p.choisir_onglet(1)
+    b = p.achats
+    assert type(b).__name__ == "BlocTransferts" and b.table.rowCount() == 6 and not p.w_finance.isVisible()
+    fc = b.ouvrir_collecte()
+    b.c_montant.setText("abc")
+    assert not b.enregistrer_collecte() and fc.isVisible() and "رقم" in fc.msg.text()
+    b.c_montant.setText("2000")
+    b.c_eleves.setText("200")
+    assert b.enregistrer_collecte() and not fc.isVisible() and "2 000.00" in b.l_collecte.text()
+    assert b.table.item(0, 2).text() == "1 300.00" and b.table.item(1, 5).text().startswith("CCP")
+    fv = b.ouvrir_virement("frmss")
+    b.c_reference.setText("شيك 7")
+    assert b.enregistrer_virement() and not fv.isVisible() and b.t_ops.rowCount() == 1
+    assert b.table.item(1, 4).text() == "0.00"
+    b.ouvrir_compte("direction")
+    b.c_compte.setText("0011 22")
+    assert b.enregistrer_compte() and b.table.item(3, 5).text() == "0011 22"
+    assert b.generer("pv") and b.generer("certificat") and len(ouverts) == 2
+    fp = b.ouvrir_part()
+    assert b.inscrire_part() is None and "السنة المالية" in fp.msg.text()
+    fp.hide()
+    an = date.today().year
+    asso.ouvrir_exercice(f.conn, "sportive", str(an), f"{an}-01-01", f"{an}-12-31")
+    b.ouvrir_part()
+    assert b.inscrire_part() and asso.totaux(f.conn, asso.exercices(f.conn, "sportive")[0]["id"])["recettes"] == 1300
+    p.choisir_onglet(0)
+    assert p.w_finance.isVisible() and p.nature.count() > 0
+    # التعاونية: مجالات الصرف
+    f.aller_a("جمعية تنمية التعاون المدرسي")
+    pc = f.page_asso_coop
+    pc.choisir_onglet(1)
+    tr.definir_collecte(f.conn, "cooperative", 1000)
+    pc.achats.rafraichir()
+    assert pc.achats.t_prog.rowCount() == 5 and pc.achats.t_prog.item(0, 2).text() == "120.00"
+    assert pc.achats.table.rowCount() == 2 + 5 + 1   # الحصتان + تفصيل حصة الفرع + المجموع
     f.close()
 
 

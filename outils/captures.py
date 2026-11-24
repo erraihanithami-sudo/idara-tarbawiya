@@ -282,6 +282,19 @@ def main(sortie: Path) -> None:
     photo(f, "35_association")
     __import__("idara.ui.saisie", fromlist=["x"]).selectionner(f.page_asso.ops, 4)
     photo(f, "36_association_pieces")
+    try:   # الجمعية الرياضية والتعاونية (2026-11-24)
+        from idara.services import transferts as _tr
+        _tr.definir_collecte(f.conn, "sportive", 2400, 240)
+        _tr.enregistrer_virement(f.conn, "sportive", "frmss", "2026-10-10", reference="شيك 15")
+        _tr.definir_collecte(f.conn, "cooperative", 2400, 240)
+        f.aller_a("الجمعية الرياضية")
+        f.page_asso_sport.choisir_onglet(1)
+        photo(f, "36b_sportive_transferts")
+        f.aller_a("جمعية تنمية التعاون المدرسي")
+        f.page_asso_coop.choisir_onglet(1)
+        photo(f, "36c_cooperative_transferts")
+    except Exception as e:  # noqa: BLE001
+        print("capture transferts:", e)
     from idara.services import achats as acx
     e_ = __import__("idara.services.etablissement", fromlist=["x"])
     et_ = e_.lire_etablissement(f.conn); et_.adresse = "حي تجريبي"; e_.enregistrer_etablissement(f.conn, et_)
