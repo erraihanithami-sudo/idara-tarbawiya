@@ -552,6 +552,17 @@ def main(sortie: Path) -> None:
         _fi.hide()
     except Exception as e:  # noqa: BLE001
         print("capture chawahid:", e)
+    # مقترح برنامج العمل السنوي (2026-11-26)
+    try:
+        f.aller_a("برنامج العمل")
+        _bp = f.page_calendrier.programme
+        _bp.c_section.setCurrentIndex(3)
+        photo(f, "66_programme_annuel")
+        _fp = _bp.ouvrir(1)
+        photo(_fp, "66b_programme_ligne")
+        _fp.hide()
+    except Exception as e:  # noqa: BLE001
+        print("capture programme:", e)
     # الإعلانات المزخرفة والاستدعاءات (2026-11-15)
     try:
         from PySide6.QtCore import QRectF as _R

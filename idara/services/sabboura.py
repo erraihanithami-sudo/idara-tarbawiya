@@ -1,9 +1,10 @@
 """السبورة المرجعية (القيادة والتدبير؛ نماذج المدير 2026-11-13).
 
-إحدى عشرة لوحة تُعلَّق في مكتب الإدارة، كل لوحة صفحة A4 على شكل نموذج المدير: ترويسة المؤسسة، شريط العنوان
+اثنتا عشرة لوحة تُعلَّق في مكتب الإدارة، كل لوحة صفحة A4 على شكل نموذج المدير: ترويسة المؤسسة، شريط العنوان
 البرتقالي، ثم جدول برأس أزرق. اللوحات:
 بطاقة معلومات المؤسسة، البنية التربوية، التنظيم التربوي، البنية المادية للمؤسسة، الأندية التربوية، المجلس التربوي،
-مجلس التدبير، جمعية دعم مدرسة النجاح، الجمعية الرياضية المدرسية، خلايا المؤسسة، استعمال الزمن الجماعي (أفقية).
+مجلس التدبير، جمعية دعم مدرسة النجاح، الجمعية الرياضية المدرسية، خلايا المؤسسة، برنامج العمل السنوي،
+استعمال الزمن الجماعي (أفقية).
 كل لوحة تُملأ من معطيات البرنامج، وتُعدَّل يدوياً، وتُولَّد وحدها أو مع باقي اللوحات في وثيقة واحدة.
 """
 
@@ -98,6 +99,8 @@ LAVHAT: list[Lavha] = [
     Lavha("cellules", "خلايا المؤسسة", "cellules", colonnes=("الخلية", "الأعضاء"),
           defaut=(("خلية اليقظة", ""), ("خلية الإنصات", "")),
           source="يدوي: لكل خلية أعضاؤها مفصولون بفاصلة."),
+    Lavha("programme", "برنامج العمل السنوي", "tableau", colonnes=("المحور", "المحطة والعملية", "فترة الإنجاز"),
+          source="من مقترح برنامج العمل السنوي (صفحة برنامج العمل السنوي): المحطات المؤرخة مرتبة حسب التاريخ."),
     Lavha("emploi", "استعمال الزمن الجماعي", "tableau", paysage=True, numero=True,
           colonnes=("اسم الأستاذ(ة)", "رقم التأجير") + tuple(f"{j}: {m}" for j in _JOURS for m in ("صباحاً", "مساءً"))
           + ("حصص التربية البدنية",),
@@ -268,11 +271,19 @@ def _auto_emploi(conn) -> dict:
     return {"lignes": lignes}
 
 
+def _auto_programme(conn) -> dict:
+    from idara.services import programme_annuel as pa
+    try:
+        return {"lignes": pa.lignes_sabboura(conn)}
+    except pa.ErreurProgramme:
+        return {"lignes": []}
+
+
 AUTO: dict[str, Callable] = {"fiche": _auto_fiche, "structure_ped": _auto_structure_ped, "tanzim": _auto_tanzim,
                              "structure_mat": _auto_structure_mat, "clubs": _auto_clubs,
                              "conseil_ped": _auto_conseil("pedagogique"), "conseil_gestion": _auto_conseil("gestion"),
                              "najah": _auto_bureau("najah"), "sportive": _auto_bureau("sportive"),
-                             "emploi": _auto_emploi}
+                             "emploi": _auto_emploi, "programme": _auto_programme}
 
 
 def _auto(conn, cle: str) -> dict:
@@ -490,12 +501,12 @@ def _rendre(d, l: Lavha, donnees: dict) -> None:
         largeurs = ([0.9] if l.numero else []) + [4.6, 2.4] + [1.45] * 12 + [2.6]
     else:
         reste = 17.0 - (1.0 if l.numero else 0)
-        larg_col = {2: [9.0, 8.0], 5: [5.6, 4.4, 2.0, 2.0, 2.0]}.get(len(l.colonnes),
+        larg_col = {2: [9.0, 8.0], 3: [3.8, 8.4, 4.8], 5: [5.6, 4.4, 2.0, 2.0, 2.0]}.get(len(l.colonnes),
                                                                       [round(reste / len(l.colonnes), 2)] * len(l.colonnes))
         largeurs = ([1.0] if l.numero else []) + larg_col
     deux = bool(l.groupes)
     t = _table(d, (2 if deux else 1) + len(lignes), n, largeurs)
-    taille = 9 if l.paysage else 13
+    taille = 9 if l.paysage else (10 if len(lignes) > 15 else 13)   # برنامج العمل السنوي: أسطر كثيرة
     if deux:
         if l.numero:
             c = t.cell(0, 0).merge(t.cell(1, 0))

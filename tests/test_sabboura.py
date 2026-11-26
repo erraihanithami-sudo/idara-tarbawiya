@@ -15,7 +15,7 @@ def _textes(chemin):
 
 
 def test_lavhat_et_donnees_auto(base):  # noqa: F811
-    assert len(sb.LAVHAT) == 11 and [l.titre for l in sb.LAVHAT][0] == "بطاقة معلومات المؤسسة"
+    assert len(sb.LAVHAT) == 12 and [l.titre for l in sb.LAVHAT][0] == "بطاقة معلومات المؤسسة"
     rh.enregistrer(base, rh.Personnel(nom_ar="التجريبية", prenom_ar="أستاذة", sexe="F", categorie="enseignant",
                                       ppr="900001"))
     f = sb.lire(base, "fiche")["champs"]
@@ -46,8 +46,15 @@ def test_saisie_actualisation_generation(base, dossier):  # noqa: F811
               "النادي البيئي", "منسق(ة) التعاونية المدرسية", "ذة. المنسقة", "خلية اليقظة", "رئيس المجلس",
               "استعمال الزمن الجماعي", "حصص التربية البدنية", "صباحاً"):
         assert x in cellules or any(x in c for c in cellules), x
-    assert len(doc.sections) == 11 and doc.sections[-1].page_width > doc.sections[-1].page_height
+    assert len(doc.sections) == 12 and doc.sections[-1].page_width > doc.sections[-1].page_height
     assert doc.sections[0].page_height > doc.sections[0].page_width
     doc, cellules = _textes(sb.generer(base, dossier, ["cellules"], {"cellules": None}))
     assert len(doc.sections) == 1 and "ذة. الثانية" in "\n".join(cellules)
     assert sb.reinitialiser(base, "fiche")["champs"].get("gipe", "") == ""
+
+
+def test_lavha_programme_annuel(base):  # noqa: F811
+    """برنامج العمل السنوي في السبورة المرجعية (طلب المدير 2026-11-26): المحطات المؤرخة مرتبة."""
+    d = sb.lire(base, "programme")
+    assert len(d["lignes"]) > 20 and d["lignes"][0][0] == "عمليات الدخول المدرسي"
+    assert d["lignes"][0][2].startswith("الثلاثاء 01 شتنبر 2026")

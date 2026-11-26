@@ -27,12 +27,16 @@ class PageCalendrier(QWidget):
         self.f = fenetre
         self.sid: int | None = None
         racine, self.message = _page("برنامج العمل السنوي",
-                                     "محطات المقرر الوزاري لتنظيم السنة الدراسية ومحطات المؤسسة، مع التذكير بها.")
+                                     "مقترح برنامج العمل السنوي، ومحطات المقرر الوزاري لتنظيم السنة الدراسية ومحطات المؤسسة مع التذكير بها.")
         self.setLayout(racine)
         self.l_mouqarrar = QLabel()
         self.l_mouqarrar.setWordWrap(True)
         self.l_mouqarrar.setObjectName("etiquette")
         racine.addWidget(self.l_mouqarrar)
+        # مقترح برنامج العمل السنوي (نموذج المدير 2026-11-26)
+        from idara.ui.bloc_programme import BlocProgramme
+        self.programme = BlocProgramme(self)
+        racine.addWidget(self.programme)
 
         # ---- التذكيرات ----
         c, v = carte("التذكيرات")
@@ -67,8 +71,7 @@ class PageCalendrier(QWidget):
         b.clicked.connect(lambda: self.marquer_selection(self.t_stations, True))
         b2 = QPushButton("إلغاء التعليم")
         b2.clicked.connect(lambda: self.marquer_selection(self.t_stations, False))
-        self.b_programme = QPushButton("توليد برنامج العمل السنوي")
-        self.b_programme.setObjectName("principal")
+        self.b_programme = QPushButton("جدولة المحطات حسب الأشهر")
         self.b_programme.clicked.connect(lambda: self.generer())
         for x in (b, b2, self.b_programme):
             h.addWidget(x)
@@ -134,6 +137,8 @@ class PageCalendrier(QWidget):
 
     # ---------- العرض ----------
     def rafraichir(self) -> None:
+        if hasattr(self, "programme"):
+            self.programme.afficher()
         a = annee_srv.annee_courante(self.f.conn)
         m = cal.mouqarrar(a["libelle"]) if a else None
         if m:
@@ -260,7 +265,7 @@ class PageCalendrier(QWidget):
         except cal.ErreurCalendrier as e:
             message(self.message, str(e), True)
             return None
-        message(self.message, f"وُلّد برنامج العمل السنوي: {p.name}")
+        message(self.message, f"وُلّدت جدولة المحطات حسب الأشهر: {p.name}")
         try:
             bureautique.ouvrir(p)
         except Exception:  # noqa: BLE001 — الفتح اختياري

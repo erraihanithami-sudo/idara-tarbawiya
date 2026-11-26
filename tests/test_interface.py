@@ -2064,7 +2064,37 @@ def test_programme_annuel_et_rappels(app, config_tmp, monkeypatch):
     selectionner(p.t_rappels, 0)
     assert p.marquer_selection(p.t_rappels, True) == 1
     assert sum(1 for s in cal.stations(f.conn) if s.fait_le) == 1
-    assert p.generer() is not None and "برنامج العمل السنوي" in p.message.text()
+    assert p.generer() is not None and "جدولة المحطات حسب الأشهر" in p.message.text()
+    # مقترح برنامج العمل السنوي (نموذج المدير 2026-11-26)
+    from idara.services import programme_annuel as pa
+    b = p.programme
+    assert b.c_section.count() == 6 and b.table.rowCount() == len(pa.DEFAUT["rentree"])
+    assert b.table.item(0, 2).text().startswith("الثلاثاء 01 شتنبر 2026")
+    assert b.table.item(4, 2).text() == "تحدده المؤسسة" and "المقترح الافتراضي" in b.l_resume.text()
+    b.c_section.setCurrentIndex(3)   # الأندية: تنبيه اليوم الذي يصادف عطلة
+    assert any("الفترة البينية" in b.table.item(i, 3).text() for i in range(b.table.rowCount()))
+    b.c_section.setCurrentIndex(1)
+    fi = b.ouvrir(None)
+    b.c_station.setCurrentText("الاجتماع الأول لمجالس المؤسسة")
+    b.c_operations.setPlainText("")
+    assert not b.enregistrer() and fi.isVisible() and "إجباري" in b.msg.text()
+    b.c_operations.setPlainText("المصادقة على النظام الداخلي")
+    b.c_debut.setText("15/10/2026")
+    assert b.enregistrer() and not fi.isVisible()
+    assert b.table.item(b.table.currentRow(), 2).text() == "الخميس 15 أكتوبر 2026"
+    assert "معدَّل من المؤسسة" in b.l_resume.text()
+    b.ouvrir(b.table.currentRow())
+    assert b.c_operations.toPlainText() == "المصادقة على النظام الداخلي"
+    b.fiche.hide()
+    n = b.table.rowCount()
+    assert b.supprimer() and b.table.rowCount() == n - 1
+    fv = b.ouvrir_validation()
+    b.c_validation.setText("19/10/2026")
+    assert b.enregistrer_validation() and not fv.isVisible() and "2026-10-19" in b.l_resume.text()
+    chemin = b.generer()
+    assert chemin is not None and chemin.exists() and "برنامج العمل السنوي" in p.message.text()
+    b.reinitialiser()
+    assert b.table.rowCount() == len(pa.DEFAUT["conseils"])
     f.close()
 
 
@@ -2721,7 +2751,7 @@ def test_page_sabboura(app, config_tmp, monkeypatch):
     f = _fenetre_avec_eleves(config_tmp)
     f.aller_a("السبورة المرجعية")
     p = f.page_sabboura
-    assert p.liste.count() == 11 and p.cle == "fiche" and p.editeurs["nom"].text() == "مدرسة تجريبية"
+    assert p.liste.count() == 12 and p.cle == "fiche" and p.editeurs["nom"].text() == "مدرسة تجريبية"
     p.editeurs["gipe"].setText("G-1")
     p.liste.setCurrentRow([l.cle for l in sb.LAVHAT].index("cellules"))   # الانتقال يحفظ
     assert sb.lire(f.conn, "fiche")["champs"]["gipe"] == "G-1"
@@ -2737,7 +2767,7 @@ def test_page_sabboura(app, config_tmp, monkeypatch):
     d = Document(chemin)
     assert len(d.sections) == 1 and d.inline_shapes      # شريط العنوان صورة
     chemin = p.generer(tout=True)
-    assert chemin is not None and len(Document(chemin).sections) == 11
+    assert chemin is not None and len(Document(chemin).sections) == 12
     assert sb.lire(f.conn, "cellules")["lignes"][0][1] == "ذ. الأول، ذة. الثانية"
     f.close()
 
