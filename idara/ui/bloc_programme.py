@@ -191,7 +191,7 @@ class BlocProgramme(QWidget):
             return False
         self.fiche.hide()
         self.afficher()
-        self.table.selectRow(i)
+        self.table.setCurrentCell(i, 0)
         return True
 
     def supprimer(self) -> bool:
@@ -208,7 +208,7 @@ class BlocProgramme(QWidget):
             return
         j = pa.deplacer_ligne(self.f.conn, self.section(), i, sens)
         self.afficher()
-        self.table.selectRow(j)
+        self.table.setCurrentCell(j, 0)
 
     def reinitialiser(self) -> None:
         pa.reinitialiser(self.f.conn, self.section())

@@ -2080,8 +2080,8 @@ def test_programme_annuel_et_rappels(app, config_tmp, monkeypatch):
     assert not b.enregistrer() and fi.isVisible() and "إجباري" in b.msg.text()
     b.c_operations.setPlainText("المصادقة على النظام الداخلي")
     b.c_debut.setText("15/10/2026")
-    assert b.enregistrer() and not fi.isVisible()
-    assert b.table.item(b.table.currentRow(), 2).text() == "الخميس 15 أكتوبر 2026"
+    assert b.enregistrer() and not fi.isVisible() and b.table.currentRow() == 2
+    assert b.table.item(2, 2).text() == "الخميس 15 أكتوبر 2026"
     assert "معدَّل من المؤسسة" in b.l_resume.text()
     b.ouvrir(b.table.currentRow())
     assert b.c_operations.toPlainText() == "المصادقة على النظام الداخلي"
