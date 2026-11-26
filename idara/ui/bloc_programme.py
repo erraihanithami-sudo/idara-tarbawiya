@@ -46,6 +46,13 @@ class BlocProgramme(QWidget):
         self.table = tableau(["المحطة", "العمليات والأنشطة المبرمجة", "فترة الإنجاز", "تنبيه"], etirer=1)
         self.table.setMinimumHeight(380)
         self.table.setWordWrap(True)
+        # أعمدة بعرض ثابت حتى لا يدفع نص طويل (التنبيه) الجدول خارج الصفحة؛ العمليات تأخذ الباقي
+        from PySide6.QtWidgets import QHeaderView
+        hh = self.table.horizontalHeader()
+        for j, w_ in ((0, 220), (2, 210), (3, 230)):
+            hh.setSectionResizeMode(j, QHeaderView.Interactive)
+            self.table.setColumnWidth(j, w_)
+        self.table.setTextElideMode(Qt.ElideNone)
         self.table.itemDoubleClicked.connect(lambda it: self.ouvrir(it.row()))
         v.addWidget(self.table)
         h = QHBoxLayout()
