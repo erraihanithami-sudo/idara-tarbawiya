@@ -73,10 +73,13 @@ class PageCalendrier(QWidget):
         b2.clicked.connect(lambda: self.marquer_selection(self.t_stations, False))
         self.b_programme = QPushButton("جدولة المحطات حسب الأشهر")
         self.b_programme.clicked.connect(lambda: self.generer())
+        h2 = QHBoxLayout()   # سطران حتى لا تتجاوز الأزرار عرض الصفحة
         for x in (b, b2, self.b_programme):
-            h.addWidget(x)
+            h2.addWidget(x)
+        h2.addStretch()
         h.addStretch()
         v.addLayout(h)
+        v.addLayout(h2)
         self.barre_stations = h
         racine.addWidget(c)
 
