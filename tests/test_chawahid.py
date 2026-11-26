@@ -60,3 +60,41 @@ def test_eleves_enregistrement_et_pptx(base, dossier, tmp_path):  # noqa: F811
     assert ex["nom"] == "اسم التلميذة أو التلميذ"
     c1 = ch.chemin_sortie(dossier, "شهادة تقديرية - أ/ب", "pdf")
     assert c1.parent.name == "الشواهد التقديرية" and "/" not in c1.name
+
+
+def test_nouvelles_familles():
+    """الدفعة الثانية: 15 تصميماً (9 بعنوان مخطوط «شكر وتقدير» و6 للصغار بثلاث لغات)."""
+    assert len(ch.MODELES) == 22 and len(ch.FAMILLES) == 3
+    chukr = [m for m in ch.MODELES if m.famille == "شكر وتقدير"]
+    atfal = [m for m in ch.MODELES if m.famille == "للصغار بثلاث لغات"]
+    assert len(chukr) == 9 and all(m.titre_fixe == "شهادة شكر وتقدير" and m.langues == ("ar",) for m in chukr)
+    assert len(atfal) == 6 and all("titre" in m.zones and set(m.langues) == {"ar", "fr", "amz"} for m in atfal)
+
+
+def test_langues_fr_amz(base, tmp_path):  # noqa: F811
+    assert ch.droite_a_gauche("شهادة") and not ch.droite_a_gauche("ATTESTATION") and not ch.droite_a_gauche("ⴰⵙⵍⴽⵉⵏ")
+    assert ch.accorder("l'apprenant(e) {ⵜ}ⵓⵏⵍⵎⴰⴷ{ⵜ} {ⵏⵏⴽ}", True) == "l'apprenante ⵜⵓⵏⵍⵎⴰⴷⵜ ⵏⵏⵎ"
+    assert ch.accorder("l'apprenant(e) {ⵜ}ⵓⵏⵍⵎⴰⴷ{ⵜ} {ⵏⵏⴽ}", False) == "l'apprenant ⵓⵏⵍⵎⴰⴷ ⵏⵏⴽ"
+    el = {"nom": "تلميذة وهمية", "nom_lat": "Fictive ELEVE", "classe": "4APG-1", "sexe": "F"}
+    fr = ch.contenu(base, el, "شهادة تفوق", ch.MOTIFS_FR[0], "الأسدوس الأول", "2026-12-05", langue="fr")
+    assert fr["titre"] == "ATTESTATION D'EXCELLENCE" and fr["nom"] == "Fictive ELEVE" and fr["ltr"]
+    assert fr["intro"].endswith("l'apprenante :") and fr["classe"] == "Niveau : 4APG-1"
+    assert fr["motif"].startswith("En reconnaissance de ses efforts remarquables lors de la première session de l'année")
+    assert "05/12/2026" in fr["date"] and fr["signataires"] == ["La Direction"]
+    amz = ch.contenu(base, el, "شهادة تقديرية", "", "الأسدوس الأول", "2026-12-05", langue="amz")
+    assert amz["titre"] == "ⴰⵙⵍⴽⵉⵏ ⵏ ⵓⵙⵎⵖⵔ" and "ⵜⵓⵏⵍⵎⴰⴷⵜ" in amz["intro"]
+    assert amz["motif"] == "ⵙ ⵜⵢⴰⴼⵓⵜⵉⵏ ⵉⵥⵉⵍⵏ ⵏⵏⴰ ⴷ ⵜⵢⵉⵡⵉ ⴳ ⵜⵙⵓⵜⵍⵜ: 01."
+    assert amz["voeu"] == "ⵔⵏⵓ ⴳ ⵓⵎⵓⵔⵙ ⵏⵏⵎ. ⴰⵏⵏⴰⵣ ⵉⵖⵓⴷⴰⵏ." and amz["signataires"] == ["ⵜⴰⵎⵀⵍⴰ ⵜⴰⵙⴳⵎⴰⵏⵜ"]
+    from idara.services import annee as annee_srv
+    lib = annee_srv.annee_courante(base)["libelle"]
+    y1 = int(lib.split("/")[0])
+    assert f"{y1 + 950}/" in amz["classe"] and "ⴳ ⵓⵙⵡⵉⵔ: 4APG-1" in amz["classe"]
+    # الاسم اللاتيني غير مسجل: الاسم العربي
+    assert ch.contenu(base, {"nom": "تلميذ وهمي", "sexe": "M"}, "تشجيع", "", langue="fr")["nom"] == "تلميذ وهمي"
+    with pytest.raises(ch.ErreurChahada, match="لغة"):
+        ch.contenu(base, el, "تشجيع", "سبب", langue="es")
+    p = ch.generer_pptx([fr, amz], "wisam_azraq", tmp_path / "t.pptx")
+    from pptx import Presentation
+    prs = Presentation(str(p))
+    t = " ".join(sh.text_frame.text for sl in prs.slides for sh in sl.shapes if sh.has_text_frame)
+    assert "ATTESTATION D'EXCELLENCE" in t and "ⴰⵙⵍⴽⵉⵏ ⵏ ⵓⵙⵎⵖⵔ" in t and "Fictive ELEVE" in t

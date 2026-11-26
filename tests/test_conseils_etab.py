@@ -75,3 +75,17 @@ def test_enseignement_tableaux_par_matiere(base, dossier):  # noqa: F811
     ce.enregistrer_membres(base, "enseignement", [("المدير", "مدير المؤسسة", "عربية"), ("ج", "ممثل القسم الأول", "عربية")])
     assert len(ce.membres_actifs(base, "enseignement")) == 2 and len(ce.membres(base, "enseignement")) == 5
     assert "ب" in texte(ce.generer_pv(base, dossier, sid))  # المحضر السابق يحتفظ بأعضائه
+
+
+def test_pv_enseignement_modele_directeur(base, dossier):  # noqa: F811
+    """نموذج محضر اجتماع المجالس التعليمية (المدير 2026-11-26): الأقسام المرقمة والاقتراحات والمقرر."""
+    assert "نتائج التقويم التشخيصي في المواد الأداتية ومأسسة عملية التتبع والمواكبة" in ce.SUGGESTIONS["enseignement"]
+    ce.enregistrer_membres(base, "enseignement", [("المدير", "مدير المؤسسة", "عربية"), ("أ", "ممثل القسم الأول", "عربية")])
+    sid = ce.enregistrer_seance(base, ce.Seance(
+        "enseignement", "2026-10-23", ["مشروع النظام الداخلي للمؤسسة", "تحديد الحاجيات من التكوين"], "09:00",
+        deliberations="قراءة مقترح القانون الداخلي ومناقشته، وتمت المصادقة عليه بالإجماع.",
+        decisions=["حملة نظافة دورية شهرية في كل وحدة"], rapporteur="أستاذ وهمي"))
+    assert ce.seance(base, sid).rapporteur == "أستاذ وهمي"
+    t = texte(ce.generer_pv(base, dossier, sid))
+    assert "1- جدول الأعمال:" in t and "2- المناقشة:" in t and "3- الاقتراحات:" in t
+    assert "1- حملة نظافة دورية شهرية في كل وحدة" in t and "المقرر(ة): أستاذ وهمي" in t

@@ -541,6 +541,11 @@ def main(sortie: Path) -> None:
                              ("مدير المؤسسة",))
             _cr.apercu(_m.cle, _c, 1600, _ch.logo_etablissement(f.conn, f.dossier)).save(
                 str(sortie / f"65b_chahada_{_k}_{_m.cle}.png"))
+            for _lg in ("fr", "amz"):   # تصاميم الصغار بثلاث لغات (2026-11-26)
+                if _lg in _m.langues:
+                    _c = _ch.contenu(f.conn, _el[_k % len(_el)] if _el else {"nom": "تلميذة وهمية", "sexe": "F"},
+                                     "شهادة تفوق", "", "الأسدوس الأول", langue=_lg)
+                    _cr.apercu(_m.cle, _c, 1600).save(str(sortie / f"65b_chahada_{_k}_{_m.cle}_{_lg}.png"))
         _fi = _pt.ouvrir("dhahabi_taqdir")
         _pt.cocher([e["nom"] for e in _el[:3]])
         photo(_fi, "65c_tahfiz_popup")

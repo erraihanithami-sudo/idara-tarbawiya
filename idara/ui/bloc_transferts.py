@@ -78,6 +78,31 @@ class BlocTransferts(QWidget):
             self.t_prog.setMinimumHeight(220)
             v.addWidget(self.t_prog)
             v0.addWidget(c)
+        # 3 مكرر. بطاقة مشروع صرف مداخيل التعاونية والتقرير المالي (نماذج المديرية، 2026-11-26)
+        self.t_bilan = None
+        if type_ == "cooperative":
+            c, v = carte("بطاقة مشروع الصرف والتقرير المالي للتعاونية")
+            self.l_coop = QLabel()
+            self.l_coop.setWordWrap(True)
+            self.l_coop.setStyleSheet("font-size: 15px; font-weight: 700;")
+            v.addWidget(self.l_coop)
+            self.t_bilan = tableau(["المجال", "النسبة", "المبلغ المخصص (درهم)", "المصاريف", "الباقي"], etirer=0)
+            self.t_bilan.setMinimumHeight(250)
+            v.addWidget(self.t_bilan)
+            h = QHBoxLayout()
+            for lib, coul, pic, fn, aide in (
+                    ("المنقول والمداخيل المرتقبة", "#1565C0", "modifier", lambda: self.ouvrir_coop(),
+                     "المنقول من السنة الماضية، والمداخيل المرتقبة، ورقم التعاونية، والمنسق"),
+                    (f"بطاقة مشروع الصرف (قبل {tr.ECHEANCE_PROJET})", "#6A1B9A", "document",
+                     lambda: self.generer("projet"), "تُبعث في نسختين إلى المديرية الإقليمية"),
+                    (f"التقرير المالي (قبل {tr.ECHEANCE_RAPPORT})", "#00838F", "document",
+                     lambda: self.generer("rapport"), "المخصص والمصاريف والباقي لكل مجال")):
+                bb = bouton_couleur(lib, coul, pic, aide)
+                bb.clicked.connect(fn)
+                h.addWidget(bb)
+            h.addStretch()
+            v.addLayout(h)
+            v0.addWidget(c)
         # 4. التحويلات المسجلة
         c, v = carte("التحويلات المسجلة")
         self.t_ops = tableau(["التاريخ", "الجهة", "المبلغ (درهم)", "المرجع", "الإجراءات"], etirer=1)
@@ -137,6 +162,16 @@ class BlocTransferts(QWidget):
         self.c_registre = QComboBox()
         self.c_registre.addItem("البنك", "banque")
         self.c_registre.addItem("الصندوق", "caisse")
+        self.c_surplus = champ("فارغ: منقول السنة المالية في البرنامج", ltr=True)
+        self.c_prevu = champ("فارغ: توقعات المداخيل أو حصة التعاونية من الاستخلاص", ltr=True)
+        self.c_numero = champ("مثال: 111-85", ltr=True)
+        self.c_coord = champ("اسم منسق(ة) التعاونية المدرسية")
+        self.fiche_coop = fiche("بطاقة مشروع الصرف والتقرير المالي", "أساس التوزيع على المجالات = المنقول + المداخيل "
+                                "المرتقبة. اترك الخانة فارغة ليُحسب المبلغ من البرنامج.",
+                                [("المنقول (الفائض عن السنة الماضية)", self.c_surplus),
+                                 ("مجموع المداخيل المرتقبة", self.c_prevu), ("رقم التعاونية", self.c_numero),
+                                 ("منسق(ة) التعاونية", self.c_coord)],
+                                [("حفظ", "#2E7D32", lambda: self.enregistrer_coop())], 720)
         self.fiche_part = fiche("تسجيل حصة الجمعية في مداخيلها", "يُسجَّل مدخولاً في السنة المالية التي يقع فيها التاريخ.",
                                 [("التاريخ", self.c_date_part), ("السجل", self.c_registre)],
                                 [("تسجيل", "#2E7D32", lambda: self.inscrire_part())])
@@ -221,6 +256,27 @@ class BlocTransferts(QWidget):
             self.page.rafraichir_finance()
         return oid
 
+    def ouvrir_coop(self):
+        d = tr.donnees_cooperative(self.f.conn)
+        self.c_surplus.setText(tr._dh(d["surplus"]).replace(" ", "") if d["source_surplus"] == "manuel" else "")
+        self.c_prevu.setText(tr._dh(d["prevu"]).replace(" ", "") if d["source_prevu"] == "manuel" else "")
+        self.c_numero.setText(d["numero"])
+        self.c_coord.setText(d["coordinateur"])
+        self.fiche_coop.msg.hide()
+        self.fiche_coop.ouvrir()
+        return self.fiche_coop
+
+    def enregistrer_coop(self) -> bool:
+        try:
+            tr.definir_donnees_cooperative(self.f.conn, self.c_surplus.text(), self.c_prevu.text(),
+                                           self.c_numero.text(), self.c_coord.text())
+        except tr.ErreurTransfert as e:
+            self._erreur(self.fiche_coop, e)
+            return False
+        self.fiche_coop.hide()
+        self.rafraichir()
+        return True
+
     def supprimer(self, vid: int) -> None:
         tr.supprimer_virement(self.f.conn, self.type_, vid)
         self.rafraichir()
@@ -229,6 +285,10 @@ class BlocTransferts(QWidget):
         try:
             if quoi == "pv":
                 p = tr.generer_pv_collecte(self.f.conn, self.f.dossier, self.type_)
+            elif quoi == "projet":
+                p = tr.generer_projet_cooperative(self.f.conn, self.f.dossier)
+            elif quoi == "rapport":
+                p = tr.generer_rapport_cooperative(self.f.conn, self.f.dossier)
             else:
                 p = tr.generer_certificat(self.f.conn, self.f.dossier, self.type_)
         except tr.ErreurTransfert as e:
@@ -302,6 +362,8 @@ class BlocTransferts(QWidget):
             for i, (lib, pc, m) in enumerate(r["programme"]):
                 for j, x in enumerate((lib, f"{pc:g}%", tr._dh(m))):
                     self.t_prog.setItem(i, j, cellule(x))
+        if self.t_bilan is not None:
+            self._rafraichir_bilan()
         noms = {p.cle: p.libelle for p in self.rg.parts}
         ops = r["operations"]
         vider_colonne_widgets(self.t_ops, 4)
@@ -313,3 +375,30 @@ class BlocTransferts(QWidget):
             self.t_ops.setCellWidget(i, 4, boutons_ligne([("حذف", "#C62828", "annuler",
                                                            lambda x=o["id"]: self.supprimer(x))]))
         ajuster_colonne_actions(self.t_ops, 4)
+
+    def _rafraichir_bilan(self) -> None:
+        b = tr.bilan_cooperative(self.f.conn)
+
+        def src(v, s_):
+            if v is None:
+                return "غير مسجل بعد"
+            return f"{tr._dh(v)} درهم" + (" (مسك يدوي)" if s_ == "manuel" else " (من البرنامج)")
+        self.l_coop.setText(f"المنقول: {src(b['surplus'], b['source_surplus'])} · المداخيل المرتقبة: "
+                            f"{src(b['prevu'], b['source_prevu'])} · أساس التوزيع: {tr._dh(b['base'])} درهم"
+                            + (f" · رقم التعاونية: {b['numero']}" if b["numero"] else ""))
+        self.t_bilan.setRowCount(len(b["lignes"]) + 1)
+        for i, l in enumerate(b["lignes"]):
+            for j, x in enumerate((l["libelle"], f"{l['pct']:g}%", tr._dh(l["alloue"]), tr._dh(l["depense"]),
+                                   tr._dh(l["reste"]))):
+                it = cellule(x)
+                if j == 4 and l["reste"] < 0:
+                    it.setForeground(QColor("#C62828"))
+                self.t_bilan.setItem(i, j, it)
+        i = len(b["lignes"])
+        for j, x in enumerate(("المجموع", "100%", tr._dh(b["total_alloue"]), tr._dh(b["total_depense"]),
+                               tr._dh(b["total_reste"]))):
+            it = cellule(x)
+            f = it.font()
+            f.setBold(True)
+            it.setFont(f)
+            self.t_bilan.setItem(i, j, it)

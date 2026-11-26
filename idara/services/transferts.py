@@ -390,3 +390,188 @@ def generer_certificat(conn: sqlite3.Connection, dossier, type_: str, qualite: s
     para(d, f"حرر ب{c['ville']} في: {tx.date_chiffres(date.today().isoformat())}", taille=12, apres=4)
     para(d, "الإمضاء", gras=True, taille=13)
     return _sauver(d, dossier, conn, type_, f"شهادة نفقة - {r['regime'].nom}")
+
+
+# ---------- بطاقة مشروع صرف مداخيل التعاونية والتقرير المالي (نماذج المديرية، المدير 2026-11-26) ----------
+# البطاقة تُبعث في نسختين إلى المديرية الإقليمية قبل 20 نونبر، والتقرير المالي قبل 30 ماي.
+# أساس التوزيع = المنقول (الفائض عن السنة الماضية) + مجموع المداخيل المرتقبة، على المجالات الخمسة للمذكرة 24.
+ECHEANCE_PROJET = "20/11"
+ECHEANCE_RAPPORT = "30/05"
+BUREAU_COOP = "مصلحة الشؤون التربوية · مكتب تنمية الأنشطة التربوية والاجتماعية والثقافية والفنية"
+
+
+def _cle_coop(conn) -> str:
+    return f"cooperative_projet_{_annee(conn)}"
+
+
+def exercice_cooperative(conn: sqlite3.Connection, le: date | None = None):
+    """السنة المالية للتعاونية التي تضم التاريخ، وإلا آخر سنة مفتوحة."""
+    from idara.services import associations as asso
+    le = (le or date.today()).isoformat()
+    exs = asso.exercices(conn, "cooperative")
+    for e in exs:
+        if e["date_debut"] <= le <= e["date_fin"]:
+            return e
+    return exs[0] if exs else None
+
+
+def donnees_cooperative(conn: sqlite3.Connection) -> dict:
+    """المنقول والمداخيل المرتقبة ورقم التعاونية والمنسق: المسجل يدوياً، وإلا المحسوب من البرنامج."""
+    from idara.services import associations as asso
+    d = fiches.lire(conn, _cle_coop(conn)) or {}
+    ex = exercice_cooperative(conn)
+    surplus_calc, prevu_calc = None, None
+    if ex is not None:
+        rep = asso.report(conn, ex["id"])
+        surplus_calc = _r(rep["banque"] + rep["caisse"])
+        prev = [r for r in asso.execution(conn, ex["id"]) if r["sens"] == "recette" and r["ligne"] != asso.REPORT]
+        if sum(r["prevu"] for r in prev) > 0:
+            prevu_calc = _r(sum(r["prevu"] for r in prev))
+    if prevu_calc is None:
+        part = next(l for l in repartition(conn, "cooperative")["lignes"] if l["cle"] == "association")
+        prevu_calc = part["du"] if part["du"] > 0 else None
+    a = asso.association(conn, "cooperative")
+    return {
+        "surplus": d["surplus"] if d.get("surplus") is not None else surplus_calc,
+        "prevu": d["prevu"] if d.get("prevu") is not None else prevu_calc,
+        "source_surplus": "manuel" if d.get("surplus") is not None else ("programme" if surplus_calc is not None else ""),
+        "source_prevu": "manuel" if d.get("prevu") is not None else ("programme" if prevu_calc is not None else ""),
+        "numero": d.get("numero", ""), "coordinateur": d.get("coordinateur", ""),
+        "compte": (a["rib"] or "") if a else "", "exercice": ex["libelle"] if ex is not None else "",
+    }
+
+
+def definir_donnees_cooperative(conn: sqlite3.Connection, surplus=None, prevu=None, numero: str = "",
+                                coordinateur: str = "") -> None:
+    """None: يُحسب من البرنامج (منقول السنة المالية، وتوقعات المداخيل أو حصة التعاونية من الاستخلاص)."""
+    def montant(v, lib):
+        if v is None or str(v).strip() == "":
+            return None
+        try:
+            m = round(float(str(v).replace(",", ".").replace(" ", "").replace(" ", "")), 2)
+        except ValueError:
+            raise ErreurTransfert(f"{lib} غير صحيح.") from None
+        if m < 0:
+            raise ErreurTransfert(f"{lib} لا يكون سالباً.")
+        return m
+    fiches.ecrire(conn, _cle_coop(conn), {"surplus": montant(surplus, "المنقول"), "prevu": montant(prevu, "مبلغ المداخيل المرتقبة"),
+                                          "numero": " ".join((numero or "").split()),
+                                          "coordinateur": " ".join((coordinateur or "").split())})
+
+
+def bilan_cooperative(conn: sqlite3.Connection) -> dict:
+    """لكل مجال: النسبة، المبلغ المخصص (من المنقول + المداخيل المرتقبة)، المصاريف المنجزة، والباقي."""
+    from idara.services import associations as asso
+    d = donnees_cooperative(conn)
+    base = _r((d["surplus"] or 0) + (d["prevu"] or 0))
+    ex = exercice_cooperative(conn)
+    depenses: dict[str, float] = {}
+    if ex is not None:
+        for r in asso.execution(conn, ex["id"]):
+            if r["sens"] == "depense":
+                depenses[r["chapitre"]] = _r(depenses.get(r["chapitre"], 0) + r["realise"])
+    lignes = []
+    for lib, pc in REGIMES["cooperative"].programme:
+        alloue = _r(base * pc / 100)
+        dep = depenses.get(lib, 0.0)
+        lignes.append({"libelle": lib, "pct": pc, "alloue": alloue, "depense": dep, "reste": _r(alloue - dep)})
+    autres = _r(sum(v for k, v in depenses.items() if k not in dict(REGIMES["cooperative"].programme)))
+    solde = None
+    if ex is not None:
+        s = asso.soldes(conn, ex["id"])
+        solde = _r(s["banque"] + s["caisse"])
+    return {**d, "base": base, "lignes": lignes, "autres_depenses": autres,
+            "total_alloue": _r(sum(l["alloue"] for l in lignes)), "total_depense": _r(sum(l["depense"] for l in lignes)),
+            "total_reste": _r(sum(l["reste"] for l in lignes)), "solde": solde}
+
+
+def _entete_coop(conn, dossier, titre: str, b: dict):
+    from idara.services import etablissement as etab_srv
+    from idara.services.docs_association import para
+    if b["surplus"] is None and b["prevu"] is None:
+        raise ErreurTransfert("سجّل المنقول (الفائض عن السنة الماضية) والمداخيل المرتقبة أولاً، أو افتح السنة "
+                              "المالية للتعاونية في تبويب «المداخيل والمصاريف والسجلات».")
+    d, c = _doc(conn, dossier, titre)
+    para(d, f"للموسم الدراسي {_annee(conn)}", centre=True, taille=13, apres=0)
+    para(d, BUREAU_COOP, centre=True, taille=11, apres=6)
+    e = etab_srv.lire_etablissement(conn)
+    trait = "." * 30
+    para(d, f"المؤسسة: {c['etablissement']}      رمزها: {(e.code_etab if e else '') or trait}", taille=13, apres=0)
+    para(d, f"الجماعة: {(e.commune_ar if e else '') or trait}      رقم التعاونية المدرسية: {b['numero'] or trait}",
+         taille=13, apres=0)
+    para(d, f"رقم الحساب: {b['compte'] or trait}", taille=13, apres=0)
+    para(d, f"المنقول الفائض عن السنة الماضية: {_dh(b['surplus'] or 0)} درهم      "
+            f"مجموع المداخيل المرتقبة خلال السنة الحالية: {_dh(b['prevu'] or 0)} درهم", taille=13, apres=6)
+    return d, c
+
+
+def _pied_coop(d, c, echeance: str, rapport: bool, coordinateur: str = "") -> None:
+    from docx.shared import Cm
+    from idara.services import textes as tx
+    from idara.services.docs_association import _cellule, para, tableau
+    para(d, apres=4)
+    para(d, f"حرر ب{c['ville']} في: {tx.date_chiffres(date.today().isoformat())}", taille=12, apres=6)
+    t = tableau(d, 2, 2, bordures=False, largeurs=[8.7, 8.7])
+    _cellule(t.cell(0, 0), "إمضاء منسق(ة) التعاونية المدرسية", gras=True, taille=12)
+    _cellule(t.cell(0, 1), "إمضاء المدير(ة) وطابع المؤسسة", gras=True, taille=12)
+    if coordinateur:
+        _cellule(t.cell(1, 0), coordinateur, taille=12)
+    t.rows[1].height = Cm(2.0)
+    t = tableau(d, 2, 2, largeurs=[8.7, 8.7])
+    _cellule(t.cell(0, 0), "خاص بالمديرية الإقليمية: تأشيرة المكتب المختص", gras=True, taille=11)
+    _cellule(t.cell(0, 1), "إمضاء السيد المدير الإقليمي", gras=True, taille=11)
+    t.rows[1].height = Cm(2.0)
+    quoi = "بدقة، " if rapport else ""
+    para(d, f"* يعبأ هذا المطبوع {quoi}ويبعث في نسختين إلى المديرية الإقليمية قبل {echeance} من الموسم الدراسي "
+            "الجاري.", taille=10, apres=0)
+
+
+def generer_projet_cooperative(conn: sqlite3.Connection, dossier) -> Path:
+    """بطاقة مشروع صرف مداخيل التعاونية المدرسية (قبل 20 نونبر)."""
+    from idara.services.docs_association import _cellule, _ombre, tableau
+    b = bilan_cooperative(conn)
+    d, c = _entete_coop(conn, dossier, "بطاقة مشروع صرف مداخيل التعاونية المدرسية", b)
+    t = tableau(d, 2 + len(b["lignes"]), 5, largeurs=[1.0, 6.0, 2.4, 3.6, 4.4])
+    for j, h in enumerate(("ر.ت", "المجالات", "النسبة المخصصة", "المبلغ المخصص للمجال (بالدرهم)", "ملاحظات")):
+        _cellule(t.cell(0, j), h, gras=True, taille=11)
+        _ombre(t.cell(0, j))
+    for i, l in enumerate(b["lignes"], start=1):
+        for j, v in enumerate((f"{i:02d}", l["libelle"], f"{l['pct']:g} %", _dh(l["alloue"]), "")):
+            _cellule(t.cell(i, j), v, taille=11, centre=j != 1)
+    i = len(b["lignes"]) + 1
+    for j, v in enumerate(("", "المجموع", "100 %", _dh(b["total_alloue"]), "")):
+        _cellule(t.cell(i, j), v, gras=True, taille=11)
+        _ombre(t.cell(i, j))
+    _pied_coop(d, c, ECHEANCE_PROJET, False, b["coordinateur"])
+    return _sauver(d, dossier, conn, "cooperative", "بطاقة مشروع صرف مداخيل التعاونية")
+
+
+def generer_rapport_cooperative(conn: sqlite3.Connection, dossier) -> Path:
+    """التقرير المالي للتعاونية المدرسية (قبل 30 ماي): المخصص والمصاريف والباقي لكل مجال."""
+    from idara.services.docs_association import _cellule, _ombre, para, tableau
+    b = bilan_cooperative(conn)
+    d, c = _entete_coop(conn, dossier, "التقرير المالي للتعاونية المدرسية", b)
+    ent = ("ر.ت", "المجالات", "النسبة المخصصة", "المبلغ المخصص للمجال (بالدرهم)", "المصاريف (بالدرهم)",
+           "الباقي (بالدرهم)", "ملاحظات")
+    t = tableau(d, 2 + len(b["lignes"]), len(ent), largeurs=[0.9, 4.0, 1.8, 2.9, 2.6, 2.6, 2.6])
+    for j, h in enumerate(ent):
+        _cellule(t.cell(0, j), h, gras=True, taille=10)
+        _ombre(t.cell(0, j))
+    for i, l in enumerate(b["lignes"], start=1):
+        obs = "تجاوز المخصص" if l["reste"] < 0 else ""
+        for j, v in enumerate((f"{i:02d}", l["libelle"], f"{l['pct']:g}%", _dh(l["alloue"]), _dh(l["depense"]),
+                               _dh(l["reste"]), obs)):
+            _cellule(t.cell(i, j), v, taille=10, centre=j != 1)
+    i = len(b["lignes"]) + 1
+    for j, v in enumerate(("", "المجموع", "100%", _dh(b["total_alloue"]), _dh(b["total_depense"]),
+                           _dh(b["total_reste"]), "")):
+        _cellule(t.cell(i, j), v, gras=True, taille=10)
+        _ombre(t.cell(i, j))
+    if b["autres_depenses"]:
+        para(d, f"مصاريف خارج المجالات الخمسة (مصاريف بنكية وبريدية ومختلفات): {_dh(b['autres_depenses'])} درهم.",
+             taille=11, apres=0)
+    if b["solde"] is not None:
+        para(d, f"الباقي في الحساب (البنك والصندوق) حسب سجلات السنة المالية {b['exercice']}: {_dh(b['solde'])} درهم.",
+             gras=True, taille=12, apres=0)
+    _pied_coop(d, c, ECHEANCE_RAPPORT, True, b["coordinateur"])
+    return _sauver(d, dossier, conn, "cooperative", "التقرير المالي للتعاونية المدرسية")

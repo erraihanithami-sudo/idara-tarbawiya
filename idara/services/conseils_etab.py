@@ -68,6 +68,10 @@ SUGGESTIONS = {
         "مقترحات من أجل تجويد العمل التربوي بالمؤسسة",
     ),
     "enseignement": (
+        "مشروع النظام الداخلي للمؤسسة",
+        "المصادقة على الصيغة النهائية لبرنامج العمل السنوي ولمشروع المؤسسة",
+        "نتائج التقويم التشخيصي في المواد الأداتية ومأسسة عملية التتبع والمواكبة",
+        "تحديد الحاجيات من التكوين",
         "دراسة وضعية تدريس المادة وتحديد حاجياتها التربوية",
         "الصعوبات المتعلقة بتدريس اللغتين العربية والفرنسية",
         "بعض المقترحات المتعلقة بتدريس اللغتين العربية والفرنسية",
@@ -213,6 +217,7 @@ class Seance:
     inclure_resultats: bool = False
     inclure_isa: bool = False
     id: int | None = None
+    rapporteur: str = ""                     # مقرر الاجتماع (يوقع المحضر مع رئيس المؤسسة)
 
 
 def quorum(conseil: str, n_membres: int, n_presents: int, convocation: str) -> tuple[bool, str]:
@@ -252,18 +257,20 @@ def enregistrer_seance(conn, s: Seance, annee: str | None = None) -> int:
     vals = (d.isoformat(), _txt(s.heure) or None, s.nature, s.convocation, json.dumps(odj, ensure_ascii=False),
             (s.deliberations or "").strip() or None,
             json.dumps([_txt(x) for x in s.decisions if _txt(x)], ensure_ascii=False),
-            int(s.inclure_resultats), int(s.inclure_isa))
+            int(s.inclure_resultats), int(s.inclure_isa), _txt(s.rapporteur) or None)
     with conn:
         if s.id is None:
             n = conn.execute("SELECT COALESCE(MAX(numero),0)+1 FROM conseil_seance WHERE annee_id=? AND conseil=?",
                              (a["id"], s.conseil)).fetchone()[0]
             s.id = conn.execute(
                 "INSERT INTO conseil_seance(annee_id, conseil, numero, date_seance, heure, nature, convocation, "
-                "ordre_du_jour, deliberations, decisions, inclure_resultats, inclure_isa) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "ordre_du_jour, deliberations, decisions, inclure_resultats, inclure_isa, rapporteur) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (a["id"], s.conseil, n, *vals)).lastrowid
         else:
             conn.execute("UPDATE conseil_seance SET date_seance=?, heure=?, nature=?, convocation=?, ordre_du_jour=?, "
-                         "deliberations=?, decisions=?, inclure_resultats=?, inclure_isa=? WHERE id=?", (*vals, s.id))
+                         "deliberations=?, decisions=?, inclure_resultats=?, inclure_isa=?, rapporteur=? WHERE id=?",
+                         (*vals, s.id))
             conn.execute("DELETE FROM conseil_presence WHERE seance_id=?", (s.id,))
         conn.executemany("INSERT INTO conseil_presence(seance_id, membre_id, present) VALUES (?,?,?)",
                          [(s.id, m, int(m in presents)) for m in ids])
@@ -286,7 +293,7 @@ def seance(conn, sid: int) -> Seance:
     pres = [x[0] for x in conn.execute("SELECT membre_id FROM conseil_presence WHERE seance_id=? AND present=1", (sid,))]
     return Seance(r["conseil"], r["date_seance"], json.loads(r["ordre_du_jour"]), r["heure"] or "", r["nature"],
                   r["convocation"], r["deliberations"] or "", json.loads(r["decisions"] or "[]"), pres,
-                  bool(r["inclure_resultats"]), bool(r["inclure_isa"]), r["id"])
+                  bool(r["inclure_resultats"]), bool(r["inclure_isa"]), r["id"], r["rapporteur"] or "")
 
 
 def supprimer_seance(conn, sid: int) -> None:
@@ -416,7 +423,8 @@ def generer_pv(conn, dossier: DossierDonnees, sid: int) -> Path:
              "enseignement": f"المجالس التعليمية ل{c['etablissement']}"}[s.conseil]
     verbe = "عقدت" if s.conseil == "enseignement" else "عقد"
     para(d, f"{verbe} {sujet} اجتماعاً {nature} يومه {tx.date_longue_ar(s.date_seance)}{heure} لتدارس النقاط المحددة "
-            "في جدول الأعمال:", apres=2)
+            "في جدول الأعمال.", apres=2)
+    para(d, "1- جدول الأعمال:", gras=True, apres=1)
     for x in s.ordre_du_jour:
         para(d, f"- {x}", apres=0)
     para(d, apres=4)
@@ -430,6 +438,7 @@ def generer_pv(conn, dossier: DossierDonnees, sid: int) -> Path:
         para(d, f"حضر الاجتماع {len(presents)} عضواً من أصل {len(ms)}. {msg}", taille=13, apres=2)
     if absents:
         para(d, "وتغيب: " + "، ".join(f"{m['nom']} ({m['qualite']})" for m in absents) + ".", taille=13, apres=4)
+    para(d, "2- المناقشة:", gras=True, apres=1)
     if s.deliberations:
         for l in s.deliberations.splitlines():
             if l.strip():
@@ -442,14 +451,20 @@ def generer_pv(conn, dossier: DossierDonnees, sid: int) -> Path:
     if s.inclure_isa:
         _table_isa(conn, d, annee)
     if s.decisions:
-        para(d, "القرارات والتوصيات:", gras=True, apres=2)
+        para(d, "3- الاقتراحات:" if s.conseil == "enseignement" else "3- القرارات والتوصيات:", gras=True, apres=2)
         for i, x in enumerate(s.decisions, start=1):
             para(d, f"{i}- {x}", apres=1)
     if s.conseil == "gestion":
         para(d, "تتخذ القرارات بأغلبية أصوات الحاضرين، وعند التعادل يرجح الجانب الذي ينتمي إليه رئيس المجلس.",
              taille=11, apres=4)
     para(d, apres=6)
-    para(d, "رئيس المؤسسة", gras=True, centre=True, apres=12)
+    if s.rapporteur:   # المقرر ورئيس المؤسسة جنباً إلى جنب (نموذج المدير)
+        t = tableau(d, 2, 2, bordures=False)
+        _cellule(t.cell(0, 0), "رئيس المؤسسة", gras=True)
+        _cellule(t.cell(0, 1), f"المقرر(ة): {s.rapporteur}", gras=True)
+        para(d, apres=10)
+    else:
+        para(d, "رئيس المؤسسة", gras=True, centre=True, apres=12)
     if s.conseil == "enseignement":
         for g in dict.fromkeys(m["groupe"] for m in ms):
             _table_signatures(d, f"المجالس التعليمية {g}", [m for m in ms if m["groupe"] == g], presents)

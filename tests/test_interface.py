@@ -1340,6 +1340,18 @@ def test_asso_sportive_cooperative(app, config_tmp, monkeypatch):
     pc.achats.rafraichir()
     assert pc.achats.t_prog.rowCount() == 5 and pc.achats.t_prog.item(0, 2).text() == "120.00"
     assert pc.achats.table.rowCount() == 2 + 5 + 1   # الحصتان + تفصيل حصة الفرع + المجموع
+    # بطاقة مشروع صرف مداخيل التعاونية والتقرير المالي (2026-11-26)
+    bc = pc.achats
+    assert bc.t_bilan.rowCount() == 6 and bc.t_bilan.item(0, 2).text() == "120.00"   # 30% من 400
+    fc = bc.ouvrir_coop()
+    bc.c_surplus.setText("-5")
+    assert not bc.enregistrer_coop() and fc.isVisible() and "سالباً" in fc.msg.text()
+    bc.c_surplus.setText("100")
+    bc.c_numero.setText("111-85")
+    assert bc.enregistrer_coop() and not fc.isVisible()
+    assert bc.t_bilan.item(5, 2).text() == "500.00" and "111-85" in bc.l_coop.text()
+    n = len(ouverts)
+    assert bc.generer("projet") and bc.generer("rapport") and len(ouverts) == n + 2
     f.close()
 
 
@@ -1382,6 +1394,22 @@ def test_tahfiz_maarid_chawahid(app, config_tmp, tmp_path, monkeypatch):
     from pptx import Presentation
     assert len(Presentation(str(pp)).slides) == 2 and len(rg.lister(f.conn, "tahfiz")) == 4
     assert p.vue.table.rowCount() == 4
+    # الدفعة الثانية (2026-11-26): تصفية المعرض حسب العائلة، ولغة الشهادة
+    assert p.filtrer_famille("شكر وتقدير") == 9 and p.cartes["almasi"].isHidden()
+    assert p.filtrer_famille("للصغار بثلاث لغات") == 6 and not p.cartes["wisam_azraq"].isHidden()
+    assert p.filtrer_famille("الكل") == len(ch.MODELES)
+    p.c_langue.setCurrentIndex(list(ch.LANGUES).index("fr"))
+    assert p.c_intro.text().startswith("La direction") and p.c_motif.currentText().startswith("En reconnaissance")
+    p.c_modele.setCurrentIndex([m.cle for m in ch.MODELES].index("midaliya"))   # عنوان مخطوط بالعربية
+    assert p.generer_pdf() is None and "مخطوط" in p.message_fiche.text()
+    p.c_modele.setCurrentIndex([m.cle for m in ch.MODELES].index("wisam_azraq"))
+    pdf_fr = p.generer_pdf(tmp_path / "fr.pdf")
+    assert pdf_fr.exists() and pdf_fr.read_bytes()[:4] == b"%PDF"
+    p.c_langue.setCurrentIndex(list(ch.LANGUES).index("amz"))
+    assert "ⵜⴰⵎⵀⵍⴰ" in p.c_intro.text()
+    pdf_amz = p.generer_pdf(tmp_path / "amz.pdf")
+    assert pdf_amz.exists() and len(rg.lister(f.conn, "tahfiz")) == 8
+    assert any("الأمازيغية" in l["modele"] for l in rg.lister(f.conn, "tahfiz"))
     fi.hide()
     f.close()
 

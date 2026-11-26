@@ -79,3 +79,39 @@ def test_part_association_en_recette(base):  # noqa: F811
     assert oid and asso.totaux(base, eid)["recettes"] == 650 and asso.totaux(base, eid)["banque"] == 650
     with pytest.raises(tr.ErreurTransfert, match="من قبل"):
         tr.inscrire_part_association(base, "sportive", "2026-10-21")
+
+
+def test_projet_et_rapport_cooperative(base, dossier):  # noqa: F811
+    """بطاقة مشروع صرف مداخيل التعاونية والتقرير المالي (نماذج المديرية، 2026-11-26)."""
+    with pytest.raises(tr.ErreurTransfert, match="المنقول"):
+        tr.generer_projet_cooperative(base, dossier)
+    tr.definir_collecte(base, "cooperative", 2260)          # حصة المؤسسة 40% = 904
+    d = tr.donnees_cooperative(base)
+    assert d["prevu"] == 904 and d["source_prevu"] == "programme" and d["surplus"] is None
+    tr.definir_donnees_cooperative(base, "92", None, "111-85", "منسق وهمي")
+    b = tr.bilan_cooperative(base)
+    assert b["base"] == 996 and [l["alloue"] for l in b["lignes"]] == [298.8, 199.2, 199.2, 199.2, 99.6]
+    assert b["total_alloue"] == 996 and b["solde"] is None
+    with pytest.raises(tr.ErreurTransfert, match="سالباً"):
+        tr.definir_donnees_cooperative(base, "-1")
+    p = tr.generer_projet_cooperative(base, dossier)
+    doc = Document(p)
+    txt = " ".join(x.text for x in doc.paragraphs)
+    cells = " ".join(c.text for t in doc.tables for r in t.rows for c in r.cells)
+    assert "بطاقة مشروع صرف مداخيل التعاونية المدرسية" in txt and "111-85" in txt and "20/11" in txt
+    assert "298.80" in cells and "996.00" in cells and "منسق وهمي" in cells
+    # السنة المالية: المنقول منها والمصاريف حسب المجال
+    tr.definir_donnees_cooperative(base, None, None, "111-85")
+    eid = asso.ouvrir_exercice(base, "cooperative", "2026-2027", "2026-09-01", "2027-08-31", 92, 0)
+    rid = {r["chapitre"]: r["id"] for r in asso.rubriques(base, "cooperative", "depense")}
+    asso.enregistrer(base, asso.Operation(eid, "2026-11-10", "depense", "banque", 90, rid["النشاط الاجتماعي"], "فاتورة 1"))
+    asso.enregistrer(base, asso.Operation(eid, "2026-11-12", "depense", "banque", 2, rid["مختلفات"], "كشف 1"))
+    b = tr.bilan_cooperative(base)
+    assert b["surplus"] == 92 and b["source_surplus"] == "programme"
+    assert b["lignes"][0]["depense"] == 90 and b["lignes"][0]["reste"] == 208.8 and b["autres_depenses"] == 2
+    assert b["solde"] == 0 and b["exercice"] == "2026-2027"
+    r = Document(tr.generer_rapport_cooperative(base, dossier))
+    txt = " ".join(x.text for x in r.paragraphs)
+    cells = " ".join(c.text for t in r.tables for row in t.rows for c in row.cells)
+    assert "التقرير المالي للتعاونية المدرسية" in txt and "30/05" in txt and "الباقي في الحساب" in txt
+    assert "208.80" in cells and "90.00" in cells

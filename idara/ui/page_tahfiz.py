@@ -72,6 +72,23 @@ class PageTahfiz(QWidget):
             "كل شهادة تُسجَّل في سجل التحفيز وفي الملف الشامل للتلميذ(ة).")
         self.setLayout(racine)
         c, v = carte("معرض الشواهد")
+        # تصفية المعرض حسب العائلة (22 تصميماً)
+        hf = QHBoxLayout()
+        hf.setSpacing(8)
+        self.filtres: dict[str, QPushButton] = {}
+        for fam in ("الكل",) + ch.FAMILLES:
+            n = len(ch.MODELES) if fam == "الكل" else sum(m.famille == fam for m in ch.MODELES)
+            b = QPushButton(f"{fam} ({n})")
+            b.setCheckable(True)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setStyleSheet("QPushButton { background: #FFF8E6; border: 1px solid #E2C77A; border-radius: 14px; "
+                            "padding: 6px 16px; font-weight: 700; color: #6B4E00; }"
+                            "QPushButton:checked { background: #1B2A4A; color: #F2D27A; border-color: #C9A227; }")
+            b.clicked.connect(lambda _=False, f=fam: self.filtrer_famille(f))
+            self.filtres[fam] = b
+            hf.addWidget(b)
+        hf.addStretch()
+        v.addLayout(hf)
         self.zone_galerie = QWidget()
         self.flux = FluxLayout(self.zone_galerie, 18, 18)
         self.cartes: dict[str, CarteModele] = {}
@@ -82,10 +99,23 @@ class PageTahfiz(QWidget):
             self.cartes[m.cle] = carte_m
             self.flux.addWidget(carte_m)
         v.addWidget(self.zone_galerie)
+        self.filtrer_famille("الكل")
         racine.addWidget(c)
         self.vue = VueRegistre(self, "tahfiz", couleur or theme.VERT)
         racine.addWidget(self.vue)
         racine.addStretch()
+
+    def filtrer_famille(self, fam: str) -> int:
+        """يعرض تصاميم عائلة واحدة أو الكل؛ يرجع عدد البطاقات الظاهرة."""
+        for f, b in self.filtres.items():
+            b.setChecked(f == fam)
+        n = 0
+        for cle, carte_m in self.cartes.items():
+            vis = fam == "الكل" or ch.PAR_CLE[cle].famille == fam
+            carte_m.setVisible(vis)
+            n += vis
+        self.flux.invalidate()
+        return n
 
     # توافق مع PageRegistres (العدادات والتنقل)
     def vue_registre(self):
@@ -127,6 +157,11 @@ class PageTahfiz(QWidget):
         self.c_modele.setCurrentIndex([m.cle for m in ch.MODELES].index(cle))
         self.c_modele.currentIndexChanged.connect(lambda _: self._changer_modele())
         fl.addRow("التصميم", self.c_modele)
+        self.c_langue = QComboBox(form)
+        for k, lib in ch.LANGUES.items():
+            self.c_langue.addItem(lib, k)
+        self.c_langue.currentIndexChanged.connect(lambda _: self._changer_langue())
+        fl.addRow("لغة الشهادة", self.c_langue)
         self.c_classe = QComboBox(form)
         self.c_classe.addItem("كل الأقسام", "")
         for k in ch.classes(self.f.conn):
@@ -163,9 +198,7 @@ class PageTahfiz(QWidget):
         fl.addRow("الفترة", self.c_periode)
         self.c_motif = QComboBox(form)
         self.c_motif.setEditable(True)
-        for t in ch.MOTIFS:
-            self.c_motif.addItem(ch.accorder(t, False).replace("{الفترة}", "…"), t)
-        self.motif_modele: str | None = ch.MOTIFS[0]
+        self._remplir_motifs("ar")
         self.c_motif.activated.connect(lambda i: self._choisir_motif(i))
         self.c_motif.lineEdit().textEdited.connect(lambda _: self._motif_libre())
         fl.addRow("السبب", self.c_motif)
@@ -260,6 +293,27 @@ class PageTahfiz(QWidget):
         return [self.l_eleves.item(i).data(Qt.UserRole) for i in range(self.l_eleves.count())
                 if self.l_eleves.item(i).checkState() == Qt.Checked]
 
+    def langue(self) -> str:
+        return self.c_langue.currentData() if hasattr(self, "c_langue") else "ar"
+
+    def _remplir_motifs(self, langue: str) -> None:
+        self.c_motif.blockSignals(True)
+        self.c_motif.clear()
+        for t in ch.MOTIFS_LANGUE[langue]:
+            self.c_motif.addItem(ch.accorder(t, False).replace("{الفترة}", "…"), t)
+        self.c_motif.setCurrentIndex(0)
+        self.c_motif.blockSignals(False)
+        self.motif_modele: str | None = ch.MOTIFS_LANGUE[langue][0]
+
+    def _changer_langue(self) -> None:
+        lg = self.langue()
+        self._remplir_motifs(lg)
+        self.intro_modifiee = False
+        d = Qt.RightToLeft if lg == "ar" else Qt.LeftToRight
+        self.c_intro.setLayoutDirection(d)
+        self.c_motif.setLayoutDirection(d)
+        self._changer_type()
+
     def _changer_modele(self) -> None:
         self.cle_modele = self.c_modele.currentData()
         self._maj()
@@ -268,11 +322,9 @@ class PageTahfiz(QWidget):
         t = self.c_type.currentText()
         if not self.intro_modifiee:
             try:
-                e = ch.etab_srv.lire_etablissement(self.f.conn)
-            except Exception:  # noqa: BLE001
-                e = None
-            etab = e.nom_ar if e else "المؤسسة"
-            self.c_intro.setText(f"يتشرف مدير وأطر {etab} بتقديم هذه {ch.NATURES[t]} إلى التلميذ(ة):")
+                self.c_intro.setText(ch.intro_defaut(self.f.conn, t, self.langue()))
+            except Exception:  # noqa: BLE001 — لا مؤسسة بعد
+                self.c_intro.setText("")
         self._maj()
 
     def _choisir_motif(self, i: int) -> None:
@@ -296,9 +348,14 @@ class PageTahfiz(QWidget):
             le = self.c_date.iso() or None
         except ValueError as e:
             raise ch.ErreurChahada("التاريخ غير صحيح.") from e
+        lg = self.langue()
+        if lg not in ch.PAR_CLE[self.cle_modele].langues:
+            raise ch.ErreurChahada("عنوان هذا التصميم مخطوط بالعربية: للشهادة بالفرنسية أو بالأمازيغية اختر تصميماً "
+                                   "بعنوان مكتوب (مثل تصاميم «للصغار بثلاث لغات» أو الرسمي أو النحاسي).")
         sig = ("مدير المؤسسة", "رئيس جمعية الآباء") if self.c_asso.isChecked() else ("مدير المؤسسة",)
         return [ch.contenu(self.f.conn, e, self.c_type.currentText(), self._motif(), self.c_periode.currentData(),
-                           le, self.c_intro.text(), signataires=sig, afficher_classe=self.c_classe_aff.isChecked())
+                           le, self.c_intro.text(), signataires=sig, afficher_classe=self.c_classe_aff.isChecked(),
+                           langue=lg)
                 for e in eleves]
 
     def _maj(self) -> None:
@@ -313,7 +370,7 @@ class PageTahfiz(QWidget):
             self.message_fiche.hide()
         except ch.ErreurChahada as e:
             c = self._exemple(self.c_type.currentText())
-            c["nom"] = el.get("nom", c["nom"])
+            c["nom"] = el.get("nom_lat") or el.get("nom", c["nom"]) if self.langue() != "ar" else el.get("nom", c["nom"])
             message(self.message_fiche, str(e), True)
         img = _apercu(self.cle_modele, c, 600, self._logo())
         self.l_apercu.setPixmap(QPixmap.fromImage(img))

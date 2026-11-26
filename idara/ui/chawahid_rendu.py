@@ -30,30 +30,45 @@ def famille() -> str:
     return app.font().family() if app else ""
 
 
-def _police(px: float, gras: bool) -> QFont:
-    f = QFont(famille())
+POLICES_TIFINAGH = ("Ebrima", "Noto Sans Tifinagh", "Segoe UI Historic", "Tifinaghe-Ircam Unicode sans serif")
+
+
+def _tifinagh(t: str) -> bool:
+    return any("\u2d30" <= c <= "\u2d7f" for c in t or "")
+
+
+def famille_tifinagh() -> str:
+    fams = set(QFontDatabase.families())
+    for f in POLICES_TIFINAGH:
+        if f in fams:
+            return f
+    return famille()   # بديل الخطوط في Qt يجد حروف تيفيناغ إن وُجدت في النظام
+
+
+def _police(px: float, gras: bool, texte: str = "") -> QFont:
+    f = QFont(famille_tifinagh() if _tifinagh(texte) else famille())
     f.setPixelSize(max(6, int(px)))
     f.setBold(gras)
     return f
 
 
-def _option(enrouler: bool = True) -> QTextOption:
+def _option(enrouler: bool = True, texte: str = "") -> QTextOption:
     o = QTextOption(Qt.AlignHCenter | Qt.AlignVCenter | Qt.AlignAbsolute)
-    o.setTextDirection(Qt.RightToLeft)
+    o.setTextDirection(Qt.RightToLeft if ch.droite_a_gauche(texte) else Qt.LeftToRight)
     o.setWrapMode(QTextOption.WordWrap if enrouler else QTextOption.NoWrap)
     return o
 
 
 def _ligne(p: QPainter, r: QRectF, t: str, px: float, couleur: str, gras: bool = False) -> None:
     """سطر واحد في الوسط، يُصغَّر حتى يتسع."""
-    f = _police(px, gras)
+    f = _police(px, gras, t)
     fm = QFontMetricsF(f)
     while fm.horizontalAdvance(t) > r.width() * 0.98 and f.pixelSize() > 6:
         f.setPixelSize(int(f.pixelSize() * 0.93))
         fm = QFontMetricsF(f)
     p.setFont(f)
     p.setPen(QColor(couleur))
-    p.drawText(r, t, _option(False))
+    p.drawText(r, t, _option(False, t))
 
 
 def _bloc(p: QPainter, r: QRectF, lignes: list[tuple[str, float, str, bool]]) -> None:
@@ -63,7 +78,7 @@ def _bloc(p: QPainter, r: QRectF, lignes: list[tuple[str, float, str, bool]]) ->
     while True:
         hs = []
         for t, px, _, gras in lignes:
-            fm = QFontMetricsF(_police(px * k, gras))
+            fm = QFontMetricsF(_police(px * k, gras, t))
             br = fm.boundingRect(QRectF(0, 0, r.width(), 10000), int(Qt.TextWordWrap | Qt.AlignHCenter), t)
             hs.append(br.height() + px * k * 0.28)
         if sum(hs) <= r.height() or k < 0.35:
@@ -71,9 +86,9 @@ def _bloc(p: QPainter, r: QRectF, lignes: list[tuple[str, float, str, bool]]) ->
         k *= 0.93
     y = r.top() + (r.height() - sum(hs)) / 2
     for (t, px, coul, gras), h in zip(lignes, hs):
-        p.setFont(_police(px * k, gras))
+        p.setFont(_police(px * k, gras, t))
         p.setPen(QColor(coul))
-        p.drawText(QRectF(r.left(), y, r.width(), h), t, _option(True))
+        p.drawText(QRectF(r.left(), y, r.width(), h), t, _option(True, t))
         y += h
 
 
@@ -144,11 +159,12 @@ def peindre(p: QPainter, r: QRectF, cle: str, c: dict, logo: str = "") -> None:
     _ligne(p, zd, c.get("date", ""), zd.height() * 0.62, m.texte_couleur)
     zs = _zone(r, m.zones["signature"])
     sig = c.get("signataires", [])
-    if len(sig) >= 2:   # من اليمين: الأول ثم الثاني
+    if len(sig) >= 2:   # من اليمين للعربية (الأول ثم الثاني)، ومن اليسار للفرنسية والأمازيغية
         w = zs.width() / len(sig)
+        ltr = bool(c.get("ltr"))
         for k, s in enumerate(sig):
-            _ligne(p, QRectF(zs.right() - (k + 1) * w, zs.top(), w, zs.height() * 0.5), s, zs.height() * 0.36,
-                   m.texte_couleur, True)
+            x = zs.left() + k * w if ltr else zs.right() - (k + 1) * w
+            _ligne(p, QRectF(x, zs.top(), w, zs.height() * 0.5), s, zs.height() * 0.36, m.texte_couleur, True)
     elif sig:
         _ligne(p, QRectF(zs.left(), zs.top(), zs.width(), zs.height() * 0.5), sig[0], zs.height() * 0.36,
                m.texte_couleur, True)

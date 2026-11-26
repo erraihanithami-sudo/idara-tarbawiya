@@ -424,6 +424,9 @@ class FluxLayout(QLayout):
         rtl = (self.parentWidget() is None or self.parentWidget().layoutDirection() == Qt.RightToLeft)
         x, y, haut = 0, zone.y(), 0
         for it in self._items:
+            w = it.widget()
+            if w is not None and w.isHidden():   # البطاقات المصفّاة لا تأخذ مكاناً
+                continue
             t = it.sizeHint()
             if x and x + t.width() > zone.width():
                 x, y, haut = 0, y + haut + self.v, 0

@@ -17,7 +17,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QFrame, QHBoxLayout,
-                               QHeaderView, QLabel, QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton,
+                               QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton,
                                QRadioButton, QTableWidget, QVBoxLayout, QWidget)
 
 from idara.services import bureautique
@@ -221,9 +221,13 @@ class PageConseilsEtab(QWidget):
         self.delib.setFixedHeight(120)
         cv.addWidget(self.delib)
         self.decisions = QPlainTextEdit()
-        self.decisions.setPlaceholderText("القرارات والتوصيات: واحدة في كل سطر (اختياري)")
+        self.decisions.setPlaceholderText("القرارات والتوصيات (أو الاقتراحات للمجالس التعليمية): واحدة في كل سطر "
+                                          "(اختياري)")
         self.decisions.setFixedHeight(90)
         cv.addWidget(self.decisions)
+        self.rapporteur = QLineEdit()
+        self.rapporteur.setPlaceholderText("اسم مقرر(ة) الاجتماع (اختياري: يوقع المحضر مع رئيس المؤسسة)")
+        cv.addWidget(etiquette("المقرر(ة)", self.rapporteur))
         t = QLabel("الحضور (أزل العلامة عن المتغيبين)")
         t.setObjectName("titreCarte")
         cv.addWidget(t)
@@ -559,6 +563,7 @@ class PageConseilsEtab(QWidget):
         self.odj.setPlainText("\n".join(s.ordre_du_jour) if s else "")
         self.delib.setPlainText(s.deliberations if s else "")
         self.decisions.setPlainText("\n".join(s.decisions) if s else "")
+        self.rapporteur.setText(s.rapporteur if s else "")
         self.c_res.setChecked(bool(s and s.inclure_resultats))
         self.c_isa.setChecked(bool(s and s.inclure_isa))
         self.presence.clear()
@@ -641,7 +646,8 @@ class PageConseilsEtab(QWidget):
                     if self.presence.item(i).checkState() == Qt.Checked]
         return ce.Seance(self.conseil.currentData(), d, _texte(self.odj), self.heure.text(), self.nature.currentData(),
                          self.convoc.currentData(), self.delib.toPlainText(), _texte(self.decisions), presents,
-                         self.c_res.isChecked(), self.c_isa.isChecked(), None if nouveau else self.sid)
+                         self.c_res.isChecked(), self.c_isa.isChecked(), None if nouveau else self.sid,
+                         self.rapporteur.text())
 
     def enregistrer(self, nouveau: bool):
         if not nouveau and not self.sid:
