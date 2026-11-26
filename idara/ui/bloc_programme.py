@@ -51,11 +51,11 @@ class BlocProgramme(QWidget):
         for lib, coul, pic, fn, aide in (
                 ("سطر جديد", "#2E7D32", "ajouter", lambda: self.ouvrir(None), "محطة أو عملية جديدة في هذا المحور"),
                 ("تعديل", "#1565C0", "modifier", lambda: self.ouvrir(self._ligne()), "أو نقرتان على السطر"),
-                ("حذف", "#C62828", "supprimer", lambda: self.supprimer(), ""),
+                ("حذف", "#C62828", "annuler", lambda: self.supprimer(), ""),
                 ("أعلى", "#546E7A", None, lambda: self.deplacer(-1), ""),
                 ("أسفل", "#546E7A", None, lambda: self.deplacer(1), ""),
-                ("استعادة مقترح المحور", "#8D6E63", None, lambda: self.reinitialiser(), "يمحو تعديلات هذا المحور"),
-                ("تاريخ المصادقة", "#6A1B9A", "modifier", lambda: self.ouvrir_validation(),
+                ("استعادة مقترح المحور", "#8D6E63", "actualiser", lambda: self.reinitialiser(), "يمحو تعديلات هذا المحور"),
+                ("تاريخ المصادقة", "#6A1B9A", "valider", lambda: self.ouvrir_validation(),
                  "مصادقة مجلس التدبير على البرنامج"),
                 ("توليد برنامج العمل السنوي", "#B8860B", "document", lambda: self.generer(),
                  "وثيقة Word على قالب ملون بالمحاور السبعة")):
