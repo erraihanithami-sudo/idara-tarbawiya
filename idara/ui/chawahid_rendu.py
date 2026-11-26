@@ -38,6 +38,12 @@ def _tifinagh(t: str) -> bool:
 
 
 def famille_tifinagh() -> str:
+    """Ebrima (Windows) أو Noto Sans Tifinagh المرفق مع البرنامج (رخصة OFL) حتى تظهر حروف تيفيناغ في كل الأجهزة."""
+    try:
+        from idara.ui import theme
+        theme.familles_chargees()
+    except Exception:  # noqa: BLE001
+        pass
     fams = set(QFontDatabase.families())
     for f in POLICES_TIFINAGH:
         if f in fams:

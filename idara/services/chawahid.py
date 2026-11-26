@@ -122,7 +122,7 @@ MODELES = MODELES + (
            famille=_F2),
     Modele("urjuwani", "الأرجواني", "منحنيات أرجوانية وذهبية وختم شمعي يحمل شعار المؤسسة.", _R2,
            {"entete": (70, 4, 27, 20), "logo": (42, 70, 9.5, 14), "corps": (16, 33, 66, 32),
-            "date": (16, 72, 24, 5), "signature": (55, 68, 24, 8)}, nom_couleur="#7B1F3A", titre_fixe=_CHUKR,
+            "date": (14, 72, 26, 5), "signature": (50, 68, 32, 8)}, nom_couleur="#7B1F3A", titre_fixe=_CHUKR,
            famille=_F2),
     Modele("turquazi", "الفيروزي", "إطار فيروزي بارز على أرضية بيضاء، ومكتب التلميذ في الأسفل.", _R2,
            {"entete": (60, 13, 29, 20), "corps": (12, 39, 76, 28), "date": (12, 77, 28, 5),

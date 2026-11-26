@@ -98,3 +98,10 @@ def test_langues_fr_amz(base, tmp_path):  # noqa: F811
     prs = Presentation(str(p))
     t = " ".join(sh.text_frame.text for sl in prs.slides for sh in sl.shapes if sh.has_text_frame)
     assert "ATTESTATION D'EXCELLENCE" in t and "ⴰⵙⵍⴽⵉⵏ ⵏ ⵓⵙⵎⵖⵔ" in t and "Fictive ELEVE" in t
+
+
+def test_police_tifinagh_fournie():
+    """حروف تيفيناغ تظهر حتى في جهاز بلا خط أمازيغي: Noto Sans Tifinagh مرفق (رخصة OFL)."""
+    from pathlib import Path
+    d = Path(ch.__file__).resolve().parent.parent / "resources" / "fonts"
+    assert (d / "NotoSansTifinagh-Regular.ttf").exists() and (d / "OFL-NotoSansTifinagh.txt").exists()
