@@ -38,17 +38,19 @@ class BlocProgramme(QWidget):
         self.c_section.currentIndexChanged.connect(lambda _: self.afficher())
         h.addWidget(QLabel("المحور"))
         h.addWidget(self.c_section, 1)
-        self.l_resume = QLabel()
-        self.l_resume.setStyleSheet("font-weight: 700;")
-        h.addWidget(self.l_resume)
         v.addLayout(h)
+        self.l_resume = QLabel()
+        self.l_resume.setWordWrap(True)
+        self.l_resume.setStyleSheet("font-weight: 700; color: #6B4E00;")
+        v.addWidget(self.l_resume)
         self.table = tableau(["المحطة", "العمليات والأنشطة المبرمجة", "فترة الإنجاز", "تنبيه"], etirer=1)
         self.table.setMinimumHeight(380)
         self.table.setWordWrap(True)
         self.table.itemDoubleClicked.connect(lambda it: self.ouvrir(it.row()))
         v.addWidget(self.table)
         h = QHBoxLayout()
-        for lib, coul, pic, fn, aide in (
+        h2 = QHBoxLayout()
+        for k_, (lib, coul, pic, fn, aide) in enumerate((
                 ("سطر جديد", "#2E7D32", "ajouter", lambda: self.ouvrir(None), "محطة أو عملية جديدة في هذا المحور"),
                 ("تعديل", "#1565C0", "modifier", lambda: self.ouvrir(self._ligne()), "أو نقرتان على السطر"),
                 ("حذف", "#C62828", "annuler", lambda: self.supprimer(), ""),
@@ -58,12 +60,13 @@ class BlocProgramme(QWidget):
                 ("تاريخ المصادقة", "#6A1B9A", "valider", lambda: self.ouvrir_validation(),
                  "مصادقة مجلس التدبير على البرنامج"),
                 ("توليد برنامج العمل السنوي", "#B8860B", "document", lambda: self.generer(),
-                 "وثيقة Word على قالب ملون بالمحاور السبعة")):
+                 "وثيقة Word على قالب ملون بالمحاور السبعة"))):
             b = bouton_couleur(lib, coul, pic, aide)
             b.clicked.connect(fn)
-            h.addWidget(b)
-        h.addStretch()
-        v.addLayout(h)
+            (h if k_ < 5 else h2).addWidget(b)
+        for x in (h, h2):
+            x.addStretch()
+            v.addLayout(x)
         v0.addWidget(c)
 
         # نافذة السطر
