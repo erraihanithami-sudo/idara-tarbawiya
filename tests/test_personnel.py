@@ -238,7 +238,9 @@ def test_donnees_tanzim_tarbawi(base):
     q.situation = "normal"
     rh.enregistrer(base, q)
     assert rh.lire(base, pid).etab_charge == ""
-    for modif, msg in ((dict(note_inspection="25"), "بين 0 و20"), (dict(echelon="12"), "الرتبة"),
+    for modif, msg in ((dict(note_inspection="25"), "بين 0 و20"), (dict(echelon="14"), "الرتبة"),
+                           (dict(grade="الدرجة الثانية", echelon="12"), "لا تتجاوز الرتبة 10"),
+                           (dict(grade="الدرجة الممتازة", echelon="الاستثنائية"), "الممتازة"),
                        (dict(repos_matin="الأحد"), "العطلة"), (dict(date_grade="2099-01-01"), "المستقبل")):
         with pytest.raises(rh.ErreurPersonnel, match=msg):
             rh.enregistrer(base, _prof(ppr="", cin="", **modif))

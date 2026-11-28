@@ -38,6 +38,7 @@ from idara.ui.page_mouvements import PageMouvements
 from idara.ui.page_comportement import PageComportement
 from idara.ui.page_conseils import PageConseils
 from idara.ui.page_associations import PageAssociations
+from idara.ui.page_tarqiya import PageTarqiya
 from idara.ui.page_conseils_etab import PageConseilsEtab
 from idara.ui.page_pedagogie import PagePerformance, PageRiyada, PageTarl, PageVieScolaire
 from idara.ui.page_tanzim import PageTanzim
@@ -530,7 +531,11 @@ SECTIONS = [
                          ("الرخص", "الرخص"), ("محاضر الموارد البشرية", "المحاضر"),
                          ("طلبات الموظفين", "طلبات الموظفين والورقة الشخصية"),
                          ("الأعوان", "أعوان الحراسة والنظافة"),
-                         ("ملفات الأساتذة", "طلب ملف أستاذ وإرساله")]),
+                         ("ملفات الأساتذة", "طلب ملف أستاذ وإرساله"),
+                         # طلب المدير 2026-11-28: ترقية الأساتذة، كل فئة في صفحة
+                         ("الترقية في الرتبة", "الترقية في الرتبة"),
+                         ("الترقية بالاختيار", "الترقية في الدرجة بالاختيار"),
+                         ("الترقية بالامتحان المهني", "الترقية بالامتحان المهني")]),
     ("التدبير التربوي", [("التنظيم التربوي", "التنظيم التربوي"), ("الدعم التربوي", "الدعم التربوي"),
                          ("استعمالات الزمن", "استعمالات الزمن"), ("جدول الحراسة", "جدول الحراسة")]),
     # طلب المدير 2026-11-19: «المدرسة الرائدة» مكون مستقل بمكونات فرعية، و«تتبع التعلمات الأساس» ضمنه
@@ -700,6 +705,9 @@ MOTS_CLES = {"ملفات الأساتذة": "طلب إرسال ملف إداري
              "برنامج العمل": "مقرر عطل عطلة تذكير محطات", "تتبع الغياب": "غياب متغيبون نسبة", "إعداد المؤسسة": "إعدادات شعار مظهر تصفير ترويسة",
              "جمعية دعم مدرسة النجاح": "مالية مداخيل مصاريف بنك صرف سند الطلب اتفاقية عروض أثمان ممون فاتورة", "التسجيلات": "تأمين واجبات تسجيل رياضية تعاون",
              "الجمعية الرياضية": "انخراط تحويل حصص جامعة رياضة مدرسية شهادة نفقة محضر استخلاص",
+             "الترقية في الرتبة": "ترقية رتبة نسق سريع متوسط بطيء استثنائية",
+             "الترقية بالاختيار": "ترقية درجة اختيار ممتازة أولى حصيص أقدمية اعتبارية",
+             "الترقية بالامتحان المهني": "ترقية امتحان الكفاءة المهنية مهني نقطة مهنية نموذج",
              "جمعية تنمية التعاون المدرسي": "تعاونية اشتراك تحويل حصص فرع إقليمي شهادة نفقة مجالات صرف", "مجالس الأقسام": "مجلس قسم محضر مداولات نتائج نقط نهاية الأسدوس",
              "التنظيم التربوي": "بنية تربوية توزيع", "تدبير الفائض": "فائض خصاص",
              "الدعم التربوي": "دعم متعثرين تعثر معالجة سجل",
@@ -800,6 +808,9 @@ class FenetrePrincipale(QMainWindow):
             "page_comportement": lambda: PageComportement(self), "page_conseils": lambda: PageConseils(self),
             "page_asso": asso, "page_achats": achats, "page_conseils_etab": lambda: PageConseilsEtab(self),
             # وثائق المدير 2026-11-24: الجمعية الرياضية والتعاونية المدرسية (الاستخلاص والتحويلات والمالية)
+            "page_tarqiya_rang": lambda: PageTarqiya(self, "rang"),
+            "page_tarqiya_choix": lambda: PageTarqiya(self, "choix"),
+            "page_tarqiya_examen": lambda: PageTarqiya(self, "examen"),
             "page_asso_sport": lambda: PageAssociations(self, "sportive"),
             "page_asso_coop": lambda: PageAssociations(self, "cooperative"),
             "page_perf": lambda: PagePerformance(self), "page_tarl": lambda: PageTarl(self),
@@ -862,6 +873,8 @@ class FenetrePrincipale(QMainWindow):
             "تتبع السلوك": "page_comportement", "مجالس الأقسام": "page_conseils",
             "جمعية دعم مدرسة النجاح": "page_asso", "مجالس المؤسسة": "page_conseils_etab",
             "الجمعية الرياضية": "page_asso_sport", "جمعية تنمية التعاون المدرسي": "page_asso_coop",
+            "الترقية في الرتبة": "page_tarqiya_rang", "الترقية بالاختيار": "page_tarqiya_choix",
+            "الترقية بالامتحان المهني": "page_tarqiya_examen",
             "أداء المؤسسة": "page_perf", "التعلمات الأساس": "page_tarl", "الأندية والأنشطة": "page_vie",
             "الريادة": "page_riyada", "نتائج الريادة": "page_resultats_pionniere",
             "تواصل الريادة": "page_comm_pionniere", "مؤشرات الريادة": "page_ind_pionniere",

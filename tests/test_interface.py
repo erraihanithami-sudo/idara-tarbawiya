@@ -3380,3 +3380,51 @@ def test_page_ecran_affichage(app, config_tmp, tmp_path, monkeypatch):
     assert p.apercu.ident["logo"] and p.apercu.grab().width() >= 480
     assert p.choisir_logo(retirer=True) == ""
     f.close()
+
+
+def test_tarqiya_trois_pages(app, config_tmp, monkeypatch):
+    """ترقية الأساتذة (طلب المدير 2026-11-28): ثلاث صفحات، والمعنيون حسب السنة، وتسجيل الترقية في نافذة."""
+    from idara.services import bureautique
+    from idara.services import personnel as rh
+    from idara.services import tarqiya as tq
+    ouverts = []
+    monkeypatch.setattr(bureautique, "ouvrir", lambda p: ouverts.append(p))
+    f = _fenetre_avec_eleves(config_tmp)
+    for n, (g, dg, e, de, dr) in enumerate((
+            (tq.G2, "2014-09-01", "6", "2023-03-01", "2014-09-01"),
+            (tq.G2, "2019-09-01", "3", "2023-09-01", "2019-09-01"),
+            (tq.G1, "2017-01-01", "7", "2024-02-01", "2004-09-01"))):
+        rh.enregistrer(f.conn, rh.Personnel(nom_ar=f"وهمي{n}", prenom_ar="أستاذ", sexe="M", categorie="enseignant",
+                                            ppr=f"880000{n}", cin=f"yy{n:04d}", cadre="أستاذ(ة) التعليم الابتدائي",
+                                            fonction="التدريس", matiere="عربية", grade=g, date_grade=dg, echelon=e,
+                                            date_echelon=de, date_recrutement=dr, date_affectation="2024-09-01"))
+    f.aller_a("الترقية في الرتبة")
+    p = f.page_tarqiya_rang
+    assert p.type_ == "rang" and p.annee() == tq.annee_defaut("rang")
+    p.c_annee.setCurrentIndex(p.c_annee.findData(2025))
+    assert p.table.rowCount() == 2 and "2 معني" in p.l_compte.text()     # 6←7 في 2025-03 و3←4 في 2025-09
+    fi = p.ouvrir_promotion(0)
+    assert fi.isVisible() and p.c_echelon.currentText() == "7" and p.c_date.iso() == "2025-03-01"
+    assert p.enregistrer_promotion() and not fi.isVisible() and p.table.rowCount() == 1
+    assert rh.lire(f.conn, p.lignes[0].pid).echelon == "3"
+    fr = p.ouvrir_rythme(0)
+    p.c_rythme.setCurrentIndex(p.c_rythme.findData("lent"))
+    assert p.enregistrer_rythme() and not fr.isVisible() and p.table.rowCount() == 0   # بطيء: 3 سنوات ← 2026
+    assert p.generer() is None and "لا معنيين" in p.message.text()
+    f.aller_a("الترقية بالاختيار")
+    c = f.page_tarqiya_choix
+    c.c_annee.setCurrentIndex(c.c_annee.findData(2025))
+    assert c.table.rowCount() == 2 and c.table.item(0, 6).text() == tq.GX
+    fi = c.ouvrir_promotion(0)
+    assert p.ouvrir_promotion(None) is None
+    assert c.c_grade.currentText() == tq.GX and c.c_echelon.currentText() == "1" and c.c_date.iso() == ""
+    assert not c.enregistrer_promotion() and fi.isVisible() and "إجباري" in c.msg_promo.text()
+    fi.hide()
+    assert c.generer() is not None and len(ouverts) == 1
+    f.aller_a("الترقية بالامتحان المهني")
+    x = f.page_tarqiya_examen
+    assert x.annee() == tq.annee_defaut("examen")
+    x.c_annee.setCurrentIndex(x.c_annee.findData(2026))
+    assert x.table.rowCount() == 2 and not x.l_examen.isHidden() and "115x26" in x.l_examen.text()
+    assert x.generer_fiches() is not None and "2 بطاقة" in x.message.text()
+    f.close()

@@ -552,6 +552,14 @@ def main(sortie: Path) -> None:
         _fi.hide()
     except Exception as e:  # noqa: BLE001
         print("capture chawahid:", e)
+    # ترقية الأساتذة (2026-11-28)
+    try:
+        for _k, _lib in (("rang", "الترقية في الرتبة"), ("choix", "الترقية بالاختيار"),
+                         ("examen", "الترقية بالامتحان المهني")):
+            f.aller_a(_lib)
+            photo(f, f"67_tarqiya_{_k}")
+    except Exception as e:  # noqa: BLE001
+        print("capture tarqiya:", e)
     # مقترح برنامج العمل السنوي (2026-11-26)
     try:
         f.aller_a("برنامج العمل")

@@ -29,7 +29,8 @@ FONCTIONS = ("التدريس", "الإدارة")
 
 
 # التنظيم التربوي (نموذج المدير 2026-11-03)
-ECHELONS = tuple(str(i) for i in range(1, 11)) + ("الاستثنائية",)
+# الدرجة الأولى لأساتذة التعليم الابتدائي حتى الرتبة 13 (المرسوم 2.24.140، المادة 49 والجدول الملحق)
+ECHELONS = tuple(str(i) for i in range(1, 14)) + ("الاستثنائية",)
 SITUATIONS = {"normal": "يعمل بالمؤسسة", "charge_in": "مكلف(ة) بالمؤسسة (من مؤسسة أخرى)",
               "charge_out": "مكلف(ة) خارج المؤسسة"}
 JOURS = ("الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت")
@@ -188,6 +189,12 @@ class Personnel:
             self.note_inspection, self.date_inspection, self.inspecteur = None, "", ""
         if self.echelon and self.echelon not in ECHELONS:
             raise ErreurPersonnel("الرتبة: اختر من القائمة.")
+        # الرتب حسب الدرجة (المرسوم 2.24.140): الثانية حتى 10 والاستثنائية، الأولى حتى 13، الممتازة حتى 8
+        maxi = {"الدرجة الثانية": 10, "الدرجة الأولى": 13, "الدرجة الممتازة": 8}.get(self.grade)
+        if self.echelon and maxi and self.echelon.isdigit() and int(self.echelon) > maxi:
+            raise ErreurPersonnel(f"الرتبة: {self.grade} لا تتجاوز الرتبة {maxi}.")
+        if self.echelon == "الاستثنائية" and self.grade == "الدرجة الممتازة":
+            raise ErreurPersonnel("الرتبة: لا رتبة استثنائية في الدرجة الممتازة.")
         if self.situation not in SITUATIONS:
             raise ErreurPersonnel("وضعية التكليف غير صحيحة.")
         if self.situation == "normal":
